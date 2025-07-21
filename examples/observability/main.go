@@ -109,7 +109,7 @@ func main() {
 
 	// Create configuration
 	cfg := config.DefaultConfig()
-	cfg.Server.Address = ":8080"
+	cfg.Server.Address = ":8089"
 
 	// Create observability components
 	// Using ImprovedCollector for lightweight metrics

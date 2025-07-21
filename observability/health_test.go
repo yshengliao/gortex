@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -127,9 +128,9 @@ func TestHealthChecker(t *testing.T) {
 	})
 
 	t.Run("BackgroundChecks", func(t *testing.T) {
-		updateCount := 0
+		var updateCount int32
 		checker.Register("background", func(ctx context.Context) observability.HealthCheckResult {
-			updateCount++
+			atomic.AddInt32(&updateCount, 1)
 			return observability.HealthCheckResult{
 				Status: observability.HealthStatusHealthy,
 			}
@@ -139,7 +140,8 @@ func TestHealthChecker(t *testing.T) {
 		time.Sleep(250 * time.Millisecond)
 		
 		// Should have run at least 2 times (initial + periodic)
-		assert.GreaterOrEqual(t, updateCount, 2)
+		count := atomic.LoadInt32(&updateCount)
+		assert.GreaterOrEqual(t, count, int32(2))
 	})
 }
 

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -37,6 +38,8 @@ type HealthChecker struct {
 	interval time.Duration
 	timeout  time.Duration
 	stop     chan struct{}
+	stopped  int32 // atomic flag to prevent multiple stops
+	stopOnce sync.Once
 }
 
 // NewHealthChecker creates a new health checker
@@ -57,6 +60,10 @@ func NewHealthChecker(interval, timeout time.Duration) *HealthChecker {
 
 // Register registers a health check
 func (hc *HealthChecker) Register(name string, check HealthCheck) {
+	if atomic.LoadInt32(&hc.stopped) == 1 {
+		return // Don't register if already stopped
+	}
+	
 	hc.mu.Lock()
 	defer hc.mu.Unlock()
 	
@@ -168,6 +175,9 @@ func (hc *HealthChecker) runChecks() {
 	for {
 		select {
 		case <-ticker.C:
+			if atomic.LoadInt32(&hc.stopped) == 1 {
+				return
+			}
 			hc.Check(context.Background())
 		case <-hc.stop:
 			return
@@ -177,7 +187,11 @@ func (hc *HealthChecker) runChecks() {
 
 // Stop stops the health checker
 func (hc *HealthChecker) Stop() {
-	close(hc.stop)
+	// Use sync.Once to ensure Stop is only called once
+	hc.stopOnce.Do(func() {
+		atomic.StoreInt32(&hc.stopped, 1)
+		close(hc.stop)
+	})
 }
 
 // Common health checks
