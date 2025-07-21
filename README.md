@@ -254,6 +254,8 @@ Gortex is currently in **Alpha** stage with ambitious optimization plans. See ou
 ✅ Dual-mode routing: Development (reflection) / Production (optimized)
 ✅ Code generation tools for static route analysis (Go AST-based)
 ✅ Comprehensive benchmark suite demonstrating performance gains
+✅ WebSocket Hub refactoring (pure channel-based concurrency, no mutex overhead)
+✅ Rate limiter memory leak fix (TTL-based cleanup, stable memory usage)
 ```
 
 ### Next Phase: Production Readiness & Advanced Features
@@ -281,6 +283,7 @@ Gortex is currently in **Alpha** stage with ambitious optimization plans. See ou
 - **Memory Stability**: ✅ Fixed unbounded growth issues in metrics and rate limiter
 - **Router Performance**: ✅ 2% faster in production mode (1034→1013 ns/op)
 - **Rate Limiter**: ✅ Auto-cleanup prevents memory leaks (TTL-based eviction)
+- **WebSocket Hub**: ✅ Pure channel-based concurrency (no mutex overhead)
 - **Latency**: <10ms p95 for simple endpoints  
 - **Throughput**: >10k RPS on standard hardware
 - **Build Modes**: Development (instant feedback) / Production (optimized)

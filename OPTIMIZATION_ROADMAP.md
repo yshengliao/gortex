@@ -166,7 +166,7 @@
 - **可配置性**: 支援根據業務需求調整 TTL 和清理頻率
 - **並發安全**: 通過壓力測試驗證並發清理的安全性
 
-#### **Commit 5: refactor(websocket): 簡化 Hub 併發模型** 🔄
+#### **Commit 5: refactor(websocket): 簡化 Hub 併發模型** ✅ **已完成**
 
 **目標**: 移除不必要的 RWMutex，統一使用 channel 模式
 
@@ -176,22 +176,28 @@
 - **證據**: 同時使用 RWMutex 和 channel，造成不必要複雜性
 - **影響**: 潛在死鎖風險和維護負擔
 
-**技術細節**:
+**實際解決方案**:
 
 - 從 Hub 結構移除 `sync.RWMutex`
 - 將所有客戶端操作序列化到 Run() goroutine
-- 優化廣播邏輯，避免阻塞
+- 新增 `clientRequest` channel 實現線程安全的客戶端計數
+- 優化 shutdown 機制，使用 channel 同步
 - 實現純 channel-based 併發模型
 
 **交付物**:
 
-- [ ] 重構 `hub/hub.go` 併發邏輯
-- [ ] 移除所有不必要的鎖
-- [ ] 併發安全性和壓力測試
-- [ ] WebSocket 連接穩定性測試
-- [ ] 效能對比報告
+- [x] 重構 `hub/hub.go` 併發邏輯，移除 sync import
+- [x] 移除所有不必要的鎖，統一使用 channel
+- [x] 併發安全性和壓力測試 (`hub_simple_test.go`)
+- [x] WebSocket 連接穩定性測試
+- [x] Race detector 測試通過，零競態條件
 
-**預期效益**: 簡化程式碼，消除死鎖風險，符合 Go 最佳實踐
+**實際效益**:
+
+- **簡化程式碼**: 移除 mutex/channel 混用的複雜性
+- **消除死鎖風險**: 純 channel 模式避免鎖競爭
+- **符合 Go 慣例**: "Don't communicate by sharing memory; share memory by communicating"
+- **維護性提升**: 所有狀態變更在單一 goroutine，易於理解和調試
 
 ### Phase 3: 低優先級改善
 
@@ -349,6 +355,7 @@
 - ✅ **記憶體穩定**: 完全消除 metrics 和 rate limiter 無限增長
 - ✅ **併發安全**: 修復所有 Health Checker race conditions
 - ✅ **Rate Limiter 修復**: 實現自動清理機制，記憶體使用穩定
+- ✅ **WebSocket Hub 簡化**: 純 channel 併發模型，消除死鎖風險
 - ✅ **依賴簡化**: 確認零外部服務需求
 - ✅ **文件整理**: 精簡至核心三文件
 

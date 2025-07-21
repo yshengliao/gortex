@@ -2,8 +2,6 @@
 package hub
 
 import (
-	"sync"
-
 	"go.uber.org/zap"
 )
 
@@ -15,29 +13,41 @@ type Message struct {
 	ClientID string                 `json:"client_id,omitempty"` // Sender's client ID
 }
 
+// clientRequest represents a request to get client information
+type clientRequest struct {
+	response chan int
+}
+
 // Hub maintains active WebSocket connections
 type Hub struct {
-	clients    map[*Client]bool
-	broadcast  chan *Message
-	register   chan *Client    // register is now unexported
-	unregister chan *Client
-	logger     *zap.Logger
-	mu         sync.RWMutex
+	clients      map[*Client]bool
+	broadcast    chan *Message
+	register     chan *Client    // register is now unexported
+	unregister   chan *Client
+	clientCount  chan clientRequest
+	logger       *zap.Logger
+	shutdown     chan struct{}
+	shutdownDone chan struct{}
 }
 
 // NewHub creates a new WebSocket hub
 func NewHub(logger *zap.Logger) *Hub {
 	return &Hub{
-		clients:    make(map[*Client]bool),
-		broadcast:  make(chan *Message, 256),
-		register:   make(chan *Client),
-		unregister: make(chan *Client),
-		logger:     logger,
+		clients:      make(map[*Client]bool),
+		broadcast:    make(chan *Message, 256),
+		register:     make(chan *Client),
+		unregister:   make(chan *Client),
+		clientCount:  make(chan clientRequest),
+		logger:       logger,
+		shutdown:     make(chan struct{}),
+		shutdownDone: make(chan struct{}),
 	}
 }
 
-// Run starts the hub's main loop
+// Run starts the hub's main loop - all state mutations happen here
 func (h *Hub) Run() {
+	defer close(h.shutdownDone)
+	
 	for {
 		select {
 		case client := <-h.register:
@@ -48,15 +58,25 @@ func (h *Hub) Run() {
 
 		case message := <-h.broadcast:
 			h.broadcastMessage(message)
+			
+		case req := <-h.clientCount:
+			req.response <- len(h.clients)
+
+		case <-h.shutdown:
+			// Close all client connections
+			for client := range h.clients {
+				close(client.send)
+				delete(h.clients, client)
+			}
+			h.logger.Info("Hub shutdown complete")
+			return
 		}
 	}
 }
 
 // registerClient adds a new client to the hub
 func (h *Hub) registerClient(client *Client) {
-	h.mu.Lock()
 	h.clients[client] = true
-	h.mu.Unlock()
 
 	h.logger.Info("Client connected",
 		zap.String("client_id", client.ID),
@@ -80,25 +100,18 @@ func (h *Hub) registerClient(client *Client) {
 
 // unregisterClient removes a client from the hub
 func (h *Hub) unregisterClient(client *Client) {
-	h.mu.Lock()
 	if _, ok := h.clients[client]; ok {
 		delete(h.clients, client)
 		close(client.send)
-		h.mu.Unlock()
 
 		h.logger.Info("Client disconnected",
 			zap.String("client_id", client.ID),
 			zap.String("user_id", client.UserID))
-	} else {
-		h.mu.Unlock()
 	}
 }
 
 // broadcastMessage sends a message to all or specific clients
 func (h *Hub) broadcastMessage(message *Message) {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-
 	if message.Target != "" {
 		// Targeted message
 		for client := range h.clients {
@@ -128,7 +141,11 @@ func (h *Hub) broadcastMessage(message *Message) {
 
 // removeClient safely removes a client
 func (h *Hub) removeClient(client *Client) {
-	h.unregister <- client
+	select {
+	case h.unregister <- client:
+	case <-h.shutdown:
+		// Hub is shutting down, ignore
+	}
 }
 
 // Broadcast sends a message to all connected clients
@@ -148,9 +165,16 @@ func (h *Hub) SendToUser(userID string, message *Message) {
 
 // GetConnectedClients returns the number of connected clients
 func (h *Hub) GetConnectedClients() int {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	return len(h.clients)
+	req := clientRequest{
+		response: make(chan int),
+	}
+	
+	select {
+	case h.clientCount <- req:
+		return <-req.response
+	case <-h.shutdown:
+		return 0
+	}
 }
 
 // RegisterClient registers a new client to the hub
@@ -164,14 +188,6 @@ func (h *Hub) RegisterClient(client *Client) {
 
 // Shutdown gracefully shuts down the hub
 func (h *Hub) Shutdown() {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-
-	// Close all client connections
-	for client := range h.clients {
-		close(client.send)
-		delete(h.clients, client)
-	}
-
-	h.logger.Info("Hub shutdown complete")
+	close(h.shutdown)
+	<-h.shutdownDone
 }

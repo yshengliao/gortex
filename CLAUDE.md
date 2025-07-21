@@ -123,9 +123,9 @@ WebSocket *WSHandler `url:"/ws" hijack:"ws"`
 
 - **Authentication**: JWT validation for `/api/*` routes
 - **Observability**: ✅ ImprovedCollector with JSON metrics endpoint
-- **Resilience**: Rate limiting (⚠️ memory leak fix needed), graceful shutdown
+- **Resilience**: ✅ Rate limiting with TTL-based cleanup, graceful shutdown
 - **Logging**: Structured logging with Zap
-- **Health Checks**: ⚠️ Race condition fixes needed
+- **Health Checks**: ✅ Race condition fixed with sync.Once
 
 ### Current Status & Recent Optimizations
 
@@ -135,12 +135,16 @@ WebSocket *WSHandler `url:"/ws" hijack:"ws"`
 - Memory leak fixes: Eliminated unbounded growth in SimpleCollector  
 - External dependency removal: Zero Redis/Jaeger/Prometheus requirements
 - Documentation cleanup: Streamlined to 3 core MD files
+- Production router optimization: Dual-mode routing (2% faster)
+- Health checker race condition fixes: sync.Once + atomic operations
+- Rate limiter memory leak resolution: TTL-based cleanup
+- WebSocket hub concurrency simplification: Pure channel-based model
 
 🚧 NEXT PRIORITIES
-- Production router code generation (eliminate reflection)
-- Health checker race condition fixes
-- Rate limiter memory leak resolution
-- WebSocket hub concurrency simplification
+- Bofry/config integration for enhanced configuration
+- CLI tool with project scaffolding (gortex new, gortex generate)
+- Hot reload for development mode
+- OpenAPI documentation generation from struct tags
 ```
 
 ### Performance Targets
@@ -224,10 +228,10 @@ func (h *UserHandler) Profile(c echo.Context) error { } // → /users/profile
 
 ### 🚨 Known Critical Issues
 
-1. **Health Checker Race Conditions**: `go test -race` detects concurrency issues
-2. **Rate Limiter Memory Leak**: Cleanup routine exists but not implemented  
+1. ✅ **Health Checker Race Conditions**: FIXED - Added sync.Once and atomic operations
+2. ✅ **Rate Limiter Memory Leak**: FIXED - Implemented TTL-based cleanup  
 3. ✅ **Router Reflection Overhead**: FIXED - Dual-mode routing implemented (2% faster)
-4. **WebSocket Hub Complexity**: Unnecessary RWMutex alongside channels
+4. ✅ **WebSocket Hub Complexity**: FIXED - Pure channel-based concurrency
 
 ### 💡 Development Philosophy
 
@@ -288,6 +292,14 @@ Each optimization commit should include:
    - ✅ Maintained only 3 essential MD files: README.md, CLAUDE.md, OPTIMIZATION_ROADMAP.md
    - ✅ No unnecessary binary files in repository
    - ✅ Clean project structure focusing on core documentation
+
+8. **WebSocket Hub Concurrency Simplified**:
+   - ✅ Removed unnecessary `sync.RWMutex` from Hub implementation
+   - ✅ Unified to pure channel-based concurrency model
+   - ✅ All state mutations now happen in single Run() goroutine
+   - ✅ Added `clientRequest` channel for thread-safe client count queries
+   - ✅ Eliminated potential deadlock risks from mixed mutex/channel usage
+   - ✅ Passed all race detector tests with zero race conditions
 
 ### 📊 Performance Metrics Summary
 
