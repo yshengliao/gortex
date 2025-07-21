@@ -278,8 +278,9 @@ Gortex is currently in **Alpha** stage with ambitious optimization plans. See ou
 
 ### Performance Targets
 - **Metrics Collection**: ✅ 163ns/op (25%+ faster than previous)
-- **Memory Stability**: ✅ Fixed unbounded growth issues
+- **Memory Stability**: ✅ Fixed unbounded growth issues in metrics and rate limiter
 - **Router Performance**: ✅ 2% faster in production mode (1034→1013 ns/op)
+- **Rate Limiter**: ✅ Auto-cleanup prevents memory leaks (TTL-based eviction)
 - **Latency**: <10ms p95 for simple endpoints  
 - **Throughput**: >10k RPS on standard hardware
 - **Build Modes**: Development (instant feedback) / Production (optimized)
@@ -436,6 +437,40 @@ This entire framework was designed and developed using [Claude Code](https://cla
 - **Echo Framework**: Excellent HTTP router foundation
 - **Go Community**: Amazing ecosystem of packages and tools
 - **Bofry Team**: Innovative architectural patterns and practices
+
+## 🚀 Future Roadmap
+
+### Upcoming Features
+
+#### Enhanced Configuration System
+- Migration to `github.com/Bofry/config` for enterprise-grade configuration
+- Support for YAML, environment variables, and `.env` files
+- Hot-reload configuration without restart
+- Configuration validation and type safety
+
+#### WebSocket Hub Improvements
+- Simplified concurrency model using pure channel-based approach
+- Room/namespace support for game lobbies
+- Horizontal scaling with Redis pub/sub (optional)
+- Message compression and binary protocol support
+
+#### Production Enhancements
+- Distributed tracing with OpenTelemetry (optional)
+- Advanced circuit breaker patterns
+- Database connection pooling and migrations
+- Kubernetes-native deployment templates
+
+#### Developer Experience
+- CLI tool for project scaffolding (`gortex new`)
+- Code generation for CRUD operations
+- Built-in API documentation with Swagger
+- VS Code extension with snippets
+
+### Version 1.0 Goals
+- 100% test coverage on core components
+- Sub-millisecond latency for WebSocket messages
+- Production deployments handling 100k+ concurrent connections
+- Comprehensive documentation and tutorials
 
 ## 📄 License
 

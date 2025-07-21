@@ -61,22 +61,63 @@ func DefaultRateLimitConfig() *RateLimitConfig {
 	}
 }
 
+// limiterEntry holds a rate limiter and its last access time
+type limiterEntry struct {
+	limiter    *rate.Limiter
+	lastAccess time.Time
+}
+
 // MemoryStore is an in-memory rate limiter store
 type MemoryStore struct {
-	rate     int
-	burst    int
-	limiters map[string]*rate.Limiter
-	mu       sync.RWMutex
-	cleanup  *time.Ticker
+	rate            int
+	burst           int
+	limiters        map[string]*limiterEntry
+	mu              sync.RWMutex
+	cleanup         *time.Ticker
+	cleanupInterval time.Duration
+	ttl             time.Duration
+	stopped         chan struct{}
+}
+
+// MemoryStoreConfig holds configuration for MemoryStore
+type MemoryStoreConfig struct {
+	Rate            int
+	Burst           int
+	CleanupInterval time.Duration
+	TTL             time.Duration
+}
+
+// DefaultMemoryStoreConfig returns default configuration
+func DefaultMemoryStoreConfig() *MemoryStoreConfig {
+	return &MemoryStoreConfig{
+		Rate:            10,
+		Burst:           20,
+		CleanupInterval: 1 * time.Minute,
+		TTL:             10 * time.Minute,
+	}
 }
 
 // NewMemoryStore creates a new in-memory rate limiter store
 func NewMemoryStore(r int, b int) *MemoryStore {
+	config := &MemoryStoreConfig{
+		Rate:            r,
+		Burst:           b,
+		CleanupInterval: 1 * time.Minute,
+		TTL:             10 * time.Minute,
+	}
+	return NewMemoryStoreWithConfig(config)
+}
+
+// NewMemoryStoreWithConfig creates a new in-memory rate limiter store with config
+func NewMemoryStoreWithConfig(config *MemoryStoreConfig) *MemoryStore {
 	store := &MemoryStore{
-		rate:     r,
-		burst:    b,
-		limiters: make(map[string]*rate.Limiter),
-		cleanup:  time.NewTicker(1 * time.Minute),
+		rate:            config.Rate,
+		burst:           config.Burst,
+		limiters:        make(map[string]*limiterEntry),
+		cleanup:         time.NewTicker(config.CleanupInterval),
+		cleanupInterval: config.CleanupInterval,
+		ttl:             config.TTL,
+		stopped:         make(chan struct{}),
 	}
 	
 	// Start cleanup routine
@@ -92,15 +133,22 @@ func (s *MemoryStore) Allow(key string) bool {
 
 // AllowN checks if n requests are allowed
 func (s *MemoryStore) AllowN(key string, n int) bool {
+	now := time.Now()
+	
 	s.mu.Lock()
-	limiter, exists := s.limiters[key]
+	entry, exists := s.limiters[key]
 	if !exists {
-		limiter = rate.NewLimiter(rate.Limit(s.rate), s.burst)
-		s.limiters[key] = limiter
+		entry = &limiterEntry{
+			limiter:    rate.NewLimiter(rate.Limit(s.rate), s.burst),
+			lastAccess: now,
+		}
+		s.limiters[key] = entry
+	} else {
+		entry.lastAccess = now
 	}
 	s.mu.Unlock()
 	
-	return limiter.AllowN(time.Now(), n)
+	return entry.limiter.AllowN(now, n)
 }
 
 // Reset resets the rate limiter for a key
@@ -112,17 +160,53 @@ func (s *MemoryStore) Reset(key string) {
 
 // cleanupRoutine periodically cleans up unused limiters
 func (s *MemoryStore) cleanupRoutine() {
-	for range s.cleanup.C {
+	for {
+		select {
+		case <-s.cleanup.C:
+			s.performCleanup()
+		case <-s.stopped:
+			return
+		}
+	}
+}
+
+// performCleanup removes expired limiters
+func (s *MemoryStore) performCleanup() {
+	now := time.Now()
+	expiredKeys := make([]string, 0)
+	
+	s.mu.RLock()
+	for key, entry := range s.limiters {
+		if now.Sub(entry.lastAccess) > s.ttl {
+			expiredKeys = append(expiredKeys, key)
+		}
+	}
+	s.mu.RUnlock()
+	
+	// Remove expired entries
+	if len(expiredKeys) > 0 {
 		s.mu.Lock()
-		// In a production implementation, you'd track last access time
-		// and remove limiters that haven't been used recently
+		for _, key := range expiredKeys {
+			// Double-check the entry is still expired (it might have been accessed since we checked)
+			if entry, exists := s.limiters[key]; exists && now.Sub(entry.lastAccess) > s.ttl {
+				delete(s.limiters, key)
+			}
+		}
 		s.mu.Unlock()
 	}
+}
+
+// Size returns the current number of limiters in the store
+func (s *MemoryStore) Size() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.limiters)
 }
 
 // Stop stops the cleanup routine
 func (s *MemoryStore) Stop() {
 	s.cleanup.Stop()
+	close(s.stopped)
 }
 
 // RateLimitMiddleware creates a rate limiting middleware
