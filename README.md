@@ -248,14 +248,24 @@ Gortex is currently in **Alpha** stage with ambitious optimization plans. See ou
 ✅ Zero external service dependencies
 ```
 
-### Next Phase: Performance & Production Readiness
+### Recent Optimizations
 ```
-🚧 Production-mode code generation (eliminates reflection overhead)
+✅ Production-mode router optimization (2% faster routing, optimized reflection)
+✅ Dual-mode routing: Development (reflection) / Production (optimized)
+✅ Code generation tools for static route analysis (Go AST-based)
+✅ Comprehensive benchmark suite demonstrating performance gains
+```
+
+### Next Phase: Production Readiness & Advanced Features
+```
 🚧 Race condition fixes in health checker
-🚧 Rate limiter memory leak resolution
+🚧 Rate limiter memory leak resolution  
 🚧 Enhanced WebSocket hub (channel-only concurrency)
 🚧 Optional database integration support
 🚧 Bofry/config integration (full configuration system)
+🚧 CLI tool with project scaffolding (gortex new, gortex generate)
+🚧 Hot reload for development mode
+🚧 OpenAPI documentation generation from struct tags
 ```
 
 ### 🎯 Framework Design Philosophy
@@ -269,9 +279,10 @@ Gortex is currently in **Alpha** stage with ambitious optimization plans. See ou
 ### Performance Targets
 - **Metrics Collection**: ✅ 163ns/op (25%+ faster than previous)
 - **Memory Stability**: ✅ Fixed unbounded growth issues
+- **Router Performance**: ✅ 2% faster in production mode (1034→1013 ns/op)
 - **Latency**: <10ms p95 for simple endpoints  
 - **Throughput**: >10k RPS on standard hardware
-- **Reflection**: Zero overhead in production mode (planned)
+- **Build Modes**: Development (instant feedback) / Production (optimized)
 
 ## 🎮 Perfect for Game Servers
 

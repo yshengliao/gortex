@@ -71,7 +71,7 @@ func WithLogger(logger *zap.Logger) Option {
 // WithHandlers registers handlers using reflection
 func WithHandlers(manager interface{}) Option {
 	return func(app *App) error {
-		return RegisterRoutesFromStruct(app.e, manager, app.ctx)
+		return RegisterRoutes(app.e, manager, app.ctx)
 	}
 }
 

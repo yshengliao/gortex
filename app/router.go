@@ -1,3 +1,6 @@
+//go:build !production
+// +build !production
+
 package app
 
 import (
@@ -8,6 +11,13 @@ import (
 	"github.com/labstack/echo/v4"
 	"go.uber.org/zap"
 )
+
+// RegisterRoutes registers routes from a HandlersManager struct
+// In development mode (default), this uses reflection for instant feedback
+// In production mode (go build -tags production), this uses generated static registration
+func RegisterRoutes(e *echo.Echo, manager interface{}, ctx *Context) error {
+	return RegisterRoutesFromStruct(e, manager, ctx)
+}
 
 // RegisterRoutesFromStruct registers routes from a struct using reflection
 func RegisterRoutesFromStruct(e *echo.Echo, manager interface{}, ctx *Context) error {
@@ -163,23 +173,4 @@ func createHandlerFunc(handler interface{}, method reflect.Method) echo.HandlerF
 	}
 }
 
-// Helper functions
-func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
-}
-
-func camelToKebab(s string) string {
-	var result strings.Builder
-	for i, r := range s {
-		if i > 0 && r >= 'A' && r <= 'Z' {
-			result.WriteRune('-')
-		}
-		result.WriteRune(r)
-	}
-	return strings.ToLower(result.String())
-}
+// Helper functions are now in utils.go
