@@ -47,25 +47,14 @@ func (h *HealthHandler) GET(c echo.Context) error {
 }
 
 type MetricsHandler struct {
-	Collector observability.MetricsCollector
+	Collector *observability.ImprovedCollector
 	Logger    *zap.Logger
 }
 
 func (h *MetricsHandler) GET(c echo.Context) error {
-	// In a real implementation, this would expose metrics in Prometheus format
-	var m runtime.MemStats
-	runtime.ReadMemStats(&m)
-	
-	return c.JSON(200, map[string]interface{}{
-		"goroutines": runtime.NumGoroutine(),
-		"memory": map[string]interface{}{
-			"alloc_mb":      m.Alloc / 1024 / 1024,
-			"total_alloc_mb": m.TotalAlloc / 1024 / 1024,
-			"sys_mb":        m.Sys / 1024 / 1024,
-			"gc_count":      m.NumGC,
-		},
-		"timestamp": time.Now().Unix(),
-	})
+	// Return metrics as JSON for easy monitoring
+	stats := h.Collector.GetStats()
+	return c.JSON(200, stats)
 }
 
 type APIHandler struct {
@@ -123,7 +112,8 @@ func main() {
 	cfg.Server.Address = ":8080"
 
 	// Create observability components
-	metricsCollector := observability.NewSimpleCollector()
+	// Using ImprovedCollector for lightweight metrics
+	metricsCollector := observability.NewImprovedCollector()
 	tracer := observability.NewSimpleTracer()
 	healthChecker := observability.NewHealthChecker(30*time.Second, 5*time.Second)
 	
@@ -187,17 +177,24 @@ func main() {
 	// Fast endpoint: 10 requests per second
 	apiGroup.POST("/fast", handlers.API.FastEndpoint, middleware.RateLimitByIP(10, 20))
 
-	// Create JWT service for protected endpoints
-	jwtService := auth.NewJWTService(
-		"secret-key",
-		time.Hour,
-		24*time.Hour*7,
-		"observability-example",
-	)
+	// Public metrics endpoint for monitoring (returns JSON)
+	// In production, you might want to protect this or use a different port
+	e.GET("/metrics", handlers.Metrics.GET)
 
-	// Protected metrics endpoint
-	metricsGroup := e.Group("/metrics")
-	metricsGroup.Use(auth.Middleware(jwtService))
+	// Example of how to create protected endpoints (optional)
+	if false { // Disabled for this example
+		jwtService := auth.NewJWTService(
+			"secret-key",
+			time.Hour,
+			24*time.Hour*7,
+			"observability-example",
+		)
+		
+		protectedGroup := e.Group("/admin")
+		protectedGroup.Use(auth.Middleware(jwtService))
+		// Add protected endpoints here if needed
+		_ = protectedGroup // Avoid unused variable warning
+	}
 
 	// Setup graceful shutdown
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -208,7 +205,7 @@ func main() {
 		logger.Info("Starting observability example server",
 			zap.String("address", cfg.Server.Address),
 			zap.String("health", "/health"),
-			zap.String("metrics", "/metrics (requires auth)"),
+			zap.String("metrics", "/metrics (JSON format)"),
 			zap.String("api_slow", "/api/slow (1 req/sec)"),
 			zap.String("api_fast", "/api/fast (10 req/sec)"),
 		)

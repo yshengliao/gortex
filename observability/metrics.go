@@ -79,6 +79,7 @@ type BusinessMetric struct {
 }
 
 // NewSimpleCollector creates a new simple metrics collector
+// Deprecated: Use NewImprovedCollector instead for better performance
 func NewSimpleCollector() *SimpleCollector {
 	return &SimpleCollector{
 		httpRequests:      make([]HTTPRequestMetric, 0),
@@ -87,6 +88,11 @@ func NewSimpleCollector() *SimpleCollector {
 		wsMessages:        make([]WebSocketMessageMetric, 0),
 		businessMetrics:   make([]BusinessMetric, 0),
 	}
+}
+
+// NewCollector creates a new improved metrics collector (recommended)
+func NewCollector() *ImprovedCollector {
+	return NewImprovedCollector()
 }
 
 func (s *SimpleCollector) RecordHTTPRequest(method, path string, statusCode int, duration time.Duration) {
