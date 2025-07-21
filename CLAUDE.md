@@ -139,9 +139,9 @@ WebSocket *WSHandler `url:"/ws" hijack:"ws"`
 - Health checker race condition fixes: sync.Once + atomic operations
 - Rate limiter memory leak resolution: TTL-based cleanup
 - WebSocket hub concurrency simplification: Pure channel-based model
+- Bofry/config integration: Enhanced configuration with YAML, .env, and environment variable support
 
 🚧 NEXT PRIORITIES
-- Bofry/config integration for enhanced configuration
 - CLI tool with project scaffolding (gortex new, gortex generate)
 - Hot reload for development mode
 - OpenAPI documentation generation from struct tags
@@ -156,15 +156,31 @@ WebSocket *WSHandler `url:"/ws" hijack:"ws"`
 
 ## Configuration
 
-Uses Builder Pattern for flexible configuration loading:
+Uses Builder Pattern for flexible configuration loading with Bofry/config integration:
 
 ```go
+// Using ConfigBuilder pattern
 cfg := config.NewConfigBuilder().
     LoadYamlFile("config.yaml").
+    LoadDotEnv(".env").              // NEW: .env file support
     LoadEnvironmentVariables("GORTEX").
     Validate().
     MustBuild()
+
+// Or using BofryLoader directly
+loader := config.NewBofryLoader().
+    WithYAMLFile("config.yaml").
+    WithDotEnvFile(".env").
+    WithEnvPrefix("GORTEX_")
+cfg := &config.Config{}
+err := loader.Load(cfg)
 ```
+
+**Features**:
+- Multi-source configuration: YAML, .env files, environment variables
+- Precedence order: env vars > .env > YAML > defaults
+- Backward compatible with SimpleLoader
+- Full validation support
 
 ## 📝 Development Standards
 
@@ -311,4 +327,15 @@ Each optimization commit should include:
 | Rate Limiter | Memory leak | 157 ns/op | Memory stable |
 | Memory Allocations | 21 allocs | 21 allocs | Same |
 
-**Last Updated**: 2025/07/21 | **Framework Status**: Alpha (Memory-Safe, Dual-Mode Router, Optimized Metrics) | **Go**: 1.24
+### 🔧 Recent Optimizations (2025/07/21 - Session 4)
+
+9. **Bofry/config Integration Completed**:
+   - ✅ Implemented BofryLoader with full Bofry/config library integration
+   - ✅ Added support for .env files in addition to YAML and environment variables
+   - ✅ Maintained backward compatibility with SimpleLoader for smooth migration
+   - ✅ Implemented ConfigBuilder pattern as documented
+   - ✅ Multi-source configuration with proper precedence: env > .env > YAML > defaults
+   - ✅ Comprehensive test suite with 10+ tests covering all scenarios
+   - ✅ Verified all examples work with new configuration system
+
+**Last Updated**: 2025/07/21 | **Framework Status**: Alpha (Memory-Safe, Dual-Mode Router, Optimized Metrics, Enhanced Config) | **Go**: 1.24

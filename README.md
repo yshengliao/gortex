@@ -187,12 +187,21 @@ func (h *UserHandler) POST(c echo.Context) error {
 ### Configuration Management
 
 ```go
-// YAML + Environment variables
+// Enhanced configuration with Bofry/config integration
 cfg := config.NewConfigBuilder().
     LoadYamlFile("config.yaml").
+    LoadDotEnv(".env").              // NEW: .env file support
     LoadEnvironmentVariables("GORTEX").
     Validate().
     MustBuild()
+
+// Or use the BofryLoader directly
+loader := config.NewBofryLoader().
+    WithYAMLFile("config.yaml").
+    WithDotEnvFile(".env").
+    WithEnvPrefix("GORTEX_")
+cfg := &config.Config{}
+err := loader.Load(cfg)
 
 // config.yaml
 server:
@@ -243,7 +252,7 @@ Gortex is currently in **Alpha** stage with ambitious optimization plans. See ou
 ✅ WebSocket hub with connection management
 ✅ JWT authentication and role-based access
 ✅ Request validation and error handling
-✅ Configuration system with builder pattern
+✅ Configuration system with Bofry/config integration (YAML, .env, environment variables)
 ✅ High-performance metrics collection (ImprovedCollector)
 ✅ Zero external service dependencies
 ```
@@ -254,6 +263,7 @@ Gortex is currently in **Alpha** stage with ambitious optimization plans. See ou
 ✅ Dual-mode routing: Development (reflection) / Production (optimized)
 ✅ Code generation tools for static route analysis (Go AST-based)
 ✅ Comprehensive benchmark suite demonstrating performance gains
+✅ Bofry/config integration with multi-source configuration loading
 ✅ WebSocket Hub refactoring (pure channel-based concurrency, no mutex overhead)
 ✅ Rate limiter memory leak fix (TTL-based cleanup, stable memory usage)
 ```
@@ -264,7 +274,6 @@ Gortex is currently in **Alpha** stage with ambitious optimization plans. See ou
 🚧 Rate limiter memory leak resolution  
 🚧 Enhanced WebSocket hub (channel-only concurrency)
 🚧 Optional database integration support
-🚧 Bofry/config integration (full configuration system)
 🚧 CLI tool with project scaffolding (gortex new, gortex generate)
 🚧 Hot reload for development mode
 🚧 OpenAPI documentation generation from struct tags
@@ -381,7 +390,7 @@ e.GET("/metrics", func(c echo.Context) error {
 | `app/` | Application framework & DI | ✅ Stable |
 | `auth/` | JWT authentication | ✅ Stable |
 | `hub/` | WebSocket hub & clients | ✅ Stable |
-| `config/` | Configuration management | 🚧 Migrating to Bofry/config |
+| `config/` | Configuration management | ✅ Bofry/config integrated |
 | `observability/` | Metrics & tracing | ✅ Recently optimized |
 | `response/` | HTTP response helpers | ✅ Stable |
 | `validation/` | Request validation | ✅ Stable |
@@ -445,11 +454,6 @@ This entire framework was designed and developed using [Claude Code](https://cla
 
 ### Upcoming Features
 
-#### Enhanced Configuration System
-- Migration to `github.com/Bofry/config` for enterprise-grade configuration
-- Support for YAML, environment variables, and `.env` files
-- Hot-reload configuration without restart
-- Configuration validation and type safety
 
 #### WebSocket Hub Improvements
 - Simplified concurrency model using pure channel-based approach
