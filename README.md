@@ -13,7 +13,7 @@ The name combines "Go" with "Vortex", representing the framework's ability to cr
 ## Version History
 
 - **v0.1.10** (2025-07-21) - Production Release
-  - CLI tool (`stmp`) for project scaffolding and code generation
+  - CLI tool (`gortex`) for project scaffolding and code generation
   - Optimized codebase with improved thread safety
   - Complete observability implementation (metrics, tracing, health checks)
   - Enhanced documentation and examples
@@ -49,14 +49,14 @@ The name combines "Go" with "Vortex", representing the framework's ability to cr
 
 ## Features
 
-- 🚀 **Declarative Routing** - Define routes using struct tags
-- 🔌 **WebSocket Support** - Built-in hub for connection management
-- 🔐 **JWT Authentication** - Complete auth middleware with role-based access
-- ✅ **Validation** - Request validation using go-playground/validator
-- 📊 **Observability** - Metrics, tracing, and health checks
-- 🚦 **Rate Limiting** - Flexible rate limiting strategies
-- ⚙️ **Configuration** - Bofry/config compatible configuration system
-- 💉 **Dependency Injection** - Simple DI container with generics
+- **Declarative Routing** - Define routes using struct tags
+- **WebSocket Support** - Built-in hub for connection management
+- **JWT Authentication** - Complete auth middleware with role-based access
+- **Validation** - Request validation using go-playground/validator
+- **Observability** - Metrics, tracing, and health checks
+- **Rate Limiting** - Flexible rate limiting strategies
+- **Configuration** - Bofry/config compatible configuration system
+- **Dependency Injection** - Simple DI container with generics
 
 ## Installation
 
@@ -565,6 +565,6 @@ MIT License - see [LICENSE](LICENSE) file for details
 ---
 
 <p align="center">
-  Built with ❤️ using <a href="https://claude.ai/code">Claude Code</a><br>
+  Built with <a href="https://claude.ai/code">Claude Code</a><br>
   Inspired by <a href="https://github.com/Bofry">Bofry</a> development practices
 </p>
