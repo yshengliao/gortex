@@ -31,7 +31,7 @@ func NewObjectPool[T any](new func() T, reset func(*T)) *ObjectPool[T] {
 	}
 	
 	p.pool = &sync.Pool{
-		New: func() interface{} {
+		New: func() any {
 			atomic.AddInt64(&p.metrics.TotalNew, 1)
 			return p.new()
 		},
@@ -76,12 +76,12 @@ func (p *ObjectPool[T]) GetMetrics() ObjectMetrics {
 type StructPool struct {
 	pool       *sync.Pool
 	structType reflect.Type
-	zeroValue  interface{}
+	zeroValue  any
 	metrics    *ObjectMetrics
 }
 
 // NewStructPool creates a pool for a specific struct type
-func NewStructPool(example interface{}) *StructPool {
+func NewStructPool(example any) *StructPool {
 	structType := reflect.TypeOf(example)
 	if structType.Kind() == reflect.Ptr {
 		structType = structType.Elem()
@@ -94,7 +94,7 @@ func NewStructPool(example interface{}) *StructPool {
 	}
 	
 	sp.pool = &sync.Pool{
-		New: func() interface{} {
+		New: func() any {
 			atomic.AddInt64(&sp.metrics.TotalNew, 1)
 			return reflect.New(sp.structType).Interface()
 		},
@@ -104,7 +104,7 @@ func NewStructPool(example interface{}) *StructPool {
 }
 
 // Get retrieves a struct pointer from the pool
-func (sp *StructPool) Get() interface{} {
+func (sp *StructPool) Get() any {
 	atomic.AddInt64(&sp.metrics.TotalGet, 1)
 	atomic.AddInt64(&sp.metrics.CurrentActive, 1)
 	
@@ -112,7 +112,7 @@ func (sp *StructPool) Get() interface{} {
 }
 
 // Put returns a struct pointer to the pool and resets it
-func (sp *StructPool) Put(obj interface{}) {
+func (sp *StructPool) Put(obj any) {
 	if obj == nil {
 		return
 	}

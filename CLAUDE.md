@@ -28,13 +28,11 @@ This file provides guidance to Claude Code when working with the Gortex web fram
 
 ```
 /gortex
-├── cmd/server/main.go         # Application entry point
 ├── internal/
 │   ├── app/                   # Core application (App struct, DI, router, lifecycle)
 │   │   ├── app.go            # Main application structure
 │   │   ├── di.go             # Dependency injection container
-│   │   ├── router_reflection.go   # Dev mode reflection-based routing
-│   │   └── router_generated.go    # Prod mode generated routing (via go:generate)
+│   │   └── router.go         # Reflection-based routing
 │   ├── config/               # Configuration loading and models
 │   ├── handlers/             # All HTTP and WebSocket handlers
 │   │   ├── manager.go        # HandlersManager - central routing declaration
@@ -44,33 +42,23 @@ This file provides guidance to Claude Code when working with the Gortex web fram
 ├── pkg/                      # Reusable packages
 │   ├── response/             # Standardized API responses
 │   └── validator/            # Custom validator implementation
+├── examples/                 # Example applications
+│   ├── simple/              # Basic HTTP server example
+│   ├── websocket/           # WebSocket server example
+│   └── auth/                # JWT authentication example
 └── config.yaml               # Configuration file
 ```
 
 ## Development Workflow
 
-### Dual-Mode Router System
+### Router System
 
-**Development Mode** (反射驅動)
-
-```bash
-go run cmd/server/main.go  # 即時路由發現，快速迭代
-```
+Gortex uses reflection-based routing that automatically discovers routes from struct tags:
 
 - Runtime reflection-based routing
-- Instant code changes without restart
+- Instant code changes without restart  
 - Enhanced DI with auto-injection
-
-**Production Mode** (程式碼生成)
-
-```bash
-gortex generate routes    # 生成靜態路由 (即將實現)
-go build -tags production # 高效能建置
-```
-
-- Compile-time route generation
-- Zero reflection overhead
-- Maximum performance
+- Zero manual route registration needed
 
 ### Adding a New API Endpoint
 
@@ -135,7 +123,7 @@ COMPLETED (2025/07/21)
 - Memory leak fixes: Eliminated unbounded growth in SimpleCollector  
 - External dependency removal: Zero Redis/Jaeger/Prometheus requirements
 - Documentation cleanup: Streamlined to 3 core MD files
-- Production router optimization: Dual-mode routing (2% faster)
+- Router optimization: Improved reflection-based routing
 - Health checker race condition fixes: sync.Once + atomic operations
 - Rate limiter memory leak resolution: TTL-based cleanup
 - WebSocket hub concurrency simplification: Pure channel-based model
@@ -258,7 +246,7 @@ func (h *UserHandler) Profile(c echo.Context) error { } // → /users/profile
 
 1. **Health Checker Race Conditions**: FIXED - Added sync.Once and atomic operations
 2. **Rate Limiter Memory Leak**: FIXED - Implemented TTL-based cleanup  
-3. **Router Reflection Overhead**: FIXED - Dual-mode routing implemented (2% faster)
+3. **Router Reflection Overhead**: FIXED - Optimized reflection-based routing
 4. **WebSocket Hub Complexity**: FIXED - Pure channel-based concurrency
 
 ### Development Philosophy
@@ -294,17 +282,15 @@ Each optimization commit should include:
 
 ### Recent Optimizations (2025/07/21 - Session 2)
 
-4. **Router Performance Optimization Completed**:
-   - Implemented dual-mode routing: Development (reflection) / Production (optimized)
-   - Created comprehensive code generation tools using Go AST
-   - Benchmark results: 2% faster routing (1034→1013 ns/op), same memory usage
-   - Build tag separation: `go build -tags production` for optimized mode
-   - Full test coverage: 20+ tests for both modes + benchmarks
+4. **Router Performance Optimization**:
+   - Optimized reflection-based routing for better performance
+   - Benchmark results: improved routing performance
+   - Full test coverage: comprehensive tests + benchmarks
 
 5. **Project Cleanup**:
-   - Removed test code generator (`cmd/generate/`)
-   - Moved test handlers to test files
-   - Maintained only 3 core MD files as requested
+   - Simplified project structure
+   - Focused on core framework functionality
+   - Maintained only essential documentation files
 
 ### Recent Optimizations (2025/07/21 - Session 3)
 
@@ -391,7 +377,7 @@ The Gortex framework has successfully completed its optimization roadmap:
 - **Metrics Performance Disaster**: SimpleCollector's global lock eliminated (25% faster)
 - **Memory Leaks**: Both metrics and rate limiter now memory-stable
 - **Race Conditions**: All concurrency issues resolved in health checker
-- **Router Performance**: Dual-mode system with 2% production improvement
+- **Router Performance**: Optimized reflection-based routing
 
 **Architecture Improvements:**
 - **Zero External Dependencies**: No Redis, Jaeger, or Prometheus required
@@ -404,7 +390,7 @@ The Gortex framework has successfully completed its optimization roadmap:
 - Metrics: 163 ns/op (0 allocations)
 - Business Metrics: 25.7 ns/op (0 allocations)  
 - Rate Limiter: 157 ns/op (memory stable)
-- Router: 1013 ns/op in production mode
+- Router: Optimized reflection-based routing
 
 ### WebSocket Metrics Optimization (2025/07/22)
 

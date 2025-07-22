@@ -35,7 +35,7 @@ func NewBufferPool() *BufferPool {
 	}
 	
 	bp.pool = &sync.Pool{
-		New: func() interface{} {
+		New: func() any {
 			atomic.AddInt64(&bp.metrics.TotalNew, 1)
 			buf := new(bytes.Buffer)
 			// Pre-allocate some capacity to reduce allocations

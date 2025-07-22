@@ -165,7 +165,7 @@ func (m *Manager) Get(name string) *circuitbreaker.CircuitBreaker {
 // GetAll returns all circuit breakers
 func (m *Manager) GetAll() map[string]*circuitbreaker.CircuitBreaker {
 	result := make(map[string]*circuitbreaker.CircuitBreaker)
-	m.breakers.Range(func(key, value interface{}) bool {
+	m.breakers.Range(func(key, value any) bool {
 		result[key.(string)] = value.(*circuitbreaker.CircuitBreaker)
 		return true
 	})
@@ -183,12 +183,12 @@ func (m *Manager) ResetAll() {
 }
 
 // Stats returns statistics for all circuit breakers
-func (m *Manager) Stats() map[string]interface{} {
-	stats := make(map[string]interface{})
-	m.breakers.Range(func(key, value interface{}) bool {
+func (m *Manager) Stats() map[string]any {
+	stats := make(map[string]any)
+	m.breakers.Range(func(key, value any) bool {
 		cb := value.(*circuitbreaker.CircuitBreaker)
 		counts := cb.Counts()
-		stats[key.(string)] = map[string]interface{}{
+		stats[key.(string)] = map[string]any{
 			"state":          cb.State().String(),
 			"requests":       counts.Requests,
 			"successes":      counts.TotalSuccesses,

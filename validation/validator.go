@@ -27,7 +27,7 @@ func NewValidator() *Validator {
 }
 
 // Validate validates a struct
-func (v *Validator) Validate(i interface{}) error {
+func (v *Validator) Validate(i any) error {
 	if err := v.validator.Struct(i); err != nil {
 		return NewValidationError(err)
 	}
@@ -141,7 +141,7 @@ func (ve *ValidationError) Error() string {
 }
 
 // BindAndValidate binds and validates request data
-func BindAndValidate(c echo.Context, i interface{}) error {
+func BindAndValidate(c echo.Context, i any) error {
 	if err := c.Bind(i); err != nil {
 		return echo.NewHTTPError(400, "Invalid request format")
 	}

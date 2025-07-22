@@ -71,7 +71,7 @@ func NewByteSlicePoolWithSizes(sizes []int) *ByteSlicePool {
 		p.metrics.SizeMetrics[size] = &SizeMetric{Size: size}
 		
 		p.pools[idx] = &sync.Pool{
-			New: func() interface{} {
+			New: func() any {
 				atomic.AddInt64(&p.metrics.SizeMetrics[size].TotalNew, 1)
 				return make([]byte, size)
 			},

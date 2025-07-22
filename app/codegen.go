@@ -110,7 +110,7 @@ func (g *RouteCodeGenerator) AnalyzeHandlersFromAST(filename string) error {
 }
 
 // AnalyzeHandlerMethods analyzes methods for a given handler type using reflection
-func (g *RouteCodeGenerator) AnalyzeHandlerMethods(handlerInstance interface{}) error {
+func (g *RouteCodeGenerator) AnalyzeHandlerMethods(handlerInstance any) error {
 	handlerType := reflect.TypeOf(handlerInstance)
 	if handlerType == nil {
 		return fmt.Errorf("handler instance is nil")
@@ -204,11 +204,11 @@ func (g *RouteCodeGenerator) GenerateCode() string {
 	code.WriteString("// RegisterRoutes registers routes from a HandlersManager struct\n")
 	code.WriteString("// In development mode (default), this uses reflection for instant feedback\n")  
 	code.WriteString("// In production mode (go build -tags production), this uses generated static registration\n")
-	code.WriteString("func RegisterRoutes(e *echo.Echo, manager interface{}, ctx *Context) error {\n")
+	code.WriteString("func RegisterRoutes(e *echo.Echo, manager any, ctx *Context) error {\n")
 	code.WriteString("\treturn RegisterRoutesStatic(e, manager)\n")
 	code.WriteString("}\n\n")
 	code.WriteString("// RegisterRoutesStatic registers routes using static registration (production mode)\n")
-	code.WriteString("func RegisterRoutesStatic(e *echo.Echo, manager interface{}) error {\n")
+	code.WriteString("func RegisterRoutesStatic(e *echo.Echo, manager any) error {\n")
 	
 	// Add type assertion
 	code.WriteString("\tm, ok := manager.(*HandlersManager)\n")

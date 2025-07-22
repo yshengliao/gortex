@@ -15,12 +15,12 @@ import (
 // RegisterRoutes registers routes from a HandlersManager struct
 // In development mode (default), this uses reflection for instant feedback  
 // In production mode (go build -tags production), this uses optimized reflection
-func RegisterRoutes(e *echo.Echo, manager interface{}, ctx *Context) error {
+func RegisterRoutes(e *echo.Echo, manager any, ctx *Context) error {
 	return RegisterRoutesOptimized(e, manager, ctx)
 }
 
 // RegisterRoutesOptimized uses reflection but with optimizations for production
-func RegisterRoutesOptimized(e *echo.Echo, manager interface{}, ctx *Context) error {
+func RegisterRoutesOptimized(e *echo.Echo, manager any, ctx *Context) error {
 	v := reflect.ValueOf(manager)
 	if v.Kind() != reflect.Ptr || v.Elem().Kind() != reflect.Struct {
 		return fmt.Errorf("handlers must be a pointer to struct")
@@ -113,7 +113,7 @@ func RegisterRoutesOptimized(e *echo.Echo, manager interface{}, ctx *Context) er
 
 // createOptimizedHandlerFunc creates an optimized echo.HandlerFunc
 // This avoids some of the overhead of the reflection version
-func createOptimizedHandlerFunc(handler interface{}, method reflect.Method) echo.HandlerFunc {
+func createOptimizedHandlerFunc(handler any, method reflect.Method) echo.HandlerFunc {
 	// Pre-compute the reflection values to avoid doing it on every request
 	handlerVal := reflect.ValueOf(handler)
 	methodFunc := method.Func

@@ -13,99 +13,33 @@ import (
 	"go.uber.org/zap"
 	"github.com/yshengliao/gortex/app"
 	"github.com/yshengliao/gortex/auth"
-	"github.com/yshengliao/gortex/validation"
 )
 
-// Request/Response structures
-
-type LoginRequest struct {
-	Username string `json:"username" validate:"required,min=3,max=50"`
-	Password string `json:"password" validate:"required,min=6"`
-}
-
-type LoginResponse struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-	ExpiresIn    int    `json:"expires_in"`
-}
-
-// Handlers
-
+// HandlersManager defines all handlers with declarative routing
 type HandlersManager struct {
 	Auth    *AuthHandler    `url:"/auth"`
 	Profile *ProfileHandler `url:"/profile"`
 }
 
+// AuthHandler demonstrates JWT authentication
 type AuthHandler struct {
 	JWTService *auth.JWTService
-	Logger     *zap.Logger
 }
 
 // POST /auth/login
 func (h *AuthHandler) Login(c echo.Context) error {
-	var req LoginRequest
-	if err := validation.BindAndValidate(c, &req); err != nil {
-		return err
-	}
-
-	// Simple authentication (in production, check against database)
-	if req.Username != "admin" || req.Password != "password" {
-		return echo.NewHTTPError(401, "Invalid credentials")
-	}
-
-	// Generate tokens
-	accessToken, err := h.JWTService.GenerateAccessToken(
-		"user-123",
-		req.Username,
-		"admin@example.com",
-		"admin",
-	)
-	if err != nil {
-		h.Logger.Error("Failed to generate access token", zap.Error(err))
-		return echo.NewHTTPError(500, "Failed to generate token")
-	}
-
-	refreshToken, err := h.JWTService.GenerateRefreshToken("user-123")
-	if err != nil {
-		h.Logger.Error("Failed to generate refresh token", zap.Error(err))
-		return echo.NewHTTPError(500, "Failed to generate token")
-	}
-
-	return c.JSON(200, LoginResponse{
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
-		ExpiresIn:    3600,
+	// Simple authentication example
+	accessToken, _ := h.JWTService.GenerateAccessToken("user-123", "admin", "admin@example.com", "admin")
+	refreshToken, _ := h.JWTService.GenerateRefreshToken("user-123")
+	
+	return c.JSON(200, map[string]any{
+		"access_token":  accessToken,
+		"refresh_token": refreshToken,
 	})
 }
 
-// POST /auth/refresh
-func (h *AuthHandler) Refresh(c echo.Context) error {
-	var req struct {
-		RefreshToken string `json:"refresh_token" validate:"required"`
-	}
-	if err := validation.BindAndValidate(c, &req); err != nil {
-		return err
-	}
-
-	// Refresh the token
-	newAccessToken, err := h.JWTService.RefreshAccessToken(req.RefreshToken, func(userID string) (string, string, string, error) {
-		// In production, fetch user details from database
-		return "admin", "admin@example.com", "admin", nil
-	})
-
-	if err != nil {
-		return echo.NewHTTPError(401, "Invalid refresh token")
-	}
-
-	return c.JSON(200, map[string]interface{}{
-		"access_token": newAccessToken,
-		"expires_in":   3600,
-	})
-}
-
-type ProfileHandler struct {
-	Logger *zap.Logger
-}
+// ProfileHandler demonstrates protected endpoints
+type ProfileHandler struct{}
 
 // GET /profile (requires authentication)
 func (h *ProfileHandler) GET(c echo.Context) error {
@@ -113,11 +47,10 @@ func (h *ProfileHandler) GET(c echo.Context) error {
 	if claims == nil {
 		return echo.NewHTTPError(401, "Unauthorized")
 	}
-
-	return c.JSON(200, map[string]interface{}{
+	
+	return c.JSON(200, map[string]any{
 		"user_id":  claims.UserID,
 		"username": claims.Username,
-		"email":    claims.Email,
 		"role":     claims.Role,
 	})
 }
@@ -127,49 +60,23 @@ func main() {
 	logger, _ := zap.NewDevelopment()
 	defer logger.Sync()
 
-	// Create configuration
-	cfg := &app.Config{}
-	cfg.Server.Address = ":8080"
-	cfg.Server.Recovery = true
-
 	// Create JWT service
-	jwtService := auth.NewJWTService(
-		"your-secret-key",
-		time.Hour,           // Access token TTL
-		24*time.Hour*7,      // Refresh token TTL
-		"stmp-auth-example",
-	)
-
-	// Create validator
-	validator := validation.NewValidator()
+	jwtService := auth.NewJWTService("secret-key", time.Hour, 24*time.Hour*7, "gortex-auth")
 
 	// Create handlers
 	handlers := &HandlersManager{
-		Auth: &AuthHandler{
-			JWTService: jwtService,
-			Logger:     logger,
-		},
-		Profile: &ProfileHandler{
-			Logger: logger,
-		},
+		Auth:    &AuthHandler{JWTService: jwtService},
+		Profile: &ProfileHandler{},
 	}
 
-	// Create application
+	// Create application with functional options
 	application, err := app.NewApp(
-		app.WithConfig(cfg),
-		app.WithLogger(logger),
 		app.WithHandlers(handlers),
+		app.WithLogger(logger),
 	)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	// Set custom validator
-	application.Echo().Validator = validator
-
-	// Register services
-	app.Register(application.Context(), logger)
-	app.Register(application.Context(), jwtService)
 
 	// Apply authentication middleware to profile routes
 	e := application.Echo()
@@ -182,18 +89,16 @@ func main() {
 
 	// Start server
 	go func() {
-		logger.Info("Starting authentication example server", zap.String("address", cfg.Server.Address))
-		logger.Info("Try: curl -X POST http://localhost:8080/auth/login -H 'Content-Type: application/json' -d '{\"username\":\"admin\",\"password\":\"password\"}'")
-		
+		logger.Info("Starting server on :8080")
 		if err := application.Run(); err != nil && err != http.ErrServerClosed {
 			logger.Fatal("Server error", zap.Error(err))
 		}
 	}()
 
-	// Wait for interrupt
+	// Wait for interrupt signal
 	<-ctx.Done()
 
-	// Shutdown
+	// Graceful shutdown
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	

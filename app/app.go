@@ -89,7 +89,7 @@ func WithLogger(logger *zap.Logger) Option {
 }
 
 // WithHandlers registers handlers using reflection
-func WithHandlers(manager interface{}) Option {
+func WithHandlers(manager any) Option {
 	return func(app *App) error {
 		return RegisterRoutes(app.e, manager, app.ctx)
 	}
@@ -436,7 +436,7 @@ func (h *devHandler) Routes(c echo.Context) error {
 		})
 	}
 
-	return c.JSON(200, map[string]interface{}{
+	return c.JSON(200, map[string]any{
 		"total_routes": len(routeList),
 		"routes":       routeList,
 		"debug_mode":   h.echo.Debug,
@@ -453,7 +453,7 @@ func (h *devHandler) Error(c echo.Context) error {
 	case "internal":
 		return fmt.Errorf("internal server error test")
 	default:
-		return c.JSON(200, map[string]interface{}{
+		return c.JSON(200, map[string]any{
 			"message": "Use ?type=<error_type> to test different error responses",
 			"available_types": []string{
 				"panic",
@@ -467,7 +467,7 @@ func (h *devHandler) Error(c echo.Context) error {
 func (h *devHandler) Config(c echo.Context) error {
 	// In a real implementation, you would get config from context
 	// For now, return a simple response
-	return c.JSON(200, map[string]interface{}{
+	return c.JSON(200, map[string]any{
 		"message": "Configuration endpoint",
 		"mode":    "development",
 	})
@@ -480,7 +480,7 @@ func (h *devHandler) Monitor(c echo.Context) error {
 	runtime.ReadMemStats(&m)
 
 	// Get system info
-	systemInfo := map[string]interface{}{
+	systemInfo := map[string]any{
 		"goroutines":      runtime.NumGoroutine(),
 		"cpu_count":       runtime.NumCPU(),
 		"go_version":      runtime.Version(),
@@ -490,7 +490,7 @@ func (h *devHandler) Monitor(c echo.Context) error {
 	}
 
 	// Memory statistics
-	memoryInfo := map[string]interface{}{
+	memoryInfo := map[string]any{
 		"alloc_mb":        float64(m.Alloc) / 1024 / 1024,
 		"total_alloc_mb":  float64(m.TotalAlloc) / 1024 / 1024,
 		"sys_mb":          float64(m.Sys) / 1024 / 1024,
@@ -507,7 +507,7 @@ func (h *devHandler) Monitor(c echo.Context) error {
 	}
 
 	// Get GC stats
-	gcStats := make([]map[string]interface{}, 0)
+	gcStats := make([]map[string]any, 0)
 	if m.NumGC > 0 {
 		// Get last 5 GC pause times
 		numPauses := int(m.NumGC)
@@ -515,7 +515,7 @@ func (h *devHandler) Monitor(c echo.Context) error {
 			numPauses = 5
 		}
 		for i := 0; i < numPauses; i++ {
-			gcStats = append(gcStats, map[string]interface{}{
+			gcStats = append(gcStats, map[string]any{
 				"pause_ms": float64(m.PauseNs[(m.NumGC+255-uint32(i))%256]) / 1e6,
 			})
 		}
@@ -523,12 +523,12 @@ func (h *devHandler) Monitor(c echo.Context) error {
 
 	// Get Echo routes count
 	routes := h.echo.Routes()
-	routesInfo := map[string]interface{}{
+	routesInfo := map[string]any{
 		"total_routes": len(routes),
 	}
 
 	// Get compression status
-	compressionInfo := map[string]interface{}{
+	compressionInfo := map[string]any{
 		"enabled": false,
 		"gzip_enabled": false,
 		"brotli_enabled": false,
@@ -578,14 +578,14 @@ func (h *devHandler) Monitor(c echo.Context) error {
 	}
 
 	// Final response
-	return c.JSON(200, map[string]interface{}{
+	return c.JSON(200, map[string]any{
 		"status":      "healthy",
 		"system":      systemInfo,
 		"memory":      memoryInfo,
 		"gc_stats":    gcStats,
 		"routes":      routesInfo,
 		"compression": compressionInfo,
-		"server_info": map[string]interface{}{
+		"server_info": map[string]any{
 			"debug_mode": h.echo.Debug,
 			"address":    h.echo.Server.Addr,
 		},

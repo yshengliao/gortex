@@ -90,9 +90,9 @@ func DevErrorPageWithConfig(config DevErrorPageConfig) echo.MiddlewareFunc {
 				var errorMsg string
 				if buf.Len() > 0 {
 					// Try to parse JSON error response
-					var jsonResp map[string]interface{}
+					var jsonResp map[string]any
 					if json.Unmarshal(buf.Bytes(), &jsonResp) == nil {
-						if errObj, ok := jsonResp["error"].(map[string]interface{}); ok {
+						if errObj, ok := jsonResp["error"].(map[string]any); ok {
 							if msg, ok := errObj["message"].(string); ok {
 								errorMsg = msg
 							}
@@ -179,7 +179,7 @@ func renderErrorPage(c echo.Context, status int, err error, stackTrace string, c
 	accept := c.Request().Header.Get("Accept")
 	if !strings.Contains(accept, "text/html") {
 		// Return JSON error for non-HTML clients
-		c.JSON(status, map[string]interface{}{
+		c.JSON(status, map[string]any{
 			"error":   err.Error(),
 			"status":  status,
 			"path":    c.Request().URL.Path,

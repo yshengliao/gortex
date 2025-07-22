@@ -57,7 +57,7 @@ func (h *APIHandler) GET(c echo.Context) error {
 
 // POST /api/echo
 func (h *APIHandler) Echo(c echo.Context) error {
-	var body map[string]interface{}
+	var body map[string]any
 	if err := c.Bind(&body); err != nil {
 		return c.JSON(400, map[string]string{"error": "Invalid JSON"})
 	}

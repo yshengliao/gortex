@@ -25,7 +25,7 @@ type HealthCheck func(ctx context.Context) HealthCheckResult
 type HealthCheckResult struct {
 	Status      HealthStatus           `json:"status"`
 	Message     string                 `json:"message,omitempty"`
-	Details     map[string]interface{} `json:"details,omitempty"`
+	Details     map[string]any `json:"details,omitempty"`
 	LastChecked time.Time              `json:"last_checked"`
 	Duration    time.Duration          `json:"duration_ms"`
 }
@@ -204,7 +204,7 @@ func DatabaseHealthCheck(ping func(ctx context.Context) error) HealthCheck {
 			return HealthCheckResult{
 				Status:  HealthStatusUnhealthy,
 				Message: "Database connection failed",
-				Details: map[string]interface{}{
+				Details: map[string]any{
 					"error": err.Error(),
 				},
 			}
@@ -225,7 +225,7 @@ func HTTPHealthCheck(url string, expectedStatus int) HealthCheck {
 			return HealthCheckResult{
 				Status:  HealthStatusUnhealthy,
 				Message: "Failed to create request",
-				Details: map[string]interface{}{
+				Details: map[string]any{
 					"error": err.Error(),
 					"url":   url,
 				},
@@ -238,7 +238,7 @@ func HTTPHealthCheck(url string, expectedStatus int) HealthCheck {
 			return HealthCheckResult{
 				Status:  HealthStatusUnhealthy,
 				Message: "HTTP request failed",
-				Details: map[string]interface{}{
+				Details: map[string]any{
 					"error": err.Error(),
 					"url":   url,
 				},
@@ -250,7 +250,7 @@ func HTTPHealthCheck(url string, expectedStatus int) HealthCheck {
 			return HealthCheckResult{
 				Status:  HealthStatusUnhealthy,
 				Message: "Unexpected status code",
-				Details: map[string]interface{}{
+				Details: map[string]any{
 					"url":             url,
 					"expected_status": expectedStatus,
 					"actual_status":   resp.StatusCode,
@@ -261,7 +261,7 @@ func HTTPHealthCheck(url string, expectedStatus int) HealthCheck {
 		return HealthCheckResult{
 			Status:  HealthStatusHealthy,
 			Message: "HTTP endpoint reachable",
-			Details: map[string]interface{}{
+			Details: map[string]any{
 				"url":    url,
 				"status": resp.StatusCode,
 			},
@@ -293,7 +293,7 @@ func MemoryHealthCheck(maxMemoryMB uint64) HealthCheck {
 		return HealthCheckResult{
 			Status:  status,
 			Message: message,
-			Details: map[string]interface{}{
+			Details: map[string]any{
 				"allocated_mb":       allocMB,
 				"total_allocated_mb": totalAllocMB,
 				"system_mb":          sysMB,

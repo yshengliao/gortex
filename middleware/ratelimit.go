@@ -292,7 +292,7 @@ func RateLimitByPath(rate, burst int) echo.MiddlewareFunc {
 func CustomRateLimitError(message string, retryAfter int) func(c echo.Context) error {
 	return func(c echo.Context) error {
 		c.Response().Header().Set("Retry-After", fmt.Sprintf("%d", retryAfter))
-		return echo.NewHTTPError(http.StatusTooManyRequests, map[string]interface{}{
+		return echo.NewHTTPError(http.StatusTooManyRequests, map[string]any{
 			"error":       "rate_limit_exceeded",
 			"message":     message,
 			"retry_after": retryAfter,

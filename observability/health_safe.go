@@ -58,7 +58,7 @@ func (hc *SafeHealthChecker) Check(ctx context.Context) map[string]HealthCheckRe
 	var mu sync.Mutex
 	
 	// Iterate over all registered checks
-	hc.checks.Range(func(key, value interface{}) bool {
+	hc.checks.Range(func(key, value any) bool {
 		name := key.(string)
 		check := value.(HealthCheck)
 		
@@ -94,7 +94,7 @@ func (hc *SafeHealthChecker) Check(ctx context.Context) map[string]HealthCheckRe
 func (hc *SafeHealthChecker) GetResults() map[string]HealthCheckResult {
 	results := make(map[string]HealthCheckResult)
 	
-	hc.results.Range(func(key, value interface{}) bool {
+	hc.results.Range(func(key, value any) bool {
 		name := key.(string)
 		result := value.(HealthCheckResult)
 		results[name] = result
@@ -110,7 +110,7 @@ func (hc *SafeHealthChecker) GetOverallStatus() HealthStatus {
 	hasDegraded := false
 	hasAny := false
 	
-	hc.results.Range(func(key, value interface{}) bool {
+	hc.results.Range(func(key, value any) bool {
 		hasAny = true
 		result := value.(HealthCheckResult)
 		

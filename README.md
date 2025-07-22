@@ -22,11 +22,7 @@ Gortex (Go + Vortex) creates a powerful vortex of connectivity between HTTP and 
 ### Installation
 
 ```bash
-# Framework
 go get github.com/yshengliao/gortex
-
-# CLI Tool (coming soon)
-go install github.com/yshengliao/gortex/cmd/gortex@latest
 ```
 
 ### Hello World
@@ -787,10 +783,10 @@ Gortex has undergone comprehensive optimization with all critical issues resolve
    - New ImprovedCollector: 25% faster, zero memory leaks
    - Atomic operations eliminate contention
 
-2. **Dual-Mode Router**
-   - Development: Reflection-based for rapid iteration
-   - Production: Optimized with code generation (2% faster)
-   - Build tag switching: `go build -tags production`
+2. **Optimized Router**
+   - Reflection-based routing with automatic discovery
+   - Zero manual route registration
+   - Excellent performance characteristics
 
 3. **Memory Leak Fixes**
    - Rate Limiter: TTL-based cleanup prevents unbounded growth
@@ -805,7 +801,7 @@ Gortex has undergone comprehensive optimization with all critical issues resolve
 ### Performance Targets
 - **Metrics Collection**: 163ns/op (25%+ faster than previous)
 - **Memory Stability**: Fixed unbounded growth issues in metrics and rate limiter
-- **Router Performance**: 2% faster in production mode (1034→1013 ns/op)
+- **Router Performance**: Optimized reflection-based routing
 - **Rate Limiter**: Auto-cleanup prevents memory leaks (TTL-based eviction)
 - **WebSocket Hub**: Pure channel-based concurrency (no mutex overhead)
 - **Latency**: <10ms p95 for simple endpoints  
@@ -947,7 +943,7 @@ All examples include comprehensive test suites with unit tests and benchmarks:
 - [ ] Enable request logging and monitoring
 
 ### Performance Optimization
-- [ ] Use production build tags: `go build -tags production`
+- [ ] Use optimized build flags: `go build -ldflags="-s -w"`
 - [ ] Enable response compression (gzip/Brotli) in configuration
 - [ ] Configure appropriate timeouts
 - [ ] Monitor memory usage and GC pressure

@@ -12,7 +12,7 @@ import (
 // Message represents a WebSocket message
 type Message struct {
 	Type     string                 `json:"type"`
-	Data     map[string]interface{} `json:"data,omitempty"`
+	Data     map[string]any `json:"data,omitempty"`
 	Target   string                 `json:"target,omitempty"`   // For targeted messages
 	ClientID string                 `json:"client_id,omitempty"` // Sender's client ID
 }
@@ -123,7 +123,7 @@ func (h *Hub) Run() {
 			
 			closeMsg := &Message{
 				Type: "close",
-				Data: map[string]interface{}{
+				Data: map[string]any{
 					"code":    1001, // Going Away
 					"reason":  "Server is shutting down",
 					"message": "Please reconnect later",
@@ -167,7 +167,7 @@ func (h *Hub) registerClient(client *Client) {
 	// Send welcome message
 	welcomeMsg := &Message{
 		Type: "welcome",
-		Data: map[string]interface{}{
+		Data: map[string]any{
 			"client_id": client.ID,
 			"message":   "Connected to server",
 		},
@@ -293,7 +293,7 @@ func (h *Hub) ShutdownWithTimeout(timeout time.Duration) error {
 	// Send shutdown notification to all clients
 	shutdownMsg := &Message{
 		Type: "server_shutdown",
-		Data: map[string]interface{}{
+		Data: map[string]any{
 			"message": "Server is shutting down",
 			"time":    time.Now().Unix(),
 		},

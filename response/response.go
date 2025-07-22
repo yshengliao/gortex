@@ -12,7 +12,7 @@ import (
 // StandardResponse represents a standard API response
 type StandardResponse struct {
 	Success bool        `json:"success"`
-	Data    interface{} `json:"data,omitempty"`
+	Data    any `json:"data,omitempty"`
 	Error   string      `json:"error,omitempty"`
 	Code    int         `json:"code,omitempty"`
 }
@@ -20,14 +20,14 @@ type StandardResponse struct {
 // SuccessResponse represents a standardized success response
 type SuccessResponse struct {
 	Success   bool                   `json:"success"`
-	Data      interface{}            `json:"data,omitempty"`
-	Meta      map[string]interface{} `json:"meta,omitempty"`
+	Data      any                    `json:"data,omitempty"`
+	Meta      map[string]any         `json:"meta,omitempty"`
 	Timestamp time.Time              `json:"timestamp"`
 	RequestID string                 `json:"request_id,omitempty"`
 }
 
 // Success sends a successful response
-func Success(c echo.Context, statusCode int, data interface{}) error {
+func Success(c echo.Context, statusCode int, data any) error {
 	return c.JSON(statusCode, StandardResponse{
 		Success: true,
 		Data:    data,
@@ -35,7 +35,7 @@ func Success(c echo.Context, statusCode int, data interface{}) error {
 }
 
 // SuccessWithMeta sends a successful response with metadata
-func SuccessWithMeta(c echo.Context, statusCode int, data interface{}, meta map[string]interface{}) error {
+func SuccessWithMeta(c echo.Context, statusCode int, data any, meta map[string]any) error {
 	resp := &SuccessResponse{
 		Success:   true,
 		Data:      data,
@@ -83,7 +83,7 @@ func InternalServerError(c echo.Context, message string) error {
 }
 
 // Created sends a 201 Created response
-func Created(c echo.Context, data interface{}) error {
+func Created(c echo.Context, data any) error {
 	return Success(c, http.StatusCreated, data)
 }
 
@@ -93,6 +93,6 @@ func NoContent(c echo.Context) error {
 }
 
 // Accepted sends a 202 Accepted response
-func Accepted(c echo.Context, data interface{}) error {
+func Accepted(c echo.Context, data any) error {
 	return Success(c, http.StatusAccepted, data)
 }

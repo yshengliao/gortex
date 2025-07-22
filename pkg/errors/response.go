@@ -12,14 +12,14 @@ type ErrorResponse struct {
 	ErrorDetail  ErrorDetail            `json:"error"`
 	Timestamp    time.Time              `json:"timestamp"`
 	RequestID    string                 `json:"request_id,omitempty"`
-	Meta         map[string]interface{} `json:"meta,omitempty"`
+	Meta         map[string]any `json:"meta,omitempty"`
 }
 
 // ErrorDetail contains detailed error information
 type ErrorDetail struct {
 	Code    int                    `json:"code"`
 	Message string                 `json:"message"`
-	Details map[string]interface{} `json:"details,omitempty"`
+	Details map[string]any `json:"details,omitempty"`
 }
 
 // Error implements the error interface
@@ -57,7 +57,7 @@ func New(code ErrorCode, message string) *ErrorResponse {
 }
 
 // NewWithDetails creates a new error response with additional details
-func NewWithDetails(code ErrorCode, message string, details map[string]interface{}) *ErrorResponse {
+func NewWithDetails(code ErrorCode, message string, details map[string]any) *ErrorResponse {
 	return &ErrorResponse{
 		Success: false,
 		ErrorDetail: ErrorDetail{
@@ -81,22 +81,22 @@ func (e *ErrorResponse) WithRequestID(requestID string) *ErrorResponse {
 }
 
 // WithMeta adds metadata to the error response
-func (e *ErrorResponse) WithMeta(meta map[string]interface{}) *ErrorResponse {
+func (e *ErrorResponse) WithMeta(meta map[string]any) *ErrorResponse {
 	e.Meta = meta
 	return e
 }
 
 // WithDetail adds a single detail to the error response
-func (e *ErrorResponse) WithDetail(key string, value interface{}) *ErrorResponse {
+func (e *ErrorResponse) WithDetail(key string, value any) *ErrorResponse {
 	if e.ErrorDetail.Details == nil {
-		e.ErrorDetail.Details = make(map[string]interface{})
+		e.ErrorDetail.Details = make(map[string]any)
 	}
 	e.ErrorDetail.Details[key] = value
 	return e
 }
 
 // WithDetails adds multiple details to the error response
-func (e *ErrorResponse) WithDetails(details map[string]interface{}) *ErrorResponse {
+func (e *ErrorResponse) WithDetails(details map[string]any) *ErrorResponse {
 	e.ErrorDetail.Details = details
 	return e
 }

@@ -56,14 +56,14 @@ func (h *DevHandlers) Routes(c echo.Context) error {
 	}
 
 	// System information
-	systemInfo := map[string]interface{}{
+	systemInfo := map[string]any{
 		"go_version":     runtime.Version(),
 		"num_goroutines": runtime.NumGoroutine(),
 		"num_cpu":        runtime.NumCPU(),
 	}
 
 	// Return debug information
-	return response.Success(c, http.StatusOK, map[string]interface{}{
+	return response.Success(c, http.StatusOK, map[string]any{
 		"total_routes": len(routeList),
 		"routes":       routeList,
 		"system":       systemInfo,
@@ -93,7 +93,7 @@ func (h *DevHandlers) Error(c echo.Context) error {
 	case "internal":
 		return fmt.Errorf("internal server error test")
 	default:
-		return response.Success(c, http.StatusOK, map[string]interface{}{
+		return response.Success(c, http.StatusOK, map[string]any{
 			"message": "Use ?type=<error_type> to test different error responses",
 			"available_types": []string{
 				"panic",
@@ -125,9 +125,9 @@ func (h *DevHandlers) Config(c echo.Context) error {
 }
 
 // maskSensitiveConfig masks sensitive configuration values
-func maskSensitiveConfig(config interface{}) interface{} {
+func maskSensitiveConfig(config any) any {
 	// This is a simplified version - in production you'd want more sophisticated masking
-	configMap, ok := config.(map[string]interface{})
+	configMap, ok := config.(map[string]any)
 	if !ok {
 		return config
 	}
@@ -140,7 +140,7 @@ func maskSensitiveConfig(config interface{}) interface{} {
 		"credential",
 	}
 
-	masked := make(map[string]interface{})
+	masked := make(map[string]any)
 	for key, value := range configMap {
 		lowerKey := strings.ToLower(key)
 		shouldMask := false
@@ -158,7 +158,7 @@ func maskSensitiveConfig(config interface{}) interface{} {
 			} else {
 				masked[key] = value
 			}
-		} else if nestedMap, ok := value.(map[string]interface{}); ok {
+		} else if nestedMap, ok := value.(map[string]any); ok {
 			masked[key] = maskSensitiveConfig(nestedMap)
 		} else {
 			masked[key] = value

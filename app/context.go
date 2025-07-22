@@ -9,13 +9,13 @@ import (
 // Context is a simple dependency injection container using generics
 type Context struct {
 	mu       sync.RWMutex
-	services map[reflect.Type]interface{}
+	services map[reflect.Type]any
 }
 
 // NewContext creates a new DI context
 func NewContext() *Context {
 	return &Context{
-		services: make(map[reflect.Type]interface{}),
+		services: make(map[reflect.Type]any),
 	}
 }
 

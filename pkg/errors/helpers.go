@@ -67,14 +67,14 @@ func GetHTTPStatus(code ErrorCode) int {
 }
 
 // ValidationError creates and sends a validation error response
-func ValidationError(c echo.Context, message string, details map[string]interface{}) error {
+func ValidationError(c echo.Context, message string, details map[string]any) error {
 	err := NewWithDetails(CodeValidationFailed, message, details)
 	return err.Send(c, http.StatusBadRequest)
 }
 
 // ValidationFieldError creates and sends a validation error for a specific field
 func ValidationFieldError(c echo.Context, field, message string) error {
-	details := map[string]interface{}{
+	details := map[string]any{
 		"field": field,
 		"error": message,
 	}
@@ -112,7 +112,7 @@ func NotFoundError(c echo.Context, resource string) error {
 func InternalServerError(c echo.Context, err error) error {
 	// In production, hide internal error details
 	message := "An internal error occurred"
-	details := map[string]interface{}{
+	details := map[string]any{
 		"error": err.Error(),
 	}
 	
@@ -161,7 +161,7 @@ func DatabaseError(c echo.Context, operation string) error {
 }
 
 // SendError is a generic function to send any error code with custom message
-func SendError(c echo.Context, code ErrorCode, message string, details map[string]interface{}) error {
+func SendError(c echo.Context, code ErrorCode, message string, details map[string]any) error {
 	if message == "" {
 		message = code.Message()
 	}

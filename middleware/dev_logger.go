@@ -177,7 +177,7 @@ func captureRequestInfo(c echo.Context, config DevLoggerConfig) *requestInfo {
 				
 				// Try to pretty print JSON
 				if isJSON(c.Request().Header.Get(echo.HeaderContentType)) {
-					var jsonData interface{}
+					var jsonData any
 					if err := json.Unmarshal(bodyBytes, &jsonData); err == nil {
 						prettyBytes, _ := json.MarshalIndent(jsonData, "", "  ")
 						info.body = string(prettyBytes)

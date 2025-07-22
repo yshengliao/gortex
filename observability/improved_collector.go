@@ -138,11 +138,11 @@ func (c *ImprovedCollector) RecordMemoryUsage(bytes uint64) {
 }
 
 // GetStats returns current statistics snapshot
-func (c *ImprovedCollector) GetStats() map[string]interface{} {
+func (c *ImprovedCollector) GetStats() map[string]any {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	
-	return map[string]interface{}{
+	return map[string]any{
 		"http":      c.httpStats,
 		"websocket": c.websocketStats,
 		"system":    c.systemStats,

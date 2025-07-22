@@ -15,12 +15,12 @@ import (
 // RegisterRoutes registers routes from a HandlersManager struct
 // In development mode (default), this uses reflection for instant feedback
 // In production mode (go build -tags production), this uses generated static registration
-func RegisterRoutes(e *echo.Echo, manager interface{}, ctx *Context) error {
+func RegisterRoutes(e *echo.Echo, manager any, ctx *Context) error {
 	return RegisterRoutesFromStruct(e, manager, ctx)
 }
 
 // RegisterRoutesFromStruct registers routes from a struct using reflection
-func RegisterRoutesFromStruct(e *echo.Echo, manager interface{}, ctx *Context) error {
+func RegisterRoutesFromStruct(e *echo.Echo, manager any, ctx *Context) error {
 	v := reflect.ValueOf(manager)
 	if v.Kind() != reflect.Ptr || v.Elem().Kind() != reflect.Struct {
 		return fmt.Errorf("handlers must be a pointer to struct")
@@ -76,7 +76,7 @@ func RegisterRoutesFromStruct(e *echo.Echo, manager interface{}, ctx *Context) e
 }
 
 // registerWebSocketHandler registers a WebSocket handler
-func registerWebSocketHandler(e *echo.Echo, pattern string, handler interface{}) error {
+func registerWebSocketHandler(e *echo.Echo, pattern string, handler any) error {
 	// Look for HandleConnection method
 	method := reflect.ValueOf(handler).MethodByName("HandleConnection")
 	if !method.IsValid() {
@@ -100,7 +100,7 @@ func registerWebSocketHandler(e *echo.Echo, pattern string, handler interface{})
 }
 
 // registerHTTPHandler registers HTTP handlers for standard methods
-func registerHTTPHandler(e *echo.Echo, basePath string, handler interface{}, handlerType reflect.Type) error {
+func registerHTTPHandler(e *echo.Echo, basePath string, handler any, handlerType reflect.Type) error {
 	methods := []string{"GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"}
 
 	for _, method := range methods {
@@ -131,7 +131,7 @@ func registerHTTPHandler(e *echo.Echo, basePath string, handler interface{}, han
 }
 
 // registerMethod registers a standard HTTP method
-func registerMethod(e *echo.Echo, httpMethod, path string, handler interface{}, method reflect.Method) {
+func registerMethod(e *echo.Echo, httpMethod, path string, handler any, method reflect.Method) {
 	handlerFunc := createHandlerFunc(handler, method)
 	
 	switch httpMethod {
@@ -153,13 +153,13 @@ func registerMethod(e *echo.Echo, httpMethod, path string, handler interface{}, 
 }
 
 // registerCustomMethod registers a custom method as POST by default
-func registerCustomMethod(e *echo.Echo, path string, handler interface{}, method reflect.Method) {
+func registerCustomMethod(e *echo.Echo, path string, handler any, method reflect.Method) {
 	handlerFunc := createHandlerFunc(handler, method)
 	e.POST(path, handlerFunc)
 }
 
 // createHandlerFunc creates an echo.HandlerFunc from a reflect.Method
-func createHandlerFunc(handler interface{}, method reflect.Method) echo.HandlerFunc {
+func createHandlerFunc(handler any, method reflect.Method) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		args := []reflect.Value{reflect.ValueOf(handler), reflect.ValueOf(c)}
 		results := method.Func.Call(args)

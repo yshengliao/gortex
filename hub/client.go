@@ -79,7 +79,7 @@ func (c *Client) ReadPump() {
 			// Respond with pong
 			pongMsg := &Message{
 				Type: "pong",
-				Data: map[string]interface{}{
+				Data: map[string]any{
 					"timestamp": time.Now().Unix(),
 				},
 			}

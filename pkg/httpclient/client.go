@@ -186,7 +186,7 @@ func (c *Client) GetMetrics() ClientMetrics {
 	
 	// Collect status codes
 	statusCodes := make(map[int]int64)
-	c.metrics.statusCodes.Range(func(key, value interface{}) bool {
+	c.metrics.statusCodes.Range(func(key, value any) bool {
 		if code, ok := key.(int); ok {
 			if count, ok := value.(*int64); ok {
 				statusCodes[code] = atomic.LoadInt64(count)
