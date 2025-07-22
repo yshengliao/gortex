@@ -288,7 +288,7 @@ Each optimization commit should include:
 
 - **[Optimization Plan](./OPTIMIZATION_PLAN.md)**: Commit-level development tasks organized by category
 - **[README](./README.md)**: Project overview reflecting latest optimizations  
-- **Examples**: `/examples` directory (all verified working as of 2025/07/21)
+- **Examples**: `/examples` directory with 3 core examples: simple, websocket, auth
 
 ---
 
@@ -352,13 +352,11 @@ Each optimization commit should include:
 
 ### Final Optimizations (2025/07/22)
 
-10. **Example Test Automation Completed**:
-    - Created comprehensive test suites for all 4 examples
-    - Implemented `test_examples.sh` automation script
-    - Added Makefile integration with `make test-examples`
-    - All examples have unit tests and benchmarks
-    - Test Results: 3/4 examples passing (auth has minor test issue)
-    - Performance benchmarks documented in README
+10. **Example Simplification Completed**:
+    - Streamlined examples to 3 core demonstrations
+    - Simple: Basic HTTP server with declarative routing
+    - WebSocket: Real-time communication with metrics
+    - Auth: JWT implementation with secure endpoints
 
 11. **Unified Error Handling System**:
     - Implemented standardized error response format with categorized codes
@@ -400,7 +398,7 @@ The Gortex framework has successfully completed its optimization roadmap:
 - **Pure Channel Concurrency**: WebSocket Hub simplified, deadlock-free
 - **Enterprise Config**: Bofry/config with YAML, .env, env var support
 - **Unified Error Handling**: Standardized error responses with categorized codes
-- **Comprehensive Testing**: All examples have automated test suites
+- **Comprehensive Testing**: Streamlined examples focusing on core functionality
 
 **Performance Achieved:**
 - Metrics: 163 ns/op (0 allocations)
@@ -417,7 +415,7 @@ The Gortex framework has successfully completed its optimization roadmap:
     - Message rate calculation (messages per second)
     - Zero performance impact on message handling
     - GetMetrics() and GetMessageRate() methods for monitoring
-    - Example: websocket-metrics demonstrates real-time monitoring
+    - Example: websocket demonstrates real-time communication
 
 ### Development Mode Enhancement (2025/07/22)
 
@@ -431,7 +429,7 @@ The Gortex framework has successfully completed its optimization roadmap:
     - Sensitive header masking (Authorization, Cookie, etc.)
     - HTML error pages with stack traces for browser requests
     - Different error rendering for API vs browser clients
-    - Example: dev-mode demonstrates all development features
+    - Development features are now built into the framework
 
 ### Development Monitoring Dashboard (2025/07/22)
 
@@ -443,7 +441,7 @@ The Gortex framework has successfully completed its optimization roadmap:
     - Provides server uptime and route statistics
     - Only available when Logger.Level = "debug"
     - Zero performance impact (only called on demand)
-    - Example: monitoring-dashboard demonstrates usage
+    - Monitoring features are built into the framework
 
 ### Compression Status Display (2025/07/22)
 
@@ -454,7 +452,7 @@ The Gortex framework has successfully completed its optimization roadmap:
     - Lists supported content types for compression
     - Shows minimum size threshold for compression (1024 bytes)
     - Helps developers debug compression configuration
-    - Example: monitoring-dashboard shows compression status
+    - Compression status is available via /_monitor endpoint
 
 ### Response Compression Implementation (2025/07/22)
 
@@ -466,7 +464,7 @@ The Gortex framework has successfully completed its optimization roadmap:
     - Content type filtering for selective compression
     - Brotli preference when both encodings are supported
     - Integrated with configuration system (cfg.Server.Compression)
-    - Example: compression demonstrates all features
+    - Compression is now a built-in middleware feature
 
 ### Static File Server Implementation (2025/07/22)
 
@@ -480,7 +478,7 @@ The Gortex framework has successfully completed its optimization roadmap:
     - Pre-compressed file serving (.gz and .br files)
     - Content type detection with proper headers
     - Integrated with compression middleware
-    - Example: static-files demonstrates all features
+    - Static file serving is now a built-in feature
     - Performance: Near-native file serving speeds
 
 ### HTTP Client Connection Pooling (2025/07/22)
@@ -493,7 +491,7 @@ The Gortex framework has successfully completed its optimization roadmap:
     - Request/response metrics collection
     - Thread-safe pool management
     - Configurable timeouts and TLS settings
-    - Example: http-pool demonstrates pooling and metrics
+    - HTTP client pooling is available via httpclient package
 
 ### Memory Pool Optimization (2025/07/22)
 
@@ -505,7 +503,7 @@ The Gortex framework has successfully completed its optimization roadmap:
     - Comprehensive metrics tracking (reuse rate, active objects)
     - Thread-safe concurrent access
     - Reduces GC pressure and allocation overhead
-    - Example: memory-pool demonstrates all pool types
+    - Memory pooling is available via mempool package
 
 ### Circuit Breaker Implementation (2025/07/22)
 
@@ -518,7 +516,7 @@ The Gortex framework has successfully completed its optimization roadmap:
     - High-performance implementation with atomic operations
     - Zero allocations in hot paths
     - Comprehensive metrics: requests, failures, consecutive counts
-    - Example: circuit-breaker demonstrates fault tolerance
+    - Circuit breaker is available via circuitbreaker package
 
 23. **Circuit Breaker Middleware**:
     - HTTP middleware for automatic circuit breaking

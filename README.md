@@ -883,18 +883,9 @@ Gortex is specifically designed for real-time game server development:
 
 Check out the `/examples` directory for complete implementations:
 
-- **[Basic Server](examples/basic)** - HTTP + WebSocket fundamentals
-- **[Game Server](examples/game)** - Player management and real-time updates  
-- **[Authentication](examples/auth)** - JWT implementation with role-based access
-- **[Configuration](examples/config)** - Multi-source configuration management
-- **[Observability](examples/observability)** - Metrics, tracing, and monitoring
-- **[Development Mode](examples/dev-mode)** - Debug endpoints, logging, and error pages
-- **[Monitoring Dashboard](examples/monitoring-dashboard)** - Real-time system monitoring
-- **[Compression](examples/compression)** - Response compression with gzip and Brotli
-- **[Static Files](examples/static-files)** - Static file server with ETag and caching
-- **[HTTP Pool](examples/http-pool)** - HTTP client connection pooling and metrics
-- **[Memory Pool](examples/memory-pool)** - Memory pooling for performance optimization
-- **[Circuit Breaker](examples/circuit-breaker)** - Circuit breaker pattern for fault tolerance
+- **[Simple Server](examples/simple)** - Basic HTTP server with declarative routing
+- **[WebSocket](examples/websocket)** - WebSocket server with real-time communication  
+- **[Authentication](examples/auth)** - JWT implementation with secure endpoints
 
 ## Testing
 
