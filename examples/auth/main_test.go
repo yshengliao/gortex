@@ -31,8 +31,8 @@ func TestAuthExample(t *testing.T) {
 	// Create JWT service
 	jwtSvc := auth.NewJWTService(
 		"test-secret-key",
-		time.Hour,           // Access token TTL
-		24*time.Hour*7,      // Refresh token TTL
+		time.Hour,      // Access token TTL
+		24*time.Hour*7, // Refresh token TTL
 		"test-auth-example",
 	)
 
@@ -57,18 +57,21 @@ func TestAuthExample(t *testing.T) {
 
 	// Get the Echo instance for testing
 	e := application.Echo()
-	
+
 	// Set custom validator (like in main.go)
 	validator := validation.NewValidator()
 	e.Validator = validator
-	
+
 	// Register services in DI container (like in main.go)
 	app.Register(application.Context(), logger)
 	app.Register(application.Context(), jwtSvc)
-	
+
 	// Apply authentication middleware to profile routes
 	profileGroup := e.Group("/profile")
 	profileGroup.Use(auth.Middleware(jwtSvc))
+	// Override the /profile route with middleware applied since RegisterRoutes
+	// does not apply the group middleware automatically.
+	e.GET("/profile", handlersManager.Profile.GET, auth.Middleware(jwtSvc))
 
 	var accessToken string
 
@@ -78,24 +81,24 @@ func TestAuthExample(t *testing.T) {
 			Password: "password",
 		}
 		body, _ := json.Marshal(loginReq)
-		
+
 		req := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewReader(body))
 		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 		rec := httptest.NewRecorder()
-		
+
 		e.ServeHTTP(rec, req)
-		
+
 		assert.Equal(t, http.StatusOK, rec.Code)
-		
+
 		var response map[string]interface{}
 		err := json.Unmarshal(rec.Body.Bytes(), &response)
 		require.NoError(t, err)
-		
+
 		accessToken = response["access_token"].(string)
 		assert.NotEmpty(t, accessToken)
 		assert.NotEmpty(t, response["refresh_token"])
 		assert.Equal(t, float64(3600), response["expires_in"])
-		
+
 		// Debug: Validate the token to ensure it's correct
 		claims, err := jwtSvc.ValidateToken(accessToken)
 		require.NoError(t, err)
@@ -109,15 +112,15 @@ func TestAuthExample(t *testing.T) {
 			Password: "wrongpassword",
 		}
 		body, _ := json.Marshal(loginReq)
-		
+
 		req := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewReader(body))
 		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 		rec := httptest.NewRecorder()
-		
+
 		e.ServeHTTP(rec, req)
-		
+
 		assert.Equal(t, http.StatusUnauthorized, rec.Code)
-		
+
 		var response map[string]interface{}
 		err := json.Unmarshal(rec.Body.Bytes(), &response)
 		require.NoError(t, err)
@@ -130,13 +133,13 @@ func TestAuthExample(t *testing.T) {
 			Password: "password",
 		}
 		body, _ := json.Marshal(loginReq)
-		
+
 		req := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewReader(body))
 		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 		rec := httptest.NewRecorder()
-		
+
 		e.ServeHTTP(rec, req)
-		
+
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
 	})
 
@@ -144,23 +147,23 @@ func TestAuthExample(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/profile", nil)
 		req.Header.Set("Authorization", "Bearer "+accessToken)
 		rec := httptest.NewRecorder()
-		
+
 		e.ServeHTTP(rec, req)
-		
+
 		assert.Equal(t, http.StatusOK, rec.Code)
-		
+
 		var response map[string]interface{}
 		err := json.Unmarshal(rec.Body.Bytes(), &response)
 		require.NoError(t, err)
-		
+
 		// Debug: Print the response to see what we're getting
 		t.Logf("Profile response: %+v", response)
-		
+
 		// If we're getting an error response instead of profile data
 		if _, ok := response["error"]; ok {
 			t.Fatalf("Got error response: %v", response)
 		}
-		
+
 		assert.Equal(t, "user-123", response["user_id"])
 		assert.Equal(t, "admin", response["username"])
 		assert.Equal(t, "admin@example.com", response["email"])
@@ -170,9 +173,9 @@ func TestAuthExample(t *testing.T) {
 	t.Run("Profile without Token", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/profile", nil)
 		rec := httptest.NewRecorder()
-		
+
 		e.ServeHTTP(rec, req)
-		
+
 		assert.Equal(t, http.StatusUnauthorized, rec.Code)
 	})
 
@@ -180,9 +183,9 @@ func TestAuthExample(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/profile", nil)
 		req.Header.Set("Authorization", "Bearer invalid-token")
 		rec := httptest.NewRecorder()
-		
+
 		e.ServeHTTP(rec, req)
-		
+
 		assert.Equal(t, http.StatusUnauthorized, rec.Code)
 	})
 
@@ -193,13 +196,13 @@ func TestAuthExample(t *testing.T) {
 			Password: "password",
 		}
 		body, _ := json.Marshal(loginReq)
-		
+
 		req := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewReader(body))
 		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 		rec := httptest.NewRecorder()
-		
+
 		e.ServeHTTP(rec, req)
-		
+
 		var loginResponse map[string]interface{}
 		json.Unmarshal(rec.Body.Bytes(), &loginResponse)
 		refreshToken := loginResponse["refresh_token"].(string)
@@ -211,19 +214,19 @@ func TestAuthExample(t *testing.T) {
 			RefreshToken: refreshToken,
 		}
 		body, _ = json.Marshal(refreshReq)
-		
+
 		req = httptest.NewRequest(http.MethodPost, "/auth/refresh", bytes.NewReader(body))
 		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 		rec = httptest.NewRecorder()
-		
+
 		e.ServeHTTP(rec, req)
-		
+
 		assert.Equal(t, http.StatusOK, rec.Code)
-		
+
 		var response map[string]interface{}
 		err := json.Unmarshal(rec.Body.Bytes(), &response)
 		require.NoError(t, err)
-		
+
 		assert.NotEmpty(t, response["access_token"])
 		assert.Equal(t, float64(3600), response["expires_in"])
 	})
@@ -242,7 +245,7 @@ func TestJWTTokenValidation(t *testing.T) {
 		token, err := jwtSvc.GenerateAccessToken("123", "testuser", "test@example.com", "user")
 		require.NoError(t, err)
 		assert.NotEmpty(t, token)
-		
+
 		// Validate token
 		validatedClaims, err := jwtSvc.ValidateToken(token)
 		require.NoError(t, err)
@@ -278,7 +281,7 @@ func BenchmarkAuth(b *testing.B) {
 
 	b.Run("ValidateToken", func(b *testing.B) {
 		token, _ := jwtSvc.GenerateAccessToken("123", "benchuser", "bench@example.com", "user")
-		
+
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			jwtSvc.ValidateToken(token)

@@ -84,7 +84,7 @@ func TestMemoryStore_CleanupDoesNotAffectActiveKeys(t *testing.T) {
 		case <-done:
 			// Wait for final cleanup
 			time.Sleep(60 * time.Millisecond)
-			
+
 			// Active key should remain, inactive should be cleaned
 			assert.Equal(t, 1, store.Size())
 			assert.True(t, store.Allow(activeKey))
@@ -158,7 +158,7 @@ func TestMemoryStore_MemoryStability(t *testing.T) {
 
 			// Final size should be much less than total created (due to cleanup)
 			assert.Less(t, finalSize, clientID/10, "Most limiters should be cleaned up")
-			
+
 			// Memory growth should be minimal
 			assert.Less(t, memGrowth, 10.0, "Memory growth should be controlled")
 			return
@@ -259,6 +259,20 @@ func TestMemoryStore_StopCleanup(t *testing.T) {
 
 	// Size should remain the same (no cleanup after stop)
 	assert.Equal(t, 5, store.Size())
+}
+
+func TestMemoryStore_StopTwice(t *testing.T) {
+	config := &middleware.MemoryStoreConfig{
+		Rate:            10,
+		Burst:           20,
+		CleanupInterval: 10 * time.Millisecond,
+		TTL:             20 * time.Millisecond,
+	}
+	store := middleware.NewMemoryStoreWithConfig(config)
+
+	// Calling Stop twice should not panic
+	store.Stop()
+	store.Stop()
 }
 
 func BenchmarkMemoryStore_WithCleanup(b *testing.B) {

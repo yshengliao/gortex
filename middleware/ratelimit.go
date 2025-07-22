@@ -15,10 +15,10 @@ import (
 type RateLimiter interface {
 	// Allow checks if a request is allowed
 	Allow(key string) bool
-	
+
 	// AllowN checks if n requests are allowed
 	AllowN(key string, n int) bool
-	
+
 	// Reset resets the rate limiter for a key
 	Reset(key string)
 }
@@ -27,19 +27,19 @@ type RateLimiter interface {
 type RateLimitConfig struct {
 	// Rate is the number of requests per second
 	Rate int
-	
+
 	// Burst is the maximum burst size
 	Burst int
-	
+
 	// KeyFunc extracts the key from the request
 	KeyFunc func(c echo.Context) string
-	
+
 	// ErrorHandler handles rate limit errors
 	ErrorHandler func(c echo.Context) error
-	
+
 	// SkipFunc determines if rate limiting should be skipped
 	SkipFunc func(c echo.Context) bool
-	
+
 	// Store is the rate limiter implementation
 	Store RateLimiter
 }
@@ -77,6 +77,7 @@ type MemoryStore struct {
 	cleanupInterval time.Duration
 	ttl             time.Duration
 	stopped         chan struct{}
+	stopOnce        sync.Once
 }
 
 // MemoryStoreConfig holds configuration for MemoryStore
@@ -119,10 +120,10 @@ func NewMemoryStoreWithConfig(config *MemoryStoreConfig) *MemoryStore {
 		ttl:             config.TTL,
 		stopped:         make(chan struct{}),
 	}
-	
+
 	// Start cleanup routine
 	go store.cleanupRoutine()
-	
+
 	return store
 }
 
@@ -134,7 +135,7 @@ func (s *MemoryStore) Allow(key string) bool {
 // AllowN checks if n requests are allowed
 func (s *MemoryStore) AllowN(key string, n int) bool {
 	now := time.Now()
-	
+
 	s.mu.Lock()
 	entry, exists := s.limiters[key]
 	if !exists {
@@ -147,7 +148,7 @@ func (s *MemoryStore) AllowN(key string, n int) bool {
 		entry.lastAccess = now
 	}
 	s.mu.Unlock()
-	
+
 	return entry.limiter.AllowN(now, n)
 }
 
@@ -174,7 +175,7 @@ func (s *MemoryStore) cleanupRoutine() {
 func (s *MemoryStore) performCleanup() {
 	now := time.Now()
 	expiredKeys := make([]string, 0)
-	
+
 	s.mu.RLock()
 	for key, entry := range s.limiters {
 		if now.Sub(entry.lastAccess) > s.ttl {
@@ -182,7 +183,7 @@ func (s *MemoryStore) performCleanup() {
 		}
 	}
 	s.mu.RUnlock()
-	
+
 	// Remove expired entries
 	if len(expiredKeys) > 0 {
 		s.mu.Lock()
@@ -205,8 +206,10 @@ func (s *MemoryStore) Size() int {
 
 // Stop stops the cleanup routine
 func (s *MemoryStore) Stop() {
-	s.cleanup.Stop()
-	close(s.stopped)
+	s.stopOnce.Do(func() {
+		s.cleanup.Stop()
+		close(s.stopped)
+	})
 }
 
 // RateLimitMiddleware creates a rate limiting middleware
@@ -214,26 +217,26 @@ func RateLimitMiddleware(config *RateLimitConfig) echo.MiddlewareFunc {
 	if config == nil {
 		config = DefaultRateLimitConfig()
 	}
-	
+
 	if config.Store == nil {
 		config.Store = NewMemoryStore(config.Rate, config.Burst)
 	}
-	
+
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			// Check if should skip
 			if config.SkipFunc != nil && config.SkipFunc(c) {
 				return next(c)
 			}
-			
+
 			// Get key
 			key := config.KeyFunc(c)
-			
+
 			// Check rate limit
 			if !config.Store.Allow(key) {
 				return config.ErrorHandler(c)
 			}
-			
+
 			return next(c)
 		}
 	}
@@ -251,21 +254,21 @@ func RateLimitByIP(rate, burst int) echo.MiddlewareFunc {
 			return echo.NewHTTPError(http.StatusTooManyRequests, "rate limit exceeded")
 		},
 	}
-	
+
 	return RateLimitMiddleware(config)
 }
 
 // RateLimitByUser creates a rate limiter by user ID
 func RateLimitByUser(rate, burst int, getUserID func(c echo.Context) string) echo.MiddlewareFunc {
 	config := &RateLimitConfig{
-		Rate:  rate,
-		Burst: burst,
+		Rate:    rate,
+		Burst:   burst,
 		KeyFunc: getUserID,
 		ErrorHandler: func(c echo.Context) error {
 			return echo.NewHTTPError(http.StatusTooManyRequests, "rate limit exceeded")
 		},
 	}
-	
+
 	return RateLimitMiddleware(config)
 }
 
@@ -281,7 +284,7 @@ func RateLimitByPath(rate, burst int) echo.MiddlewareFunc {
 			return echo.NewHTTPError(http.StatusTooManyRequests, "rate limit exceeded")
 		},
 	}
-	
+
 	return RateLimitMiddleware(config)
 }
 
