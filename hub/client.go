@@ -121,7 +121,28 @@ func (c *Client) WritePump() {
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
 				// The hub closed the channel
-				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
+				c.logger.Info("Channel closed, sending close message", zap.String("client_id", c.ID))
+				c.conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseGoingAway, "Server shutting down"))
+				return
+			}
+
+			// Handle special close message
+			if message.Type == "close" {
+				c.logger.Info("Received close message", zap.String("client_id", c.ID))
+				
+				// Extract close code and reason
+				code := websocket.CloseGoingAway
+				reason := "Server shutting down"
+				
+				if codeVal, ok := message.Data["code"].(float64); ok {
+					code = int(codeVal)
+				}
+				if reasonVal, ok := message.Data["reason"].(string); ok {
+					reason = reasonVal
+				}
+				
+				// Send proper WebSocket close message
+				c.conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(code, reason))
 				return
 			}
 

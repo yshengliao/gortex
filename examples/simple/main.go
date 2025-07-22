@@ -140,6 +140,20 @@ func main() {
 	// Start WebSocket hub
 	go wsHub.Run()
 
+	// Register shutdown hooks
+	application.OnShutdown(func(ctx context.Context) error {
+		logger.Info("Running WebSocket hub shutdown hook")
+		return wsHub.ShutdownWithTimeout(5 * time.Second)
+	})
+
+	application.OnShutdown(func(ctx context.Context) error {
+		logger.Info("Running cleanup tasks")
+		// Add any cleanup tasks here (e.g., closing database connections)
+		time.Sleep(100 * time.Millisecond) // Simulate cleanup work
+		logger.Info("Cleanup completed")
+		return nil
+	})
+
 	// Setup graceful shutdown
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -155,15 +169,14 @@ func main() {
 	// Wait for interrupt signal
 	<-ctx.Done()
 
-	// Shutdown
-	logger.Info("Shutting down...")
+	// Shutdown with timeout
+	logger.Info("Shutdown signal received, starting graceful shutdown...")
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	wsHub.Shutdown()
 	if err := application.Shutdown(shutdownCtx); err != nil {
 		logger.Error("Shutdown error", zap.Error(err))
 	}
 
-	logger.Info("Server stopped")
+	logger.Info("Server stopped gracefully")
 }

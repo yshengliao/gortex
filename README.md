@@ -354,6 +354,70 @@ checker.Register("database", func(ctx context.Context) observability.HealthCheck
 e.Use(middleware.RateLimitByIP(100, 200)) // 100 req/sec, burst 200
 ```
 
+### Graceful Shutdown
+
+Comprehensive graceful shutdown support with configurable timeouts and shutdown hooks:
+
+```go
+// Configure shutdown timeout
+app, err := app.NewApp(
+    app.WithShutdownTimeout(30 * time.Second), // Default: 30s
+    // ... other options
+)
+
+// Register shutdown hooks for cleanup tasks
+app.OnShutdown(func(ctx context.Context) error {
+    logger.Info("Waiting for active requests to complete...")
+    // Wait for in-flight requests
+    return nil
+})
+
+// WebSocket hub graceful shutdown
+app.OnShutdown(func(ctx context.Context) error {
+    logger.Info("Shutting down WebSocket connections...")
+    // Sends close messages to all clients before shutdown
+    return wsHub.ShutdownWithTimeout(5 * time.Second)
+})
+
+// Database cleanup
+app.OnShutdown(func(ctx context.Context) error {
+    logger.Info("Closing database connections...")
+    return db.Close(ctx)
+})
+
+// Shutdown process:
+// 1. Stop accepting new requests
+// 2. Execute all shutdown hooks in parallel
+// 3. Send WebSocket close messages (code 1001 - Going Away)
+// 4. Wait for active connections to close gracefully
+// 5. Force close remaining connections after timeout
+
+// Handle shutdown signals
+ctx, stop := signal.NotifyContext(context.Background(), 
+    os.Interrupt,    // Ctrl+C
+    syscall.SIGTERM, // Kubernetes/Docker
+)
+defer stop()
+
+<-ctx.Done()
+
+// Perform graceful shutdown
+shutdownCtx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+defer cancel()
+
+if err := app.Shutdown(shutdownCtx); err != nil {
+    logger.Error("Shutdown error", zap.Error(err))
+}
+```
+
+**Key Features:**
+- Configurable shutdown timeout with context propagation
+- Parallel execution of shutdown hooks for efficiency
+- WebSocket clients receive proper close messages before disconnection
+- Automatic timeout handling to prevent hanging shutdowns
+- Thread-safe hook registration and execution
+- Detailed logging throughout shutdown process
+
 ## Development Status
 
 ### Current Version: Alpha (Production-Optimized)

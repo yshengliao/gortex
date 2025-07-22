@@ -2,6 +2,9 @@
 package hub
 
 import (
+	"fmt"
+	"time"
+	
 	"go.uber.org/zap"
 )
 
@@ -63,11 +66,37 @@ func (h *Hub) Run() {
 			req.response <- len(h.clients)
 
 		case <-h.shutdown:
-			// Close all client connections
+			// Send graceful close message to all clients
+			h.logger.Info("Closing all client connections", zap.Int("count", len(h.clients)))
+			
+			closeMsg := &Message{
+				Type: "close",
+				Data: map[string]interface{}{
+					"code":    1001, // Going Away
+					"reason":  "Server is shutting down",
+					"message": "Please reconnect later",
+				},
+			}
+			
+			// Send close message to all clients
+			for client := range h.clients {
+				select {
+				case client.send <- closeMsg:
+					// Give client time to process the close message
+				default:
+					// Channel is full, client will be forcefully closed
+				}
+			}
+			
+			// Give clients a moment to receive close messages
+			time.Sleep(500 * time.Millisecond)
+			
+			// Now close all client connections
 			for client := range h.clients {
 				close(client.send)
 				delete(h.clients, client)
 			}
+			
 			h.logger.Info("Hub shutdown complete")
 			return
 		}
@@ -188,6 +217,41 @@ func (h *Hub) RegisterClient(client *Client) {
 
 // Shutdown gracefully shuts down the hub
 func (h *Hub) Shutdown() {
+	h.logger.Info("Hub shutdown initiated")
 	close(h.shutdown)
 	<-h.shutdownDone
+}
+
+// ShutdownWithTimeout gracefully shuts down the hub with a timeout
+func (h *Hub) ShutdownWithTimeout(timeout time.Duration) error {
+	h.logger.Info("Hub shutdown initiated", zap.Duration("timeout", timeout))
+	
+	// Send shutdown notification to all clients
+	shutdownMsg := &Message{
+		Type: "server_shutdown",
+		Data: map[string]interface{}{
+			"message": "Server is shutting down",
+			"time":    time.Now().Unix(),
+		},
+	}
+	
+	// Try to broadcast shutdown message
+	select {
+	case h.broadcast <- shutdownMsg:
+		// Give clients a moment to receive the message
+		time.Sleep(100 * time.Millisecond)
+	default:
+		h.logger.Warn("Could not broadcast shutdown message")
+	}
+	
+	// Start shutdown
+	close(h.shutdown)
+	
+	// Wait for shutdown with timeout
+	select {
+	case <-h.shutdownDone:
+		return nil
+	case <-time.After(timeout):
+		return fmt.Errorf("hub shutdown timed out after %v", timeout)
+	}
 }

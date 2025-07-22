@@ -377,6 +377,14 @@ Each optimization commit should include:
     - HTTP client wrapper for automatic propagation
     - Performance: ~1.6μs for generation, ~15ns for context operations
 
+13. **Graceful Shutdown Enhancements**:
+    - Configurable shutdown timeout with WithShutdownTimeout() option
+    - Shutdown hooks system for parallel cleanup execution
+    - WebSocket graceful shutdown with client notification
+    - Proper close messages (1001 - Going Away) sent to clients
+    - Thread-safe hook registration and execution
+    - Comprehensive shutdown progress logging
+
 ### Optimization Summary
 
 The Gortex framework has successfully completed its optimization roadmap:

@@ -4,6 +4,8 @@ package app
 import (
 	"context"
 	"fmt"
+	"sync"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -12,12 +14,18 @@ import (
 	errorMiddleware "github.com/yshengliao/gortex/middleware"
 )
 
+// ShutdownHook is a function that gets called during shutdown
+type ShutdownHook func(ctx context.Context) error
+
 // App represents the main application instance
 type App struct {
-	e      *echo.Echo
-	config *Config
-	logger *zap.Logger
-	ctx    *Context
+	e               *echo.Echo
+	config          *Config
+	logger          *zap.Logger
+	ctx             *Context
+	shutdownHooks   []ShutdownHook
+	shutdownTimeout time.Duration
+	mu              sync.RWMutex
 }
 
 // Config is re-exported from the config package for convenience
@@ -29,8 +37,10 @@ type Option func(*App) error
 // NewApp creates a new application instance with the given options
 func NewApp(opts ...Option) (*App, error) {
 	app := &App{
-		e:   echo.New(),
-		ctx: NewContext(),
+		e:               echo.New(),
+		ctx:             NewContext(),
+		shutdownHooks:   make([]ShutdownHook, 0),
+		shutdownTimeout: 30 * time.Second, // Default 30 seconds
 	}
 
 	// Apply all options
@@ -72,6 +82,17 @@ func WithLogger(logger *zap.Logger) Option {
 func WithHandlers(manager interface{}) Option {
 	return func(app *App) error {
 		return RegisterRoutes(app.e, manager, app.ctx)
+	}
+}
+
+// WithShutdownTimeout sets the shutdown timeout duration
+func WithShutdownTimeout(timeout time.Duration) Option {
+	return func(app *App) error {
+		if timeout <= 0 {
+			return fmt.Errorf("shutdown timeout must be positive")
+		}
+		app.shutdownTimeout = timeout
+		return nil
 	}
 }
 
@@ -142,10 +163,121 @@ func (app *App) Run() error {
 	return app.e.Start(address)
 }
 
+// RegisterShutdownHook registers a function to be called during shutdown
+func (app *App) RegisterShutdownHook(hook ShutdownHook) {
+	app.mu.Lock()
+	defer app.mu.Unlock()
+	app.shutdownHooks = append(app.shutdownHooks, hook)
+}
+
+// OnShutdown is a convenience method for registering shutdown hooks
+func (app *App) OnShutdown(fn func(context.Context) error) {
+	app.RegisterShutdownHook(ShutdownHook(fn))
+}
+
 // Shutdown gracefully shuts down the server
 func (app *App) Shutdown(ctx context.Context) error {
 	if app.logger != nil {
-		app.logger.Info("Shutting down server")
+		app.logger.Info("Starting graceful shutdown")
 	}
-	return app.e.Shutdown(ctx)
+
+	// Create a timeout context if none provided
+	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, app.shutdownTimeout)
+		defer cancel()
+	}
+
+	var shutdownErr error
+
+	// Run pre-shutdown hooks in parallel
+	if err := app.runShutdownHooks(ctx); err != nil {
+		if app.logger != nil {
+			app.logger.Error("Error running shutdown hooks", zap.Error(err))
+		}
+		shutdownErr = err
+	}
+
+	// Shutdown the Echo server
+	if app.logger != nil {
+		app.logger.Info("Shutting down HTTP server")
+	}
+	
+	if err := app.e.Shutdown(ctx); err != nil {
+		if app.logger != nil {
+			app.logger.Error("Error shutting down HTTP server", zap.Error(err))
+		}
+		// Server shutdown error takes precedence
+		return err
+	}
+
+	if app.logger != nil {
+		app.logger.Info("Graceful shutdown completed")
+	}
+	
+	return shutdownErr
+}
+
+// runShutdownHooks executes all registered shutdown hooks
+func (app *App) runShutdownHooks(ctx context.Context) error {
+	app.mu.RLock()
+	hooks := make([]ShutdownHook, len(app.shutdownHooks))
+	copy(hooks, app.shutdownHooks)
+	app.mu.RUnlock()
+
+	if len(hooks) == 0 {
+		return nil
+	}
+
+	if app.logger != nil {
+		app.logger.Info("Running shutdown hooks", zap.Int("count", len(hooks)))
+	}
+
+	// Run hooks in parallel with error collection
+	var wg sync.WaitGroup
+	errChan := make(chan error, len(hooks))
+
+	for i, hook := range hooks {
+		wg.Add(1)
+		go func(idx int, h ShutdownHook) {
+			defer wg.Done()
+			
+			if app.logger != nil {
+				app.logger.Debug("Running shutdown hook", zap.Int("index", idx))
+			}
+			
+			if err := h(ctx); err != nil {
+				errChan <- fmt.Errorf("shutdown hook %d failed: %w", idx, err)
+			}
+		}(i, hook)
+	}
+
+	// Wait for all hooks to complete or context to expire
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		// All hooks completed
+	case <-ctx.Done():
+		// Context expired
+		return fmt.Errorf("shutdown hooks timed out: %w", ctx.Err())
+	}
+
+	close(errChan)
+
+	// Collect any errors
+	var errs []error
+	for err := range errChan {
+		errs = append(errs, err)
+	}
+
+	if len(errs) > 0 {
+		return fmt.Errorf("shutdown hooks failed: %v", errs)
+	}
+
+	return nil
 }
