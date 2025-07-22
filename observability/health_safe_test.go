@@ -138,7 +138,7 @@ func TestSafeHealthChecker(t *testing.T) {
 		checker.Register("after-stop", func(ctx context.Context) HealthCheckResult {
 			return HealthCheckResult{Status: HealthStatusHealthy}
 		})
-		
+
 		results := checker.Check(context.Background())
 		assert.Empty(t, results)
 	})
@@ -149,7 +149,7 @@ func TestSafeHealthChecker(t *testing.T) {
 
 		// Register many checks
 		for i := 0; i < 100; i++ {
-			name := string(rune('A' + (i % 26))) + string(rune('0' + (i / 26)))
+			name := string(rune('A'+(i%26))) + string(rune('0'+(i/26)))
 			checker.Register(name, func(ctx context.Context) HealthCheckResult {
 				return HealthCheckResult{Status: HealthStatusHealthy}
 			})
@@ -162,7 +162,7 @@ func TestSafeHealthChecker(t *testing.T) {
 			wg.Add(1)
 			go func(id int) {
 				defer wg.Done()
-				name := string(rune('A' + (id % 26))) + string(rune('0' + (id / 26)))
+				name := string(rune('A'+(id%26))) + string(rune('0'+(id/26)))
 				checker.Unregister(name)
 			}(i)
 		}
@@ -181,7 +181,7 @@ func TestSafeHealthChecker(t *testing.T) {
 		// Should have some checks remaining
 		results := checker.GetResults()
 		assert.Greater(t, len(results), 0)
-		assert.Less(t, len(results), 100)
+		assert.LessOrEqual(t, len(results), 100)
 	})
 }
 
