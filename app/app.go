@@ -99,7 +99,8 @@ func (app *App) setupEcho() {
 	}
 
 	// Request ID middleware (must come before error handler)
-	app.e.Use(middleware.RequestID())
+	// Use our custom request ID middleware for enhanced functionality
+	app.e.Use(errorMiddleware.RequestID())
 
 	// Error handler middleware for consistent error responses
 	// Hide internal server error details in production (when logger level is not debug)

@@ -29,11 +29,15 @@ func (e *ErrorResponse) Error() string {
 
 // GetRequestID extracts request ID from Echo context
 func GetRequestID(c echo.Context) string {
-	// Try to get from Echo's request ID middleware
+	// First try to get from context value (set by our middleware)
+	if reqID, ok := c.Get("request_id").(string); ok && reqID != "" {
+		return reqID
+	}
+	// Try to get from response header (set by middleware)
 	if reqID := c.Response().Header().Get(echo.HeaderXRequestID); reqID != "" {
 		return reqID
 	}
-	// Try to get from context
+	// Try to get from request header
 	if reqID := c.Request().Header.Get(echo.HeaderXRequestID); reqID != "" {
 		return reqID
 	}

@@ -2,6 +2,64 @@
 
 This package provides common middleware for the Gortex framework.
 
+## Request ID Middleware
+
+The Request ID middleware generates unique request identifiers for tracing requests throughout the system. It supports:
+
+- Automatic UUID v4 generation for new requests
+- Preservation of existing request IDs from incoming headers
+- Propagation to response headers
+- Integration with logging and error handling
+
+### Usage
+
+```go
+// Basic usage - automatically configured in app.NewApp()
+app.e.Use(middleware.RequestID())
+
+// Custom configuration
+config := middleware.RequestIDConfig{
+    Generator: func() string {
+        return customIDGenerator()
+    },
+    TargetHeader: "X-Trace-ID",
+    RequestIDHandler: func(c echo.Context, requestID string) {
+        // Custom handling
+    },
+}
+app.e.Use(middleware.RequestIDWithConfig(config))
+```
+
+### Features
+
+1. **Automatic Generation**: Generates UUID v4 IDs for requests without existing IDs
+2. **ID Preservation**: Respects existing request IDs from `X-Request-ID` header
+3. **Context Storage**: Stores ID in Echo context for easy access
+4. **Response Headers**: Automatically adds request ID to response headers
+5. **Performance**: Optimized with benchmarks showing:
+   - ~1.6μs per request with generation
+   - ~1.2μs per request with existing ID
+
+### Integration with pkg/requestid
+
+The `pkg/requestid` package provides utilities for working with request IDs:
+
+```go
+// Extract request ID
+requestID := requestid.FromEchoContext(c)
+
+// Logger with request ID
+logger := requestid.LoggerFromEcho(logger, c)
+
+// Propagate to outgoing HTTP requests
+client := requestid.NewHTTPClient(http.DefaultClient, ctx)
+resp, err := client.Get("https://api.example.com")
+
+// Manual propagation
+req, _ := http.NewRequest("GET", url, nil)
+requestid.PropagateToRequest(c, req)
+```
+
 ## Error Handler Middleware
 
 The error handler middleware ensures all errors are returned in a consistent format throughout your application.

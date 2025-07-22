@@ -369,6 +369,14 @@ Each optimization commit should include:
     - Production-safe error detail hiding
     - Performance: ~59ns/op with only 1 allocation
 
+12. **Request ID Tracking System**:
+    - Custom request ID middleware with UUID v4 generation
+    - Preserves existing request IDs from X-Request-ID headers
+    - Request ID utilities package for context management
+    - Automatic logger integration with request_id field
+    - HTTP client wrapper for automatic propagation
+    - Performance: ~1.6μs for generation, ~15ns for context operations
+
 ### Optimization Summary
 
 The Gortex framework has successfully completed its optimization roadmap:

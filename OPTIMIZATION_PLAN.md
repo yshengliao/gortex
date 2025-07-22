@@ -15,6 +15,11 @@
 - Bofry/config 整合
 - 範例測試自動化
 
+✅ **錯誤處理與追蹤**
+- 統一錯誤回應系統 (標準化格式，錯誤碼分類)
+- 錯誤中間件實作 (自動轉換，請求 ID 注入)
+- 請求 ID 追蹤系統 (UUID 生成，日誌整合，HTTP 傳播)
+
 ---
 
 ## 優化任務清單
@@ -25,7 +30,7 @@
 |------------|---------|----------|
 | ✅ 統一錯誤回應系統 | 實作標準化錯誤回應格式，包含錯誤碼分類 (validation, auth, system, business) | README.md, CLAUDE.md, OPTIMIZATION_PLAN.md |
 | ✅ 錯誤中間件實作 | 建立錯誤回應中間件，確保所有錯誤格式一致性 | README.md, CLAUDE.md |
-| 請求 ID 追蹤 | 實作請求 ID 生成與傳播，整合至日誌系統 | README.md, CLAUDE.md |
+| ✅ 請求 ID 追蹤 | 實作請求 ID 生成與傳播，整合至日誌系統 | README.md, CLAUDE.md |
 | 優雅關閉增強 | 改進關閉超時配置，新增預關閉鉤子，確保 WebSocket 連接正確關閉 | README.md, CLAUDE.md |
 
 ### 觀察性/監控類

@@ -14,7 +14,7 @@ Gortex (Go + Vortex) creates a powerful vortex of connectivity between HTTP and 
 - **Development Speed**: Hot reload in dev, optimized builds for production  
 - **WebSocket Native**: Built-in hub for real-time communication
 - **Convention over Configuration**: Minimal setup, maximum productivity
-- **Observability Ready**: Metrics, tracing, and health checks included
+- **Observability Ready**: Metrics, tracing, health checks, and request ID tracking
 - **Security Built-in**: JWT, validation, rate limiting out of the box
 
 ## Quick Start
@@ -232,6 +232,40 @@ admin.Use(auth.RequireRole("admin"))
 // Access user info in handlers
 userID := auth.GetUserID(c)
 role := auth.GetRole(c)
+```
+
+### Request ID Tracking & Propagation
+
+```go
+// Automatic request ID generation and tracking
+// Every request gets a unique ID (UUID v4) or preserves incoming X-Request-ID
+
+// Access request ID in handlers
+func (h *APIHandler) GET(c echo.Context) error {
+    // Logger automatically includes request_id field
+    logger := requestid.LoggerFromEcho(h.Logger, c)
+    logger.Info("Processing request")
+    
+    // Propagate to external services
+    ctx := requestid.WithEchoContext(context.Background(), c)
+    client := requestid.NewHTTPClient(http.DefaultClient, ctx)
+    
+    // Request ID automatically added to outgoing requests
+    resp, err := client.Get("https://external-api.com/data")
+    
+    return response.SuccessWithMeta(c, 200, data, meta)
+}
+
+// Request ID included in all error responses
+{
+    "success": false,
+    "error": {
+        "code": 3001,
+        "message": "Internal server error"
+    },
+    "request_id": "550e8400-e29b-41d4-a716-446655440000",
+    "timestamp": "2025-07-21T10:00:00Z"
+}
 ```
 
 ### Request Validation
