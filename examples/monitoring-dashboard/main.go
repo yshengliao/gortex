@@ -105,6 +105,7 @@ func main() {
 	cfg := &app.Config{}
 	cfg.Server.Address = ":8080"
 	cfg.Logger.Level = "debug" // This enables development mode and monitoring endpoints
+	cfg.Server.GZip = true     // Enable compression to see it in monitor output
 
 	startTime := time.Now()
 
@@ -151,7 +152,7 @@ func main() {
 		fmt.Println("  POST /metrics/health - Health check")
 		
 		fmt.Println("\nDevelopment monitoring endpoints:")
-		fmt.Println("  GET /_monitor - System monitoring dashboard (memory, goroutines, etc.)")
+		fmt.Println("  GET /_monitor - System monitoring dashboard (memory, goroutines, compression, etc.)")
 		fmt.Println("  GET /_routes - List all registered routes")
 		
 		fmt.Println("\nTry these commands:")
@@ -161,12 +162,16 @@ func main() {
 		fmt.Println("  # Watch system metrics in real-time")
 		fmt.Println("  watch -n 1 'curl -s http://localhost:8080/_monitor | jq .memory'")
 		fmt.Println()
+		fmt.Println("  # Check compression status")
+		fmt.Println("  curl -s http://localhost:8080/_monitor | jq .compression")
+		fmt.Println()
 		fmt.Println("  # Check application metrics")
 		fmt.Println("  curl http://localhost:8080/metrics | jq")
 		fmt.Println()
 		fmt.Println("  # Monitor specific fields")
 		fmt.Println("  curl -s http://localhost:8080/_monitor | jq '.system.goroutines'")
 		fmt.Println("  curl -s http://localhost:8080/_monitor | jq '.memory.heap_alloc_mb'")
+		fmt.Println("  curl -s http://localhost:8080/_monitor | jq '.compression.gzip_enabled'")
 		fmt.Println()
 		fmt.Println("Press Ctrl+C to stop...")
 		fmt.Println()

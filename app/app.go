@@ -328,6 +328,7 @@ func (app *App) registerDevelopmentRoutes() {
 	devHandlers := &devHandler{
 		logger: app.logger,
 		echo:   app.e,
+		config: app.config,
 	}
 
 	// Register development routes
@@ -350,6 +351,7 @@ func (app *App) registerDevelopmentRoutes() {
 type devHandler struct {
 	logger *zap.Logger
 	echo   *echo.Echo
+	config *Config
 }
 
 // Routes returns debug information about all registered routes
@@ -495,6 +497,27 @@ func (h *devHandler) Monitor(c echo.Context) error {
 		"total_routes": len(routes),
 	}
 
+	// Get compression status
+	compressionInfo := map[string]interface{}{
+		"gzip_enabled": false,
+		"compression_level": "not configured",
+	}
+	
+	if h.config != nil && h.config.Server.GZip {
+		compressionInfo["gzip_enabled"] = true
+		compressionInfo["compression_level"] = "default (gzip.DefaultCompression)"
+		compressionInfo["content_types"] = []string{
+			"text/html",
+			"text/css", 
+			"text/plain",
+			"text/javascript",
+			"application/javascript",
+			"application/json",
+			"application/xml",
+		}
+		compressionInfo["min_size_bytes"] = 1024
+	}
+
 	// Final response
 	return c.JSON(200, map[string]interface{}{
 		"status":      "healthy",
@@ -502,6 +525,7 @@ func (h *devHandler) Monitor(c echo.Context) error {
 		"memory":      memoryInfo,
 		"gc_stats":    gcStats,
 		"routes":      routesInfo,
+		"compression": compressionInfo,
 		"server_info": map[string]interface{}{
 			"debug_mode": h.echo.Debug,
 			"address":    h.echo.Server.Addr,

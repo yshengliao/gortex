@@ -529,6 +529,7 @@ The `/_monitor` endpoint provides real-time system metrics:
 - **System Info**: Goroutine count, CPU count, Go version, uptime
 - **Memory Stats**: Heap allocation, GC statistics, memory usage breakdown
 - **GC History**: Last 5 garbage collection pause times
+- **Compression Status**: GZip enabled state, compression level, supported content types
 - **Server Info**: Debug mode status, route count
 
 Example response:
@@ -546,6 +547,12 @@ Example response:
     "heap_alloc_mb": 10.5,
     "heap_objects": 15234,
     "num_gc": 5
+  },
+  "compression": {
+    "gzip_enabled": true,
+    "compression_level": "default (gzip.DefaultCompression)",
+    "content_types": ["text/html", "text/css", "application/json"],
+    "min_size_bytes": 1024
   }
 }
 ```

@@ -445,6 +445,17 @@ The Gortex framework has successfully completed its optimization roadmap:
     - Zero performance impact (only called on demand)
     - Example: monitoring-dashboard demonstrates usage
 
+### Compression Status Display (2025/07/22)
+
+17. **Compression Status Display**:
+    - Added compression status to /_monitor endpoint
+    - Shows whether GZip compression is enabled
+    - Displays compression level (default: gzip.DefaultCompression)
+    - Lists supported content types for compression
+    - Shows minimum size threshold for compression (1024 bytes)
+    - Helps developers debug compression configuration
+    - Example: monitoring-dashboard shows compression status
+
 The framework is now production-ready with excellent performance characteristics and zero operational dependencies.
 
 **Last Updated**: 2025/07/22 | **Framework Status**: Alpha (Production-Optimized) | **Go**: 1.24

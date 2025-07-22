@@ -92,6 +92,12 @@ func TestMonitoringEndpoint(t *testing.T) {
 	serverInfo, ok := response["server_info"].(map[string]interface{})
 	require.True(t, ok, "server_info should be present")
 	assert.NotNil(t, serverInfo["debug_mode"])
+	
+	// Check compression info
+	compression, ok := response["compression"].(map[string]interface{})
+	require.True(t, ok, "compression info should be present")
+	assert.NotNil(t, compression["gzip_enabled"])
+	assert.NotNil(t, compression["compression_level"])
 }
 
 func TestMonitoringEndpointNotInProduction(t *testing.T) {
@@ -178,6 +184,81 @@ func TestMonitoringMetricsValues(t *testing.T) {
 
 	heapObjects := memory["heap_objects"].(float64)
 	assert.Greater(t, heapObjects, float64(0), "Should have some heap objects")
+}
+
+func TestMonitoringCompressionStatus(t *testing.T) {
+	// Create logger
+	logger, _ := zap.NewDevelopment()
+
+	// Test with compression enabled
+	t.Run("CompressionEnabled", func(t *testing.T) {
+		cfg := &app.Config{}
+		cfg.Logger.Level = "debug"
+		cfg.Server.GZip = true
+
+		application, err := app.NewApp(
+			app.WithConfig(cfg),
+			app.WithLogger(logger),
+			app.WithHandlers(&MockHandlers{Root: &MockHandler{}}),
+			app.WithDevelopmentMode(true),
+		)
+		require.NoError(t, err)
+
+		e := application.Echo()
+
+		req := httptest.NewRequest(http.MethodGet, "/_monitor", nil)
+		rec := httptest.NewRecorder()
+		e.ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		var response map[string]interface{}
+		err = json.Unmarshal(rec.Body.Bytes(), &response)
+		require.NoError(t, err)
+
+		compression := response["compression"].(map[string]interface{})
+		assert.Equal(t, true, compression["gzip_enabled"])
+		assert.Contains(t, compression["compression_level"].(string), "default")
+		
+		contentTypes, ok := compression["content_types"].([]interface{})
+		assert.True(t, ok)
+		assert.Greater(t, len(contentTypes), 0)
+		
+		minSize, ok := compression["min_size_bytes"].(float64)
+		assert.True(t, ok)
+		assert.Equal(t, float64(1024), minSize)
+	})
+
+	// Test with compression disabled
+	t.Run("CompressionDisabled", func(t *testing.T) {
+		cfg := &app.Config{}
+		cfg.Logger.Level = "debug"
+		cfg.Server.GZip = false
+
+		application, err := app.NewApp(
+			app.WithConfig(cfg),
+			app.WithLogger(logger),
+			app.WithHandlers(&MockHandlers{Root: &MockHandler{}}),
+			app.WithDevelopmentMode(true),
+		)
+		require.NoError(t, err)
+
+		e := application.Echo()
+
+		req := httptest.NewRequest(http.MethodGet, "/_monitor", nil)
+		rec := httptest.NewRecorder()
+		e.ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		var response map[string]interface{}
+		err = json.Unmarshal(rec.Body.Bytes(), &response)
+		require.NoError(t, err)
+
+		compression := response["compression"].(map[string]interface{})
+		assert.Equal(t, false, compression["gzip_enabled"])
+		assert.Equal(t, "not configured", compression["compression_level"])
+	})
 }
 
 func BenchmarkMonitoringEndpoint(b *testing.B) {
