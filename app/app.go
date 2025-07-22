@@ -4,12 +4,12 @@ package app
 import (
 	"context"
 	"fmt"
-	"net/http"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"go.uber.org/zap"
 	"github.com/yshengliao/gortex/config"
+	errorMiddleware "github.com/yshengliao/gortex/middleware"
 )
 
 // App represents the main application instance
@@ -81,8 +81,8 @@ func (app *App) setupEcho() {
 	app.e.HideBanner = true
 	app.e.HidePort = true
 
-	// Set custom error handler
-	app.e.HTTPErrorHandler = app.customErrorHandler
+	// Error handler middleware will handle all errors consistently
+	// Remove the custom error handler in favor of middleware
 
 	// Apply middleware based on configuration
 	if app.config == nil || app.config.Server.Recovery {
@@ -98,42 +98,24 @@ func (app *App) setupEcho() {
 		app.e.Use(middleware.Logger())
 	}
 
-	// Request ID middleware
+	// Request ID middleware (must come before error handler)
 	app.e.Use(middleware.RequestID())
+
+	// Error handler middleware for consistent error responses
+	// Hide internal server error details in production (when logger level is not debug)
+	hideDetails := true
+	if app.config != nil && app.config.Logger.Level == "debug" {
+		hideDetails = false
+	}
+	
+	errorConfig := &errorMiddleware.ErrorHandlerConfig{
+		Logger: app.logger,
+		HideInternalServerErrorDetails: hideDetails,
+		DefaultMessage: "An internal error occurred",
+	}
+	app.e.Use(errorMiddleware.ErrorHandlerWithConfig(errorConfig))
 }
 
-// customErrorHandler handles errors in a consistent way
-func (app *App) customErrorHandler(err error, c echo.Context) {
-	code := http.StatusInternalServerError
-	message := "Internal Server Error"
-
-	if he, ok := err.(*echo.HTTPError); ok {
-		code = he.Code
-		message = fmt.Sprintf("%v", he.Message)
-	}
-
-	// Log the error
-	if app.logger != nil {
-		app.logger.Error("HTTP error",
-			zap.Int("code", code),
-			zap.String("message", message),
-			zap.String("path", c.Request().URL.Path),
-			zap.String("method", c.Request().Method),
-			zap.Error(err))
-	}
-
-	// Send response
-	if !c.Response().Committed {
-		if c.Request().Method == http.MethodHead {
-			c.NoContent(code)
-		} else {
-			c.JSON(code, map[string]interface{}{
-				"error": message,
-				"code":  code,
-			})
-		}
-	}
-}
 
 // Echo returns the underlying Echo instance
 func (app *App) Echo() *echo.Echo {

@@ -1,11 +1,13 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	errorMiddleware "github.com/yshengliao/gortex/middleware"
 	"github.com/yshengliao/gortex/pkg/errors"
 	"github.com/yshengliao/gortex/response"
 	"go.uber.org/zap"
@@ -205,45 +207,17 @@ func (h *UserHandler) TriggerSystemError(c echo.Context) error {
 	}
 }
 
-// ErrorHandlingMiddleware demonstrates how to use the error system in middleware
-func ErrorHandlingMiddleware(logger *zap.Logger) echo.MiddlewareFunc {
-	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
-			err := next(c)
-			if err != nil {
-				// Check if it's already an ErrorResponse
-				if errResp, ok := err.(*errors.ErrorResponse); ok {
-					// Log the error
-					logger.Error("Request failed",
-						zap.Int("code", errResp.ErrorDetail.Code),
-						zap.String("message", errResp.ErrorDetail.Message),
-						zap.String("request_id", errResp.RequestID),
-					)
-					// Error is already formatted, just return it
-					return err
-				}
+// DemoStandardError demonstrates returning a standard Go error
+func (h *UserHandler) DemoStandardError(c echo.Context) error {
+	// This demonstrates how standard Go errors are handled by the middleware
+	// In production, the actual error message will be hidden
+	return fmt.Errorf("database connection failed: timeout connecting to postgres://localhost:5432")
+}
 
-				// Check if it's an Echo HTTP error
-				if he, ok := err.(*echo.HTTPError); ok {
-					code := errors.CodeInternalServerError
-					switch he.Code {
-					case http.StatusBadRequest:
-						code = errors.CodeInvalidInput
-					case http.StatusUnauthorized:
-						code = errors.CodeUnauthorized
-					case http.StatusNotFound:
-						code = errors.CodeResourceNotFound
-					}
-					return errors.SendError(c, code, he.Message.(string), nil)
-				}
-
-				// Generic error
-				logger.Error("Unhandled error", zap.Error(err))
-				return errors.InternalServerError(c, err)
-			}
-			return nil
-		}
-	}
+// DemoEchoHTTPError demonstrates returning an Echo HTTP error
+func (h *UserHandler) DemoEchoHTTPError(c echo.Context) error {
+	// This demonstrates how Echo HTTP errors are converted to our format
+	return echo.NewHTTPError(http.StatusBadGateway, "Upstream service unavailable")
 }
 
 func main() {
@@ -259,7 +233,16 @@ func main() {
 	e.Use(middleware.RequestID())
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
-	e.Use(ErrorHandlingMiddleware(logger))
+	
+	// Use the framework's error handler middleware
+	// In development mode (debug logger), it shows full error details
+	// In production mode, it hides sensitive error information
+	errorConfig := &errorMiddleware.ErrorHandlerConfig{
+		Logger: logger,
+		HideInternalServerErrorDetails: false, // Development mode - show details
+		DefaultMessage: "An internal error occurred",
+	}
+	e.Use(errorMiddleware.ErrorHandlerWithConfig(errorConfig))
 
 	// Initialize handler
 	handler := &UserHandler{logger: logger}
@@ -270,6 +253,8 @@ func main() {
 	e.POST("/transfer", handler.TransferMoney)
 	e.GET("/protected", handler.ProtectedEndpoint)
 	e.GET("/error", handler.TriggerSystemError)
+	e.GET("/demo/standard-error", handler.DemoStandardError)
+	e.GET("/demo/echo-error", handler.DemoEchoHTTPError)
 
 	// Start server
 	logger.Info("Starting error example server on :8080")
@@ -280,6 +265,8 @@ func main() {
 	logger.Info("  POST /transfer          - Transfer money (business errors)")
 	logger.Info("  GET  /protected         - Protected endpoint (auth errors)")
 	logger.Info("  GET  /error?type=xxx    - Trigger various system errors")
+	logger.Info("  GET  /demo/standard-error - Demo standard Go error handling")
+	logger.Info("  GET  /demo/echo-error   - Demo Echo HTTP error conversion")
 
 	if err := e.Start(":8080"); err != nil {
 		logger.Fatal("Failed to start server", zap.Error(err))

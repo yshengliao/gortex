@@ -24,7 +24,7 @@
 | Commit 主題 | 任務描述 | 影響文件 |
 |------------|---------|----------|
 | ✅ 統一錯誤回應系統 | 實作標準化錯誤回應格式，包含錯誤碼分類 (validation, auth, system, business) | README.md, CLAUDE.md, OPTIMIZATION_PLAN.md |
-| 錯誤中間件實作 | 建立錯誤回應中間件，確保所有錯誤格式一致性 | README.md, CLAUDE.md |
+| ✅ 錯誤中間件實作 | 建立錯誤回應中間件，確保所有錯誤格式一致性 | README.md, CLAUDE.md |
 | 請求 ID 追蹤 | 實作請求 ID 生成與傳播，整合至日誌系統 | README.md, CLAUDE.md |
 | 優雅關閉增強 | 改進關閉超時配置，新增預關閉鉤子，確保 WebSocket 連接正確關閉 | README.md, CLAUDE.md |
 

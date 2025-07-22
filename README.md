@@ -202,6 +202,17 @@ const (
     CodeConflict         = 4002
     CodeQuotaExceeded    = 4003
 )
+
+// Error middleware ensures consistent responses
+app.NewApp(
+    app.WithHandlers(handlers),
+    app.WithConfig(cfg),
+    // Error handler middleware automatically:
+    // - Converts all errors to standard format
+    // - Adds request IDs to error responses
+    // - Logs errors with appropriate levels
+    // - Hides internal details in production
+)
 ```
 
 ### Authentication & Authorization

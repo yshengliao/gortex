@@ -124,7 +124,10 @@ func TestAuthExample(t *testing.T) {
 		var response map[string]interface{}
 		err := json.Unmarshal(rec.Body.Bytes(), &response)
 		require.NoError(t, err)
-		assert.Equal(t, "Invalid credentials", response["error"])
+		// Error response should have the new format with error details
+		assert.False(t, response["success"].(bool))
+		errorDetail := response["error"].(map[string]interface{})
+		assert.Equal(t, "Invalid credentials", errorDetail["message"])
 	})
 
 	t.Run("Login Validation Error", func(t *testing.T) {
