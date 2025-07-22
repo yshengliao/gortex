@@ -1,6 +1,6 @@
 # Gortex Framework - 優化與開發計劃
 
-> **最後更新**: 2025/07/23 | **框架版本**: Alpha (Production-Optimized)
+> **最後更新**: 2025/07/22 | **框架版本**: Alpha (Production-Optimized)
 
 本文件列出 Gortex 框架的所有優化、增強與技術債務清單，每項任務為獨立的 commit 單元，按類型歸納並依重要性排序。
 
@@ -38,7 +38,7 @@
 
 | Commit 主題 | 任務描述 | 影響文件 |
 |------------|---------|----------|
-| WebSocket 指標增強 | 新增當前連接數、訊息速率、簡易訊息類型計數器 (開發用) | README.md, CLAUDE.md |
+| ✅ WebSocket 指標增強 | 新增當前連接數、訊息速率、簡易訊息類型計數器 (開發用) | README.md, CLAUDE.md |
 | 開發模式增強 | 新增路由除錯端點 (/_routes)、請求/回應日誌中間件、開發錯誤頁面 | README.md, CLAUDE.md |
 | 開發監控儀表板 | 新增簡易 JSON 端點顯示當前系統狀態、記憶體使用、goroutine 數量 | README.md, CLAUDE.md |
 | 壓縮狀態顯示 | 新增壓縮啟用狀態、當前壓縮等級顯示 (開發除錯用) | README.md |
@@ -132,6 +132,6 @@
 
 ---
 
-**最後更新**: 2025/07/23  
+**最後更新**: 2025/07/22  
 **維護者**: @yshengliao  
 **框架版本**: Alpha (Production-Optimized)

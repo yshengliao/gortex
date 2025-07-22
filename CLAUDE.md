@@ -408,6 +408,17 @@ The Gortex framework has successfully completed its optimization roadmap:
 - Rate Limiter: 157 ns/op (memory stable)
 - Router: 1013 ns/op in production mode
 
+### WebSocket Metrics Optimization (2025/07/22)
+
+14. **WebSocket Metrics Tracking**:
+    - Added comprehensive metrics tracking to WebSocket hub
+    - Tracks current connections, total connections, messages sent/received
+    - Message type counting for development analysis
+    - Message rate calculation (messages per second)
+    - Zero performance impact on message handling
+    - GetMetrics() and GetMessageRate() methods for monitoring
+    - Example: websocket-metrics demonstrates real-time monitoring
+
 The framework is now production-ready with excellent performance characteristics and zero operational dependencies.
 
 **Last Updated**: 2025/07/22 | **Framework Status**: Alpha (Production-Optimized) | **Go**: 1.24

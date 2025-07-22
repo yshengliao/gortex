@@ -124,6 +124,16 @@ wsHub.Broadcast(&hub.Message{
     Type: "game_update",
     Data: gameState,
 })
+
+// WebSocket metrics for development monitoring
+metrics := wsHub.GetMetrics()
+fmt.Printf("Connected clients: %d\n", metrics.CurrentConnections)
+fmt.Printf("Messages sent: %d\n", metrics.MessagesSent)
+fmt.Printf("Message types: %v\n", metrics.MessageTypes)
+
+// Calculate message rates
+sentRate, receivedRate := wsHub.GetMessageRate()
+fmt.Printf("Send rate: %.2f msg/s, Receive rate: %.2f msg/s\n", sentRate, receivedRate)
 ```
 
 ### Dependency Injection
@@ -427,13 +437,14 @@ Gortex has undergone comprehensive optimization with all critical issues resolve
 ```
 - Core HTTP server with Echo v4 integration
 - Declarative routing with struct tag discovery  
-- WebSocket hub with pure channel-based concurrency
+- WebSocket hub with pure channel-based concurrency and metrics tracking
 - JWT authentication and role-based access
 - Unified error response system with categorized error codes
 - High-performance metrics (ImprovedCollector: 163ns/op, 0 allocs)
 - Configuration system with Bofry/config (YAML, .env, env vars)
 - Memory-stable rate limiting with TTL-based cleanup
 - Race-condition-free health checking system
+- WebSocket metrics: connection counts, message rates, type tracking
 - Comprehensive test coverage with example automation
 - Zero external service dependencies
 ```
