@@ -80,10 +80,7 @@ func (h *DevHandlers) Error(c echo.Context) error {
 	case "panic":
 		panic("Development test panic")
 	case "validation":
-		return response.BadRequest(c, "Validation error test", map[string]string{
-			"field1": "required",
-			"field2": "invalid format",
-		})
+		return response.BadRequest(c, "Validation error test")
 	case "unauthorized":
 		return response.Unauthorized(c, "Authentication required")
 	case "forbidden":
@@ -91,7 +88,8 @@ func (h *DevHandlers) Error(c echo.Context) error {
 	case "notfound":
 		return response.NotFound(c, "Resource not found")
 	case "conflict":
-		return response.Conflict(c, "Resource conflict")
+		// Use generic error for conflict as response.Conflict doesn't exist
+		return response.Error(c, http.StatusConflict, "Resource conflict")
 	case "internal":
 		return fmt.Errorf("internal server error test")
 	default:

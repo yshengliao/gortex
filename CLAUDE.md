@@ -2,11 +2,11 @@
 
 > **Framework**: Gortex | **Language**: Go 1.24 | **Updated**: 2025/07/21
 
-This file provides guidance to Claude Code when working with the Gortex game server framework.
+This file provides guidance to Claude Code when working with the Gortex web framework.
 
 ## Framework Overview
 
-**Gortex** (Go + Vortex) is a high-performance Go backend framework designed for game servers, featuring declarative routing, first-class WebSocket support, and developer-friendly conventions.
+**Gortex** (Go + Vortex) is a high-performance Go backend framework designed for real-time web applications, featuring declarative routing, first-class WebSocket support, and developer-friendly conventions.
 
 ### Architecture Highlights
 
@@ -77,12 +77,12 @@ go build -tags production # 高效能建置
 1. Create handler file in `internal/handlers/`:
 
 ```go
-type GameHandler struct {
+type APIHandler struct {
     Logger  *zap.Logger
-    GameSvc *services.GameService
+    APISvc *services.APIService
 }
 
-func (h *GameHandler) GET(c echo.Context) error {
+func (h *APIHandler) GET(c echo.Context) error {
     // Handler logic
     return response.Success(c, http.StatusOK, data)
 }
@@ -92,7 +92,7 @@ func (h *GameHandler) GET(c echo.Context) error {
 
 ```go
 type HandlersManager struct {
-    Game *GameHandler `url:"/game"`
+    API *APIHandler `url:"/api"`
 }
 ```
 
@@ -100,7 +100,7 @@ type HandlersManager struct {
 
 ```go
 handlersManager := &handlers.HandlersManager{
-    Game: &handlers.GameHandler{},
+    API: &handlers.APIHandler{},
 }
 ```
 
@@ -235,7 +235,7 @@ func (h *UserHandler) Profile(c echo.Context) error { } // → /users/profile
 
 ### Framework Positioning
 
-**Gortex** is positioned as a **self-contained, lightweight** game server framework with **zero external service dependencies**. This differentiates it from heavy enterprise solutions requiring Redis, Jaeger, Prometheus infrastructure.
+**Gortex** is positioned as a **self-contained, lightweight** web framework with **zero external service dependencies**. This differentiates it from heavy enterprise solutions requiring Redis, Jaeger, Prometheus infrastructure.
 
 ### Recent Major Discoveries (2025/07/21)
 
@@ -270,7 +270,7 @@ func (h *UserHandler) Profile(c echo.Context) error { } // → /users/profile
 
 ### Target Use Cases
 
-- **Real-time game servers**: WebSocket-heavy applications
+- **Real-time applications**: WebSocket-heavy applications
 - **Microservices**: Lightweight, fast-starting services
 - **Development prototypes**: Rapid iteration without infrastructure
 - **Edge computing**: Minimal resource footprint

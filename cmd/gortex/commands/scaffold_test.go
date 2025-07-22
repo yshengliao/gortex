@@ -43,11 +43,11 @@ func TestInitProjectWithExamples(t *testing.T) {
 	require.NoError(t, err)
 
 	expected := []string{
-		"handlers/user.go",
-		"handlers/auth.go",
+		"handlers/example.go",
+		"handlers/health.go",
 		"handlers/websocket.go",
-		"services/user_service.go",
-		"models/user.go",
+		"services/data_service.go",
+		"models/example.go",
 	}
 
 	for _, f := range expected {

@@ -113,7 +113,7 @@
 |------------|---------|----------|
 | 熱重載實作 | 實作檔案監視器、優雅伺服器重啟、建置快取 | README.md, CLAUDE.md |
 | 路由生成完善 | 完成路由生成實作、路由驗證與衝突偵測 | README.md, CLAUDE.md |
-| 專案範本系統 | 建立遊戲伺服器、微服務、GraphQL、全端範本 | README.md, CLAUDE.md |
+| 專案範本系統 | 建立即時應用、微服務、GraphQL、全端範本 | README.md, CLAUDE.md |
 | 外掛系統設計 | 設計外掛介面、實作載入器、生命週期鉤子 | README.md, CLAUDE.md |
 
 ### 持續維護類

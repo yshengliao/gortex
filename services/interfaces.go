@@ -1,9 +1,8 @@
-// Package services provides service interfaces for business logic
+// Package services provides service interfaces for framework abstractions
 package services
 
 import (
 	"context"
-	"time"
 )
 
 // Service is the base interface for all services
@@ -12,111 +11,47 @@ type Service interface {
 	Stop(ctx context.Context) error
 }
 
-// User represents a user in the system
-type User struct {
-	ID        string
-	Username  string
-	Email     string
-	Role      string
-	Password  string // Hashed password
-	CreatedAt time.Time
-	UpdatedAt time.Time
+// HealthChecker defines the interface for health checking services
+type HealthChecker interface {
+	Check(ctx context.Context) error
 }
 
-// UserService defines the interface for user management
-type UserService interface {
+// MetricsCollector defines the interface for metrics collection services
+type MetricsCollector interface {
+	Collect(ctx context.Context) (map[string]interface{}, error)
+}
+
+// ConfigProvider defines the interface for configuration services
+type ConfigProvider interface {
+	Get(key string) interface{}
+	GetString(key string) string
+	GetInt(key string) int
+	GetBool(key string) bool
+	Reload(ctx context.Context) error
+}
+
+// Logger defines the interface for logging services
+type Logger interface {
+	Debug(msg string, fields ...interface{})
+	Info(msg string, fields ...interface{})
+	Warn(msg string, fields ...interface{})
+	Error(msg string, fields ...interface{})
+	Fatal(msg string, fields ...interface{})
+}
+
+// EventBus defines the interface for event publishing/subscribing
+type EventBus interface {
 	Service
-	
-	// User management
-	CreateUser(ctx context.Context, user *User) (*User, error)
-	GetUser(ctx context.Context, userID string) (*User, error)
-	GetUserByUsername(ctx context.Context, username string) (*User, error)
-	UpdateUser(ctx context.Context, user *User) (*User, error)
-	DeleteUser(ctx context.Context, userID string) error
-	
-	// Authentication
-	Authenticate(ctx context.Context, username, password string) (*User, error)
-	
-	// Balance management
-	GetBalance(ctx context.Context, userID, currency string) (*Balance, error)
-	UpdateBalance(ctx context.Context, userID, currency string, amount float64) (*Balance, error)
+	Publish(ctx context.Context, topic string, event interface{}) error
+	Subscribe(topic string, handler func(event interface{})) error
+	Unsubscribe(topic string) error
 }
 
-// Balance represents a user's balance in a specific currency
-type Balance struct {
-	UserID    string
-	Currency  string
-	Amount    float64
-	UpdatedAt time.Time
-}
-
-// Game represents a game in the system
-type Game struct {
-	ID          string
-	Name        string
-	Type        string
-	Provider    string
-	Status      string
-	MinBet      float64
-	MaxBet      float64
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-}
-
-// GameService defines the interface for game management
-type GameService interface {
+// CacheService defines the interface for caching services
+type CacheService interface {
 	Service
-	
-	// Game management
-	CreateGame(ctx context.Context, game *Game) (*Game, error)
-	GetGame(ctx context.Context, gameID string) (*Game, error)
-	ListGames(ctx context.Context) ([]*Game, error)
-	UpdateGame(ctx context.Context, game *Game) (*Game, error)
-	DeleteGame(ctx context.Context, gameID string) error
-	
-	// Session management
-	CreateSession(ctx context.Context, userID, gameID string) (*GameSession, error)
-	GetSession(ctx context.Context, sessionID string) (*GameSession, error)
-	EndSession(ctx context.Context, sessionID string) error
-}
-
-// GameSession represents an active game session
-type GameSession struct {
-	ID        string
-	UserID    string
-	GameID    string
-	Status    string
-	StartedAt time.Time
-	EndedAt   *time.Time
-}
-
-// Transaction represents a financial transaction
-type Transaction struct {
-	ID            string
-	UserID        string
-	GameID        string
-	SessionID     string
-	Type          string // "bet", "win", "refund"
-	Amount        float64
-	Currency      string
-	BalanceBefore float64
-	BalanceAfter  float64
-	Status        string
-	CreatedAt     time.Time
-	CompletedAt   *time.Time
-}
-
-// TransactionService defines the interface for transaction management
-type TransactionService interface {
-	Service
-	
-	// Transaction management
-	CreateTransaction(ctx context.Context, tx *Transaction) (*Transaction, error)
-	GetTransaction(ctx context.Context, txID string) (*Transaction, error)
-	ListTransactions(ctx context.Context, userID string, limit int) ([]*Transaction, error)
-	
-	// Game transactions
-	PlaceBet(ctx context.Context, userID, gameID, sessionID string, amount float64, currency string) (*Transaction, error)
-	ProcessWin(ctx context.Context, userID, gameID, sessionID string, amount float64, currency string) (*Transaction, error)
-	ProcessRefund(ctx context.Context, txID string) (*Transaction, error)
+	Get(ctx context.Context, key string) (interface{}, error)
+	Set(ctx context.Context, key string, value interface{}) error
+	Delete(ctx context.Context, key string) error
+	Clear(ctx context.Context) error
 }

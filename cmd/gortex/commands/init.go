@@ -105,13 +105,13 @@ func generateExamples(basePath, moduleName string) error {
 	// Create example handlers
 	exampleHandlersPath := filepath.Join(basePath, "handlers")
 
-	if err := generateFile(filepath.Join(exampleHandlersPath, "user.go"), userHandlerTemplate, map[string]string{
+	if err := generateFile(filepath.Join(exampleHandlersPath, "example.go"), exampleHandlerTemplate, map[string]string{
 		"ModuleName": moduleName,
 	}); err != nil {
 		return err
 	}
 
-	if err := generateFile(filepath.Join(exampleHandlersPath, "auth.go"), authHandlerTemplate, map[string]string{
+	if err := generateFile(filepath.Join(exampleHandlersPath, "health.go"), healthHandlerTemplate, map[string]string{
 		"ModuleName": moduleName,
 	}); err != nil {
 		return err
@@ -126,7 +126,7 @@ func generateExamples(basePath, moduleName string) error {
 	// Create example services
 	exampleServicesPath := filepath.Join(basePath, "services")
 
-	if err := generateFile(filepath.Join(exampleServicesPath, "user_service.go"), userServiceTemplate, map[string]string{
+	if err := generateFile(filepath.Join(exampleServicesPath, "data_service.go"), dataServiceTemplate, map[string]string{
 		"ModuleName": moduleName,
 	}); err != nil {
 		return err
@@ -135,7 +135,7 @@ func generateExamples(basePath, moduleName string) error {
 	// Create example models
 	exampleModelsPath := filepath.Join(basePath, "models")
 
-	if err := generateFile(filepath.Join(exampleModelsPath, "user.go"), userModelTemplate, map[string]string{
+	if err := generateFile(filepath.Join(exampleModelsPath, "example.go"), dataModelTemplate, map[string]string{
 		"ModuleName": moduleName,
 	}); err != nil {
 		return err

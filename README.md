@@ -4,7 +4,7 @@
 ![Framework Status](https://img.shields.io/badge/status-Alpha-orange.svg)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 
-> **A high-performance game server framework with declarative routing, first-class WebSocket support, and developer-centric design.**
+> **A high-performance Go web framework with declarative routing, first-class WebSocket support, and developer-centric design.**
 
 Gortex (Go + Vortex) creates a powerful vortex of connectivity between HTTP and WebSocket protocols. Like a vortex that seamlessly pulls and integrates different streams, Gortex unifies request handling through an elegant tag-based routing system, enabling developers to build real-time applications with the speed and efficiency of Go.
 
@@ -81,20 +81,20 @@ func main() {
 Routes are defined via struct tags, automatically discovered at runtime:
 
 ```go
-type GameAPI struct {
-    Users     *UserHandler      `url:"/users"`
-    Matches   *MatchHandler     `url:"/matches"`
+type APIHandlers struct {
+    Resources *ResourceHandler  `url:"/resources"`
+    Events    *EventHandler     `url:"/events"`
     WebSocket *WSHandler        `url:"/ws" hijack:"ws"`
 }
 
 // HTTP verbs become methods
-func (h *UserHandler) GET(c echo.Context) error     { /* list users */ }
-func (h *UserHandler) POST(c echo.Context) error    { /* create user */ }
-func (h *UserHandler) DELETE(c echo.Context) error  { /* delete user */ }
+func (h *ResourceHandler) GET(c echo.Context) error     { /* list resources */ }
+func (h *ResourceHandler) POST(c echo.Context) error    { /* create resource */ }
+func (h *ResourceHandler) DELETE(c echo.Context) error  { /* delete resource */ }
 
 // Custom methods become sub-routes
-func (h *MatchHandler) Join(c echo.Context) error   { /* POST /matches/join */ }
-func (h *MatchHandler) Leave(c echo.Context) error  { /* POST /matches/leave */ }
+func (h *EventHandler) Subscribe(c echo.Context) error   { /* POST /events/subscribe */ }
+func (h *EventHandler) Unsubscribe(c echo.Context) error { /* POST /events/unsubscribe */ }
 ```
 
 ### WebSocket Integration
@@ -121,8 +121,8 @@ func (h *WebSocketHandler) HandleConnection(c echo.Context) error {
 
 // Broadcast to all connected clients
 wsHub.Broadcast(&hub.Message{
-    Type: "game_update",
-    Data: gameState,
+    Type: "event_update",
+    Data: eventData,
 })
 
 // WebSocket metrics for development monitoring
@@ -170,8 +170,8 @@ type ErrorResponse struct {
 }
 
 // Using error helpers in handlers
-func (h *UserHandler) POST(c echo.Context) error {
-    var req CreateUserRequest
+func (h *ResourceHandler) POST(c echo.Context) error {
+    var req CreateResourceRequest
     if err := c.Bind(&req); err != nil {
         return errors.ValidationError(c, "Invalid request format", err)
     }
@@ -180,15 +180,15 @@ func (h *UserHandler) POST(c echo.Context) error {
         return errors.ValidationFieldsError(c, err)
     }
     
-    user, err := h.UserSvc.Create(req)
+    resource, err := h.ResourceSvc.Create(req)
     if err != nil {
         if errors.IsConflict(err) {
-            return errors.BusinessConflict(c, "Username already exists")
+            return errors.BusinessConflict(c, "Resource already exists")
         }
-        return errors.InternalServerError(c, "Failed to create user", err)
+        return errors.InternalServerError(c, "Failed to create resource", err)
     }
     
-    return response.Success(c, http.StatusCreated, user)
+    return response.Success(c, http.StatusCreated, resource)
 }
 
 // Pre-defined error codes for consistency
@@ -281,14 +281,14 @@ func (h *APIHandler) GET(c echo.Context) error {
 ### Request Validation
 
 ```go
-type CreateUserRequest struct {
-    Username string `json:"username" validate:"required,min=3,max=30,username"`
-    Email    string `json:"email" validate:"required,email"`
-    Password string `json:"password" validate:"required,min=8"`
+type CreateResourceRequest struct {
+    Name        string `json:"name" validate:"required,min=3,max=100"`
+    Type        string `json:"type" validate:"required,oneof=document image video"`
+    Description string `json:"description" validate:"max=500"`
 }
 
-func (h *UserHandler) POST(c echo.Context) error {
-    var req CreateUserRequest
+func (h *ResourceHandler) POST(c echo.Context) error {
+    var req CreateResourceRequest
     if err := validation.BindAndValidate(c, &req); err != nil {
         return response.BadRequest(c, "Validation failed")
     }
@@ -869,15 +869,15 @@ Example response:
 
 **Security Warning**: Development mode exposes sensitive debugging information. Always ensure `Logger.Level` is set to `"info"` or higher in production environments.
 
-## Perfect for Game Servers
+## Perfect for Real-time Applications
 
-Gortex is specifically designed for real-time game server development:
+Gortex is specifically designed for real-time application development:
 
 - **Low Latency**: Optimized request handling with minimal overhead
-- **Real-time Communication**: Built-in WebSocket hub for game state sync
-- **Player Management**: JWT-based player sessions with role support
+- **Real-time Communication**: Built-in WebSocket hub for state synchronization
+- **Session Management**: JWT-based authentication with role support
 - **Scalable Architecture**: Stateless design for horizontal scaling
-- **Monitoring Ready**: Built-in metrics for player counts, match duration, server health
+- **Monitoring Ready**: Built-in metrics for connections, performance, and health
 
 ## Examples
 
@@ -1019,10 +1019,10 @@ response.BadRequest(c, "Invalid input")
 response.Unauthorized(c, "Login required")
 
 // Custom validators
-validate:"required,min=3,max=30,username"
+validate:"required,min=3,max=30"
 validate:"required,email"  
-validate:"required,gameid"
-validate:"required,currency"
+validate:"required,uuid"
+validate:"required,oneof=USD EUR JPY"
 ```
 
 ## Contributing
@@ -1085,7 +1085,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 ---
 
 <p align="center">
-  <strong>Ready to build your next game server?</strong><br>
+  <strong>Ready to build your next real-time application?</strong><br>
   <a href="#-quick-start">Get Started</a> • 
   <a href="/examples">Examples</a> •
   <a href="#-contributing">Contribute</a>

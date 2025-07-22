@@ -102,7 +102,7 @@ func DevErrorPageWithConfig(config DevErrorPageConfig) echo.MiddlewareFunc {
 				if errorMsg == "" {
 					errorMsg = http.StatusText(status)
 				}
-				err = fmt.Errorf(errorMsg)
+				err = fmt.Errorf("%s", errorMsg)
 			}
 			
 			if err != nil || status >= 400 {

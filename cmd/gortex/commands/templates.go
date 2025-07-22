@@ -47,7 +47,7 @@ func main() {
 	}
 
 	// Initialize services
-	userService := services.NewUserService(logger)
+	// Example: dataService := services.NewDataService(logger)
 
 	// Initialize WebSocket hub
 	wsHub := hub.NewHub(logger)
@@ -144,9 +144,54 @@ type HandlersManager struct {
 	Health    *HealthHandler    ` + "`url:\"/health\"`" + `
 	// Add more handlers here
 	// Example:
-	// Users     *UserHandler      ` + "`url:\"/api/users\"`" + `
-	// Auth      *AuthHandler      ` + "`url:\"/api/auth\"`" + `
+	// API       *APIHandler       ` + "`url:\"/api\"`" + `
+	// Health    *HealthHandler    ` + "`url:\"/health\"`" + `
 	// WebSocket *WebSocketHandler ` + "`url:\"/ws\" hijack:\"ws\"`" + `
+}
+`
+
+const exampleHandlerTemplate = `package handlers
+
+import (
+	"net/http"
+	"time"
+
+	"github.com/labstack/echo/v4"
+	"go.uber.org/zap"
+	"github.com/yshengliao/gortex/response"
+	"github.com/yshengliao/gortex/validation"
+)
+
+// ExampleHandler demonstrates a basic HTTP handler
+type ExampleHandler struct {
+	Logger *zap.Logger
+}
+
+type ExampleRequest struct {
+	Name  string ` + "`json:\"name\" validate:\"required,min=3,max=30\"`" + `
+	Value string ` + "`json:\"value\" validate:\"required\"`" + `
+}
+
+func (h *ExampleHandler) GET(c echo.Context) error {
+	data := map[string]interface{}{
+		"message": "Example handler response",
+		"timestamp": time.Now().Unix(),
+	}
+	return response.Success(c, http.StatusOK, data)
+}
+
+func (h *ExampleHandler) POST(c echo.Context) error {
+	var req ExampleRequest
+	if err := validation.BindAndValidate(c, &req); err != nil {
+		return err
+	}
+
+	responseData := map[string]interface{}{
+		"received": req,
+		"processed": true,
+	}
+
+	return response.Success(c, http.StatusCreated, responseData)
 }
 `
 
@@ -306,140 +351,16 @@ tmp/
 temp/
 `
 
-// Example templates
-const userHandlerTemplate = `package handlers
-
-import (
-	"net/http"
-
-	"github.com/labstack/echo/v4"
-	"go.uber.org/zap"
-	"{{.ModuleName}}/models"
-	"{{.ModuleName}}/services"
-	"github.com/yshengliao/gortex/response"
-	"github.com/yshengliao/gortex/validation"
-)
-
-type UserHandler struct {
-	UserService services.UserService
-	Logger      *zap.Logger
-}
-
-type CreateUserRequest struct {
-	Username string ` + "`json:\"username\" validate:\"required,min=3,max=30\"`" + `
-	Email    string ` + "`json:\"email\" validate:\"required,email\"`" + `
-	Password string ` + "`json:\"password\" validate:\"required,min=8\"`" + `
-}
-
-func (h *UserHandler) GET(c echo.Context) error {
-	users, err := h.UserService.ListUsers(c.Request().Context())
-	if err != nil {
-		h.Logger.Error("Failed to list users", zap.Error(err))
-		return response.InternalServerError(c, "Failed to fetch users")
-	}
-
-	return response.Success(c, http.StatusOK, users)
-}
-
-func (h *UserHandler) POST(c echo.Context) error {
-	var req CreateUserRequest
-	if err := validation.BindAndValidate(c, &req); err != nil {
-		return err
-	}
-
-	user := &models.User{
-		Username: req.Username,
-		Email:    req.Email,
-	}
-
-	created, err := h.UserService.CreateUser(c.Request().Context(), user, req.Password)
-	if err != nil {
-		h.Logger.Error("Failed to create user", zap.Error(err))
-		return response.InternalServerError(c, "Failed to create user")
-	}
-
-	return response.Success(c, http.StatusCreated, created)
-}
-`
-
-const authHandlerTemplate = `package handlers
-
-import (
-	"net/http"
-	"time"
-
-	"github.com/labstack/echo/v4"
-	"go.uber.org/zap"
-	"{{.ModuleName}}/services"
-	"github.com/yshengliao/gortex/auth"
-	"github.com/yshengliao/gortex/response"
-	"github.com/yshengliao/gortex/validation"
-)
-
-type AuthHandler struct {
-	UserService services.UserService
-	JWTService  *auth.JWTService
-	Logger      *zap.Logger
-}
-
-type LoginRequest struct {
-	Username string ` + "`json:\"username\" validate:\"required\"`" + `
-	Password string ` + "`json:\"password\" validate:\"required\"`" + `
-}
-
-type LoginResponse struct {
-	AccessToken  string ` + "`json:\"access_token\"`" + `
-	RefreshToken string ` + "`json:\"refresh_token\"`" + `
-	ExpiresIn    int    ` + "`json:\"expires_in\"`" + `
-}
-
-func (h *AuthHandler) Login(c echo.Context) error {
-	var req LoginRequest
-	if err := validation.BindAndValidate(c, &req); err != nil {
-		return err
-	}
-
-	user, err := h.UserService.Authenticate(c.Request().Context(), req.Username, req.Password)
-	if err != nil {
-		return response.Unauthorized(c, "Invalid credentials")
-	}
-
-	accessToken, err := h.JWTService.GenerateAccessToken(user.ID, user.Username, user.Email, "user")
-	if err != nil {
-		h.Logger.Error("Failed to generate access token", zap.Error(err))
-		return response.InternalServerError(c, "Failed to generate token")
-	}
-
-	refreshToken, err := h.JWTService.GenerateRefreshToken(user.ID)
-	if err != nil {
-		h.Logger.Error("Failed to generate refresh token", zap.Error(err))
-		return response.InternalServerError(c, "Failed to generate token")
-	}
-
-	return response.Success(c, http.StatusOK, LoginResponse{
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
-		ExpiresIn:    int(time.Hour.Seconds()),
-	})
-}
-
-func (h *AuthHandler) Refresh(c echo.Context) error {
-	// TODO: Implement refresh token logic
-	return response.Success(c, http.StatusOK, map[string]string{
-		"message": "Token refreshed",
-	})
-}
-`
-
 const websocketHandlerTemplate = `package handlers
 
 import (
+	"fmt"
 	"net/http"
+	"time"
 	
 	"github.com/gorilla/websocket"
 	"github.com/labstack/echo/v4"
 	"go.uber.org/zap"
-	"github.com/yshengliao/gortex/auth"
 	"github.com/yshengliao/gortex/hub"
 )
 
@@ -449,10 +370,10 @@ type WebSocketHandler struct {
 }
 
 func (h *WebSocketHandler) HandleConnection(c echo.Context) error {
-	// Get user ID from JWT
-	userID := auth.GetUserID(c)
-	if userID == "" {
-		return echo.NewHTTPError(401, "Unauthorized")
+	// Get client ID from query param or generate one
+	clientID := c.QueryParam("client_id")
+	if clientID == "" {
+		clientID = fmt.Sprintf("client-%d", time.Now().UnixNano())
 	}
 
 	// Create WebSocket upgrader
@@ -470,7 +391,7 @@ func (h *WebSocketHandler) HandleConnection(c echo.Context) error {
 	}
 
 	// Create client
-	client := hub.NewClient(h.Hub, conn, userID, h.Logger)
+	client := hub.NewClient(h.Hub, conn, clientID, h.Logger)
 	h.Hub.RegisterClient(client)
 
 	// Start client pumps
@@ -478,7 +399,7 @@ func (h *WebSocketHandler) HandleConnection(c echo.Context) error {
 	go client.ReadPump()
 
 	h.Logger.Info("WebSocket client connected", 
-		zap.String("user_id", userID),
+		zap.String("client_id", clientID),
 		zap.String("remote_addr", c.Request().RemoteAddr),
 	)
 
@@ -486,7 +407,7 @@ func (h *WebSocketHandler) HandleConnection(c echo.Context) error {
 }
 `
 
-const userServiceTemplate = `package services
+const dataServiceTemplate = `package services
 
 import (
 	"context"
@@ -494,132 +415,75 @@ import (
 	"sync"
 
 	"go.uber.org/zap"
-	"golang.org/x/crypto/bcrypt"
-	"github.com/google/uuid"
-	"{{.ModuleName}}/models"
 )
 
-type UserService interface {
-	CreateUser(ctx context.Context, user *models.User, password string) (*models.User, error)
-	GetUser(ctx context.Context, id string) (*models.User, error)
-	ListUsers(ctx context.Context) ([]*models.User, error)
-	Authenticate(ctx context.Context, username, password string) (*models.User, error)
+// DataService is an example service interface
+type DataService interface {
+	Start(ctx context.Context) error
+	Stop(ctx context.Context) error
+	GetData(ctx context.Context, key string) (interface{}, error)
+	SetData(ctx context.Context, key string, value interface{}) error
 }
 
-type userService struct {
+type dataService struct {
 	logger *zap.Logger
-	users  map[string]*models.User
+	data   map[string]interface{}
 	mu     sync.RWMutex
 }
 
-func NewUserService(logger *zap.Logger) UserService {
-	return &userService{
+func NewDataService(logger *zap.Logger) DataService {
+	return &dataService{
 		logger: logger,
-		users:  make(map[string]*models.User),
+		data:   make(map[string]interface{}),
 	}
 }
 
-func (s *userService) CreateUser(ctx context.Context, user *models.User, password string) (*models.User, error) {
+func (s *dataService) Start(ctx context.Context) error {
+	s.logger.Info("Starting data service")
+	return nil
+}
+
+func (s *dataService) Stop(ctx context.Context) error {
+	s.logger.Info("Stopping data service")
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.data = make(map[string]interface{})
+	return nil
+}
+
+func (s *dataService) GetData(ctx context.Context, key string) (interface{}, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	data, exists := s.data[key]
+	if !exists {
+		return nil, errors.New("data not found")
+	}
+
+	return data, nil
+}
+
+func (s *dataService) SetData(ctx context.Context, key string, value interface{}) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// Hash password
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
-		return nil, err
-	}
-
-	// Generate ID
-	user.ID = uuid.New().String()
-	user.Password = string(hashedPassword)
-
-	// Check if username exists
-	for _, u := range s.users {
-		if u.Username == user.Username {
-			return nil, errors.New("username already exists")
-		}
-	}
-
-	// Store user
-	s.users[user.ID] = user
-
-	// Return user without password
-	result := *user
-	result.Password = ""
-	return &result, nil
-}
-
-func (s *userService) GetUser(ctx context.Context, id string) (*models.User, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	user, exists := s.users[id]
-	if !exists {
-		return nil, errors.New("user not found")
-	}
-
-	// Return copy without password
-	result := *user
-	result.Password = ""
-	return &result, nil
-}
-
-func (s *userService) ListUsers(ctx context.Context) ([]*models.User, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	users := make([]*models.User, 0, len(s.users))
-	for _, user := range s.users {
-		// Copy without password
-		u := *user
-		u.Password = ""
-		users = append(users, &u)
-	}
-
-	return users, nil
-}
-
-func (s *userService) Authenticate(ctx context.Context, username, password string) (*models.User, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	// Find user by username
-	var foundUser *models.User
-	for _, user := range s.users {
-		if user.Username == username {
-			foundUser = user
-			break
-		}
-	}
-
-	if foundUser == nil {
-		return nil, errors.New("invalid credentials")
-	}
-
-	// Verify password
-	if err := bcrypt.CompareHashAndPassword([]byte(foundUser.Password), []byte(password)); err != nil {
-		return nil, errors.New("invalid credentials")
-	}
-
-	// Return copy without password
-	result := *foundUser
-	result.Password = ""
-	return &result, nil
+	s.data[key] = value
+	s.logger.Debug("Data stored", zap.String("key", key))
+	return nil
 }
 `
 
-const userModelTemplate = `package models
+const dataModelTemplate = `package models
 
 import "time"
 
-type User struct {
-	ID        string    ` + "`json:\"id\"`" + `
-	Username  string    ` + "`json:\"username\"`" + `
-	Email     string    ` + "`json:\"email\"`" + `
-	Password  string    ` + "`json:\"-\"`" + ` // Never expose in JSON
-	Role      string    ` + "`json:\"role\"`" + `
-	CreatedAt time.Time ` + "`json:\"created_at\"`" + `
-	UpdatedAt time.Time ` + "`json:\"updated_at\"`" + `
+// ExampleModel is a generic data model
+type ExampleModel struct {
+	ID        string                 ` + "`json:\"id\"`" + `
+	Name      string                 ` + "`json:\"name\"`" + `
+	Data      map[string]interface{} ` + "`json:\"data\"`" + `
+	CreatedAt time.Time              ` + "`json:\"created_at\"`" + `
+	UpdatedAt time.Time              ` + "`json:\"updated_at\"`" + `
 }
 `
 
