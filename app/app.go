@@ -13,6 +13,7 @@ import (
 	"go.uber.org/zap"
 	"github.com/yshengliao/gortex/config"
 	errorMiddleware "github.com/yshengliao/gortex/middleware"
+	"github.com/yshengliao/gortex/middleware/compression"
 )
 
 // ShutdownHook is a function that gets called during shutdown
@@ -132,8 +133,37 @@ func (app *App) setupEcho() {
 	if app.config == nil || app.config.Server.Recovery {
 		app.e.Use(middleware.Recover())
 	}
-	if app.config != nil && app.config.Server.GZip {
-		app.e.Use(middleware.Gzip())
+	// Legacy GZip support - use new compression config if available
+	if app.config != nil {
+		if app.config.Server.Compression.Enabled {
+			// Use new advanced compression middleware
+			compressionConfig := compression.Config{
+				MinSize:      app.config.Server.Compression.MinSize,
+				EnableBrotli: app.config.Server.Compression.EnableBrotli,
+				PreferBrotli: app.config.Server.Compression.PreferBrotli,
+				ContentTypes: app.config.Server.Compression.ContentTypes,
+			}
+			
+			// Set compression level
+			switch app.config.Server.Compression.Level {
+			case "speed":
+				compressionConfig.Level = compression.CompressionLevelBestSpeed
+			case "best":
+				compressionConfig.Level = compression.CompressionLevelBestCompression
+			default:
+				compressionConfig.Level = compression.CompressionLevelDefault
+			}
+			
+			// If no content types specified, use defaults
+			if len(compressionConfig.ContentTypes) == 0 {
+				compressionConfig.ContentTypes = compression.DefaultConfig().ContentTypes
+			}
+			
+			app.e.Use(compression.Middleware(compressionConfig))
+		} else if app.config.Server.GZip {
+			// Fallback to legacy GZip setting
+			app.e.Use(middleware.Gzip())
+		}
 	}
 	if app.config != nil && app.config.Server.CORS {
 		app.e.Use(middleware.CORS())
@@ -499,23 +529,52 @@ func (h *devHandler) Monitor(c echo.Context) error {
 
 	// Get compression status
 	compressionInfo := map[string]interface{}{
+		"enabled": false,
 		"gzip_enabled": false,
+		"brotli_enabled": false,
 		"compression_level": "not configured",
 	}
 	
-	if h.config != nil && h.config.Server.GZip {
-		compressionInfo["gzip_enabled"] = true
-		compressionInfo["compression_level"] = "default (gzip.DefaultCompression)"
-		compressionInfo["content_types"] = []string{
-			"text/html",
-			"text/css", 
-			"text/plain",
-			"text/javascript",
-			"application/javascript",
-			"application/json",
-			"application/xml",
+	if h.config != nil {
+		// Check new compression config first
+		if h.config.Server.Compression.Enabled {
+			compressionInfo["enabled"] = true
+			compressionInfo["gzip_enabled"] = true
+			compressionInfo["brotli_enabled"] = h.config.Server.Compression.EnableBrotli
+			compressionInfo["prefer_brotli"] = h.config.Server.Compression.PreferBrotli
+			compressionInfo["compression_level"] = h.config.Server.Compression.Level
+			compressionInfo["min_size_bytes"] = h.config.Server.Compression.MinSize
+			
+			contentTypes := h.config.Server.Compression.ContentTypes
+			if len(contentTypes) == 0 {
+				// Use defaults if not specified
+				contentTypes = []string{
+					"text/html",
+					"text/css", 
+					"text/plain",
+					"text/javascript",
+					"application/javascript",
+					"application/json",
+					"application/xml",
+				}
+			}
+			compressionInfo["content_types"] = contentTypes
+		} else if h.config.Server.GZip {
+			// Legacy GZip config
+			compressionInfo["enabled"] = true
+			compressionInfo["gzip_enabled"] = true
+			compressionInfo["compression_level"] = "default (gzip.DefaultCompression)"
+			compressionInfo["content_types"] = []string{
+				"text/html",
+				"text/css", 
+				"text/plain",
+				"text/javascript",
+				"application/javascript",
+				"application/json",
+				"application/xml",
+			}
+			compressionInfo["min_size_bytes"] = 1024
 		}
-		compressionInfo["min_size_bytes"] = 1024
 	}
 
 	// Final response

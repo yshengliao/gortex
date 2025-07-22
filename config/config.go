@@ -18,15 +18,26 @@ type Config struct {
 
 // ServerConfig holds HTTP server configuration
 type ServerConfig struct {
-	Port            string        `yaml:"port" env:"PORT" default:"8080"`
-	Address         string        `yaml:"address" env:"ADDRESS" default:":8080"`
-	ReadTimeout     time.Duration `yaml:"read_timeout" env:"READ_TIMEOUT" default:"30s"`
-	WriteTimeout    time.Duration `yaml:"write_timeout" env:"WRITE_TIMEOUT" default:"30s"`
-	IdleTimeout     time.Duration `yaml:"idle_timeout" env:"IDLE_TIMEOUT" default:"120s"`
-	ShutdownTimeout time.Duration `yaml:"shutdown_timeout" env:"SHUTDOWN_TIMEOUT" default:"10s"`
-	GZip            bool          `yaml:"gzip" env:"GZIP" default:"true"`
-	CORS            bool          `yaml:"cors" env:"CORS" default:"true"`
-	Recovery        bool          `yaml:"recovery" env:"RECOVERY" default:"true"`
+	Port            string             `yaml:"port" env:"PORT" default:"8080"`
+	Address         string             `yaml:"address" env:"ADDRESS" default:":8080"`
+	ReadTimeout     time.Duration      `yaml:"read_timeout" env:"READ_TIMEOUT" default:"30s"`
+	WriteTimeout    time.Duration      `yaml:"write_timeout" env:"WRITE_TIMEOUT" default:"30s"`
+	IdleTimeout     time.Duration      `yaml:"idle_timeout" env:"IDLE_TIMEOUT" default:"120s"`
+	ShutdownTimeout time.Duration      `yaml:"shutdown_timeout" env:"SHUTDOWN_TIMEOUT" default:"10s"`
+	GZip            bool               `yaml:"gzip" env:"GZIP" default:"true"`
+	CORS            bool               `yaml:"cors" env:"CORS" default:"true"`
+	Recovery        bool               `yaml:"recovery" env:"RECOVERY" default:"true"`
+	Compression     CompressionConfig  `yaml:"compression" env:"COMPRESSION"`
+}
+
+// CompressionConfig holds compression middleware configuration
+type CompressionConfig struct {
+	Enabled      bool     `yaml:"enabled" env:"ENABLED" default:"true"`
+	Level        string   `yaml:"level" env:"LEVEL" default:"default"` // default, speed, best
+	MinSize      int      `yaml:"min_size" env:"MIN_SIZE" default:"1024"`
+	EnableBrotli bool     `yaml:"enable_brotli" env:"ENABLE_BROTLI" default:"true"`
+	PreferBrotli bool     `yaml:"prefer_brotli" env:"PREFER_BROTLI" default:"true"`
+	ContentTypes []string `yaml:"content_types" env:"CONTENT_TYPES"`
 }
 
 // LoggerConfig holds logging configuration
@@ -91,6 +102,22 @@ func DefaultConfig() *Config {
 			GZip:            true,
 			CORS:            true,
 			Recovery:        true,
+			Compression: CompressionConfig{
+				Enabled:      true,
+				Level:        "default",
+				MinSize:      1024,
+				EnableBrotli: true,
+				PreferBrotli: true,
+				ContentTypes: []string{
+					"text/html",
+					"text/css",
+					"text/plain",
+					"text/javascript",
+					"application/javascript",
+					"application/json",
+					"application/xml",
+				},
+			},
 		},
 		Logger: LoggerConfig{
 			Level:            "info",

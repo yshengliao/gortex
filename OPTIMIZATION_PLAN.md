@@ -47,7 +47,7 @@
 
 | Commit 主題 | 任務描述 | 影響文件 |
 |------------|---------|----------|
-| 回應壓縮實作 | 實作 gzip/brotli 壓縮中間件，支援壓縮等級配置 | README.md, CLAUDE.md |
+| ✅ 回應壓縮實作 | 實作 gzip/brotli 壓縮中間件，支援壓縮等級配置 | README.md, CLAUDE.md |
 | 靜態檔案服務 | 實作高效靜態檔案伺服器，支援 ETag、快取標頭、範圍請求 | README.md, CLAUDE.md |
 | 連接池優化 | 建立 HTTP 客戶端連接池，新增連接重用指標 | README.md, CLAUDE.md |
 | 記憶體池優化 | 實作 sync.Pool 緩衝區管理，優化物件池與記憶體分配 | README.md, CLAUDE.md |

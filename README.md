@@ -337,6 +337,64 @@ default to the `GORTEX_` prefix. If you have existing `STMP_` variables, call
 as a drop-in replacement. Helpers such as `config.LoadWithBofry` and
 `config.LoadFromDotEnv` can further ease the transition.
 
+### Response Compression
+
+Advanced compression middleware supporting both gzip and Brotli:
+
+```go
+// Configuration-based compression
+cfg.Server.Compression = config.CompressionConfig{
+    Enabled:      true,
+    Level:        "default", // Options: default, speed, best
+    MinSize:      1024,      // Minimum size before compression (bytes)
+    EnableBrotli: true,      // Enable Brotli support
+    PreferBrotli: true,      // Prefer Brotli over gzip when both accepted
+    ContentTypes: []string{  // Compressible content types
+        "text/html",
+        "text/css",
+        "text/plain",
+        "text/javascript",
+        "application/javascript",
+        "application/json",
+        "application/xml",
+    },
+}
+
+// Or use middleware directly with custom config
+import "github.com/yshengliao/gortex/middleware/compression"
+
+app.Use(compression.Middleware(compression.Config{
+    Level:        compression.CompressionLevelBestSpeed,
+    MinSize:      512,
+    EnableBrotli: true,
+    PreferBrotli: true,
+    Skipper: func(c echo.Context) bool {
+        // Skip compression for specific paths
+        return c.Path() == "/metrics"
+    },
+}))
+
+// Simple gzip-only middleware
+app.Use(compression.Gzip())
+
+// Brotli-only middleware
+app.Use(compression.Brotli())
+```
+
+**Features:**
+- Automatic content negotiation based on Accept-Encoding
+- Configurable compression levels (speed vs compression ratio)
+- Minimum size threshold to avoid compressing small responses
+- Content type filtering for selective compression
+- Support for both gzip and Brotli algorithms
+- Brotli preference when both encodings are supported
+
+**Performance Impact:**
+- Gzip: ~30-70% size reduction for text content
+- Brotli: ~20-30% better compression than gzip
+- CPU usage increases with compression level
+- Network bandwidth savings often outweigh CPU cost
+
 ### Observability
 
 ```go
@@ -580,6 +638,7 @@ Check out the `/examples` directory for complete implementations:
 - **[Observability](examples/observability)** - Metrics, tracing, and monitoring
 - **[Development Mode](examples/dev-mode)** - Debug endpoints, logging, and error pages
 - **[Monitoring Dashboard](examples/monitoring-dashboard)** - Real-time system monitoring
+- **[Compression](examples/compression)** - Response compression with gzip and Brotli
 
 ## Testing
 
@@ -642,7 +701,7 @@ All examples include comprehensive test suites with unit tests and benchmarks:
 
 ### Performance Optimization
 - [ ] Use production build tags: `go build -tags production`
-- [ ] Enable gzip compression in reverse proxy
+- [ ] Enable response compression (gzip/Brotli) in configuration
 - [ ] Configure appropriate timeouts
 - [ ] Monitor memory usage and GC pressure
 - [ ] Set up health check endpoints

@@ -20,6 +20,7 @@ require (
 require (
 	github.com/Bofry/structproto v0.2.1 // indirect
 	github.com/Bofry/types v0.1.0 // indirect
+	github.com/andybalholm/brotli v1.2.0 // indirect
 	github.com/cstockton/go-conv v0.0.0-20170524002450-66a2b2ba36e1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.8 // indirect
