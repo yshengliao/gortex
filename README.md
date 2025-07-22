@@ -466,6 +466,75 @@ config := httpclient.Config{
 }
 ```
 
+### Memory Pool Optimization
+
+High-performance memory pools to reduce GC pressure and improve allocation efficiency:
+
+```go
+import "github.com/yshengliao/gortex/pkg/pool"
+
+// Buffer pool for reusable byte buffers
+bufferPool := pool.NewBufferPool()
+
+// Get buffer from pool
+buf := bufferPool.Get()
+defer bufferPool.Put(buf) // Always return to pool
+
+// Use the buffer
+buf.WriteString("data")
+json.NewEncoder(buf).Encode(myData)
+
+// Byte slice pool with multiple sizes
+bytePool := pool.NewByteSlicePool()
+
+// Get appropriately sized byte slice
+data := bytePool.Get(4096) // Returns slice of at least 4096 bytes
+defer bytePool.Put(data)
+
+// Generic object pool with reset function
+type Response struct {
+    ID   string
+    Data map[string]interface{}
+}
+
+responsePool := pool.NewObjectPool(
+    func() *Response {
+        return &Response{
+            Data: make(map[string]interface{}),
+        }
+    },
+    func(r **Response) {
+        // Reset object before reuse
+        (*r).ID = ""
+        for k := range (*r).Data {
+            delete((*r).Data, k)
+        }
+    },
+)
+
+// Use object from pool
+resp := responsePool.Get()
+defer responsePool.Put(resp)
+
+// Pool metrics for monitoring
+metrics := bufferPool.GetMetrics()
+fmt.Printf("Buffer pool reuse rate: %.2f%%\n", metrics.ReuseRate * 100)
+```
+
+**Features:**
+- Buffer pools for `bytes.Buffer` with automatic reset
+- Byte slice pools with size buckets (512B to 1MB)
+- Generic object pools with type safety
+- Automatic object reset before reuse
+- Pool metrics and reuse rate tracking
+- Thread-safe concurrent access
+
+**Performance Benefits:**
+- Reduces garbage collection pressure
+- Eliminates allocation overhead for frequently used objects
+- Improves memory locality
+- Typical 90%+ reuse rates in production
+
 ### Observability
 
 ```go
@@ -714,6 +783,7 @@ Check out the `/examples` directory for complete implementations:
 - **[Compression](examples/compression)** - Response compression with gzip and Brotli
 - **[Static Files](examples/static-files)** - Static file server with ETag and caching
 - **[HTTP Pool](examples/http-pool)** - HTTP client connection pooling and metrics
+- **[Memory Pool](examples/memory-pool)** - Memory pooling for performance optimization
 
 ## Testing
 
@@ -828,6 +898,7 @@ e.GET("/metrics", func(c echo.Context) error {
 | `validation/` | Request validation | Stable |
 | `middleware/` | Rate limiting & security | Memory leak fixed |
 | `httpclient/` | HTTP client with connection pooling | Stable |
+| `pool/` | Memory pools for buffers and objects | Stable |
 
 ### Quick Reference
 
