@@ -31,15 +31,15 @@ func initProject(basePath, projectName string, withExamples bool) error {
 	}
 
 	if err := generateFile(filepath.Join(basePath, "go.mod"), goModTemplate, map[string]string{
-		"ModuleName": moduleName,
-		"STMPVersion": "v0.1.10",
+		"ModuleName":    moduleName,
+		"GORTEXVersion": rootCmd.Version,
 	}); err != nil {
 		return err
 	}
 
 	// Generate main.go
 	if err := generateFile(filepath.Join(basePath, "cmd/server/main.go"), mainTemplate, map[string]string{
-		"ModuleName": moduleName,
+		"ModuleName":  moduleName,
 		"ProjectName": projectName,
 	}); err != nil {
 		return err
@@ -73,7 +73,7 @@ func initProject(basePath, projectName string, withExamples bool) error {
 	// Generate README
 	if err := generateFile(filepath.Join(basePath, "README.md"), projectReadmeTemplate, map[string]string{
 		"ProjectName": projectName,
-		"ModuleName": moduleName,
+		"ModuleName":  moduleName,
 	}); err != nil {
 		return err
 	}
@@ -104,7 +104,7 @@ func initProject(basePath, projectName string, withExamples bool) error {
 func generateExamples(basePath, moduleName string) error {
 	// Create example handlers
 	exampleHandlersPath := filepath.Join(basePath, "handlers")
-	
+
 	if err := generateFile(filepath.Join(exampleHandlersPath, "user.go"), userHandlerTemplate, map[string]string{
 		"ModuleName": moduleName,
 	}); err != nil {
@@ -125,7 +125,7 @@ func generateExamples(basePath, moduleName string) error {
 
 	// Create example services
 	exampleServicesPath := filepath.Join(basePath, "services")
-	
+
 	if err := generateFile(filepath.Join(exampleServicesPath, "user_service.go"), userServiceTemplate, map[string]string{
 		"ModuleName": moduleName,
 	}); err != nil {
@@ -134,7 +134,7 @@ func generateExamples(basePath, moduleName string) error {
 
 	// Create example models
 	exampleModelsPath := filepath.Join(basePath, "models")
-	
+
 	if err := generateFile(filepath.Join(exampleModelsPath, "user.go"), userModelTemplate, map[string]string{
 		"ModuleName": moduleName,
 	}); err != nil {
