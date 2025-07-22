@@ -514,6 +514,26 @@ The Gortex framework has successfully completed its optimization roadmap:
     - Integration with Echo middleware stack
     - Thread-safe with concurrent request handling
 
+### Graceful Shutdown Enhancement (2025/07/22)
+
+23. **Comprehensive Graceful Shutdown**:
+    - **Configurable Shutdown Timeout**: `WithShutdownTimeout()` option (default: 30s)
+    - **Shutdown Hooks System**: Register cleanup functions with `OnShutdown()`
+    - **Parallel Hook Execution**: Hooks run concurrently for efficiency
+    - **WebSocket Graceful Shutdown**: 
+      - Sends close messages (1001 - Going Away) to all clients
+      - `ShutdownWithTimeout()` method for controlled shutdown
+      - Clients receive notification before disconnection
+    - **Enhanced Logging**: Detailed shutdown progress tracking
+    - **Thread-Safe**: Concurrent-safe hook registration and execution
+    - **Usage Example**:
+      ```go
+      app.OnShutdown(func(ctx context.Context) error {
+          logger.Info("Shutting down WebSocket connections...")
+          return wsHub.ShutdownWithTimeout(5 * time.Second)
+      })
+      ```
+
 The framework is now production-ready with excellent performance characteristics and zero operational dependencies.
 
 **Last Updated**: 2025/07/22 | **Framework Status**: Alpha (Production-Optimized) | **Go**: 1.24

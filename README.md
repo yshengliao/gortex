@@ -756,7 +756,6 @@ Gortex has undergone comprehensive optimization with all critical issues resolve
 - Zero external service dependencies
 ```
 
-**Development Roadmap**: See [OPTIMIZATION_PLAN.md](./OPTIMIZATION_PLAN.md) for detailed commit-level tasks organized by category (error handling, observability, performance, testing, WebSocket, security, database).
 
 ### Framework Philosophy
 
@@ -1055,24 +1054,50 @@ This entire framework was designed and developed using [Claude Code](https://cla
 
 ## Future Roadmap
 
-### Upcoming Features
+### Planned Features
 
-The framework continues to evolve with a clear roadmap. All planned enhancements are documented in [OPTIMIZATION_PLAN.md](./OPTIMIZATION_PLAN.md) with the following priority categories:
+The framework continues to evolve with a focus on production readiness and developer experience:
 
-1. **Error Handling & Resilience** - Unified error responses, circuit breakers, retry logic
-2. **Observability & Monitoring** - Enhanced metrics, development mode tools, monitoring integration
-3. **Performance Optimizations** - Response compression, static file serving, connection pooling
-4. **Testing Tools** - Handler testing utilities, integration framework, load testing
-5. **WebSocket Enhancements** - Room support, message compression, binary protocol
-6. **Security Features** - CORS configuration, API key auth, input sanitization
-7. **Database Integration** - Connection pooling, migrations, repository pattern
-8. **Developer Experience** - Hot reload, route generation, OpenAPI docs
+#### Error Handling & Resilience
+- **Retry Logic** - Exponential backoff retry mechanism with circuit breaker coordination
+- **Resilience Patterns** - Bulkhead pattern, timeout handling, fallback strategies
+
+#### Testing & Quality
+- **Handler Testing Utilities** - Test server builder, request/response assertion helpers  
+- **Integration Test Framework** - Database test fixtures, test data seeding tools
+- **Load Testing Tools** - WebSocket load testing, performance benchmarking CLI
+
+#### Documentation & Examples  
+- **OpenAPI Generation** - Auto-generate OpenAPI 3.0 specs from struct tags
+- **Extended Examples** - E-commerce, IoT gateway, GraphQL, microservices patterns
+
+#### WebSocket Enhancements
+- **Room/Namespace Support** - Room-based message routing, dynamic room management
+- **Message Compression** - Per-message deflate with compression negotiation
+- **Binary Protocol** - Efficient binary message format with custom encoder/decoder
+
+#### Security Features
+- **CORS Configuration** - Flexible per-route CORS with preflight caching
+- **API Key Authentication** - Key generation, rotation, and management tools
+- **Input Sanitization** - HTML sanitization, SQL injection protection, XSS prevention
+
+#### Database Integration
+- **Connection Pool Abstraction** - PostgreSQL support with health check integration
+- **Migration System** - Version tracking, rollback support, automated migrations
+- **Repository Pattern** - Generic repository interface with transaction support
+- **Caching Layer** - Memory cache implementation with TTL and eviction policies
+
+#### Developer Experience
+- **Hot Reload** - File watcher with graceful server restart and build caching
+- **Project Templates** - Starter templates for common application patterns
+- **Plugin System** - Plugin interface design with lifecycle hooks
 
 ### Version 1.0 Goals
 - 100% test coverage on core components
-- Sub-millisecond latency for WebSocket messages
+- Sub-millisecond latency for WebSocket messages  
 - Production deployments handling 100k+ concurrent connections
 - Comprehensive documentation and tutorials
+- Stable API with backward compatibility guarantee
 
 ## License
 
