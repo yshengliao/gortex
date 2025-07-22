@@ -426,11 +426,24 @@ The Gortex framework has successfully completed its optimization roadmap:
     - /_routes endpoint lists all registered routes
     - /_error endpoint for testing error responses
     - /_config endpoint shows masked configuration
+    - /_monitor endpoint provides system monitoring dashboard
     - Request/response logging middleware with body capture
     - Sensitive header masking (Authorization, Cookie, etc.)
     - HTML error pages with stack traces for browser requests
     - Different error rendering for API vs browser clients
     - Example: dev-mode demonstrates all development features
+
+### Development Monitoring Dashboard (2025/07/22)
+
+16. **Development Monitoring Dashboard**:
+    - Added /_monitor endpoint for real-time system metrics
+    - Displays memory usage statistics (heap, stack, GC)
+    - Shows goroutine count and CPU information
+    - Tracks garbage collection history (last 5 pauses)
+    - Provides server uptime and route statistics
+    - Only available when Logger.Level = "debug"
+    - Zero performance impact (only called on demand)
+    - Example: monitoring-dashboard demonstrates usage
 
 The framework is now production-ready with excellent performance characteristics and zero operational dependencies.
 

@@ -136,6 +136,7 @@ func main() {
 			zap.String("routes", "GET /_routes - List all registered routes"),
 			zap.String("error", "GET /_error - Test error pages"),
 			zap.String("config", "GET /_config - View configuration"),
+			zap.String("monitor", "GET /_monitor - System monitoring dashboard"),
 		)
 		
 		logger.Info("Example endpoints:",
@@ -152,7 +153,8 @@ func main() {
 			zap.String("cmd2", "curl -X POST http://localhost:8080/api/users | jq"),
 			zap.String("cmd3", "curl -X POST http://localhost:8080/example/error"),
 			zap.String("cmd4", "curl 'http://localhost:8080/_error?type=panic'"),
-			zap.String("cmd5", "Open http://localhost:8080/example/error in browser for HTML error page"),
+			zap.String("cmd5", "curl http://localhost:8080/_monitor | jq"),
+			zap.String("cmd6", "Open http://localhost:8080/example/error in browser for HTML error page"),
 		)
 		
 		if err := application.Run(); err != nil && err != http.ErrServerClosed {

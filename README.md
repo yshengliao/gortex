@@ -510,6 +510,7 @@ When `Logger.Level` is set to `"debug"`, Gortex automatically enables developmen
 - `GET /_routes` - Lists all registered routes with methods
 - `GET /_error?type=<type>` - Test error responses (panic, internal)
 - `GET /_config` - View current configuration (sensitive values masked)
+- `GET /_monitor` - System monitoring dashboard with memory usage, goroutines, and GC stats
 
 ### Request/Response Logging
 - Detailed logging of all HTTP requests and responses
@@ -522,6 +523,32 @@ When `Logger.Level` is set to `"debug"`, Gortex automatically enables developmen
 - Request details including headers, query parameters, and request ID
 - Different rendering for browser vs API clients (HTML vs JSON)
 - Panic recovery with detailed stack traces
+
+### System Monitoring Dashboard
+The `/_monitor` endpoint provides real-time system metrics:
+- **System Info**: Goroutine count, CPU count, Go version, uptime
+- **Memory Stats**: Heap allocation, GC statistics, memory usage breakdown
+- **GC History**: Last 5 garbage collection pause times
+- **Server Info**: Debug mode status, route count
+
+Example response:
+```json
+{
+  "status": "healthy",
+  "system": {
+    "goroutines": 15,
+    "cpu_count": 8,
+    "go_version": "go1.24.5",
+    "uptime_seconds": 234.5
+  },
+  "memory": {
+    "alloc_mb": 12.34,
+    "heap_alloc_mb": 10.5,
+    "heap_objects": 15234,
+    "num_gc": 5
+  }
+}
+```
 
 **Security Warning**: Development mode exposes sensitive debugging information. Always ensure `Logger.Level` is set to `"info"` or higher in production environments.
 
@@ -545,6 +572,7 @@ Check out the `/examples` directory for complete implementations:
 - **[Configuration](examples/config)** - Multi-source configuration management
 - **[Observability](examples/observability)** - Metrics, tracing, and monitoring
 - **[Development Mode](examples/dev-mode)** - Debug endpoints, logging, and error pages
+- **[Monitoring Dashboard](examples/monitoring-dashboard)** - Real-time system monitoring
 
 ## Testing
 

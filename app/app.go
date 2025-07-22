@@ -4,6 +4,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"sync"
 	"time"
 
@@ -16,6 +17,9 @@ import (
 
 // ShutdownHook is a function that gets called during shutdown
 type ShutdownHook func(ctx context.Context) error
+
+// startTime tracks when the application started
+var startTime = time.Now()
 
 // App represents the main application instance
 type App struct {
@@ -330,12 +334,14 @@ func (app *App) registerDevelopmentRoutes() {
 	app.e.GET("/_routes", devHandlers.Routes)
 	app.e.GET("/_error", devHandlers.Error)
 	app.e.GET("/_config", devHandlers.Config)
+	app.e.GET("/_monitor", devHandlers.Monitor)
 
 	if app.logger != nil {
 		app.logger.Info("Development routes registered",
 			zap.String("routes", "/_routes"),
 			zap.String("error", "/_error"),
 			zap.String("config", "/_config"),
+			zap.String("monitor", "/_monitor"),
 		)
 	}
 }
@@ -432,5 +438,73 @@ func (h *devHandler) Config(c echo.Context) error {
 	return c.JSON(200, map[string]interface{}{
 		"message": "Configuration endpoint",
 		"mode":    "development",
+	})
+}
+
+// Monitor returns system monitoring information
+func (h *devHandler) Monitor(c echo.Context) error {
+	// Get memory statistics
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+
+	// Get system info
+	systemInfo := map[string]interface{}{
+		"goroutines":      runtime.NumGoroutine(),
+		"cpu_count":       runtime.NumCPU(),
+		"go_version":      runtime.Version(),
+		"max_procs":       runtime.GOMAXPROCS(0),
+		"timestamp":       time.Now().Format(time.RFC3339),
+		"uptime_seconds":  time.Since(startTime).Seconds(),
+	}
+
+	// Memory statistics
+	memoryInfo := map[string]interface{}{
+		"alloc_mb":        float64(m.Alloc) / 1024 / 1024,
+		"total_alloc_mb":  float64(m.TotalAlloc) / 1024 / 1024,
+		"sys_mb":          float64(m.Sys) / 1024 / 1024,
+		"heap_alloc_mb":   float64(m.HeapAlloc) / 1024 / 1024,
+		"heap_sys_mb":     float64(m.HeapSys) / 1024 / 1024,
+		"heap_idle_mb":    float64(m.HeapIdle) / 1024 / 1024,
+		"heap_inuse_mb":   float64(m.HeapInuse) / 1024 / 1024,
+		"heap_released_mb": float64(m.HeapReleased) / 1024 / 1024,
+		"heap_objects":    m.HeapObjects,
+		"stack_inuse_mb":  float64(m.StackInuse) / 1024 / 1024,
+		"stack_sys_mb":    float64(m.StackSys) / 1024 / 1024,
+		"num_gc":          m.NumGC,
+		"gc_cpu_fraction": m.GCCPUFraction,
+	}
+
+	// Get GC stats
+	gcStats := make([]map[string]interface{}, 0)
+	if m.NumGC > 0 {
+		// Get last 5 GC pause times
+		numPauses := int(m.NumGC)
+		if numPauses > 5 {
+			numPauses = 5
+		}
+		for i := 0; i < numPauses; i++ {
+			gcStats = append(gcStats, map[string]interface{}{
+				"pause_ms": float64(m.PauseNs[(m.NumGC+255-uint32(i))%256]) / 1e6,
+			})
+		}
+	}
+
+	// Get Echo routes count
+	routes := h.echo.Routes()
+	routesInfo := map[string]interface{}{
+		"total_routes": len(routes),
+	}
+
+	// Final response
+	return c.JSON(200, map[string]interface{}{
+		"status":      "healthy",
+		"system":      systemInfo,
+		"memory":      memoryInfo,
+		"gc_stats":    gcStats,
+		"routes":      routesInfo,
+		"server_info": map[string]interface{}{
+			"debug_mode": h.echo.Debug,
+			"address":    h.echo.Server.Addr,
+		},
 	})
 }
