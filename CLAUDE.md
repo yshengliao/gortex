@@ -483,6 +483,18 @@ The Gortex framework has successfully completed its optimization roadmap:
     - Example: static-files demonstrates all features
     - Performance: Near-native file serving speeds
 
+### HTTP Client Connection Pooling (2025/07/22)
+
+20. **HTTP Client Connection Pool**:
+    - High-performance HTTP client with connection pooling
+    - Multiple client configurations in single pool
+    - Per-host connection limits and idle timeouts
+    - Automatic connection reuse tracking
+    - Request/response metrics collection
+    - Thread-safe pool management
+    - Configurable timeouts and TLS settings
+    - Example: http-pool demonstrates pooling and metrics
+
 The framework is now production-ready with excellent performance characteristics and zero operational dependencies.
 
 **Last Updated**: 2025/07/22 | **Framework Status**: Alpha (Production-Optimized) | **Go**: 1.24

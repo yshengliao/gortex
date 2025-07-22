@@ -395,6 +395,77 @@ app.Use(compression.Brotli())
 - CPU usage increases with compression level
 - Network bandwidth savings often outweigh CPU cost
 
+### HTTP Client Connection Pooling
+
+High-performance HTTP client with connection pooling and metrics:
+
+```go
+import "github.com/yshengliao/gortex/pkg/httpclient"
+
+// Create client pool with custom factory
+pool := httpclient.NewPoolWithFactory(func(name string) *httpclient.Client {
+    config := httpclient.DefaultConfig()
+    
+    switch name {
+    case "internal":
+        // Fast timeout for internal services
+        config.Timeout = 5 * time.Second
+        config.MaxIdleConnsPerHost = 20
+    case "external":
+        // Longer timeout for external APIs
+        config.Timeout = 30 * time.Second
+        config.MaxIdleConnsPerHost = 10
+    default:
+        // Default configuration
+    }
+    
+    return httpclient.New(config)
+})
+defer pool.Close()
+
+// Use different clients for different purposes
+internalClient := pool.Get("internal")
+externalClient := pool.Get("external")
+
+// Make requests with automatic metrics
+resp, err := externalClient.Do(req)
+
+// Get connection pool metrics
+metrics := pool.GetAllMetrics()
+for name, m := range metrics {
+    fmt.Printf("Client %s: %d active, %d idle, %d reused\n", 
+        name, m.ActiveConnections, m.IdleConnections, m.ConnectionReuse)
+}
+```
+
+**Features:**
+- Configurable connection limits per host
+- Automatic connection reuse tracking
+- Request/response metrics collection
+- Multiple client configurations in one pool
+- Thread-safe client management
+- Graceful connection cleanup
+
+**Configuration Options:**
+```go
+config := httpclient.Config{
+    // Connection pool settings
+    MaxIdleConns:        100,              // Total idle connections
+    MaxIdleConnsPerHost: 10,               // Idle connections per host
+    MaxConnsPerHost:     0,                // Max connections per host (0 = no limit)
+    IdleConnTimeout:     90 * time.Second, // Idle connection timeout
+    
+    // Timeouts
+    Timeout:             30 * time.Second, // Request timeout
+    DialTimeout:         10 * time.Second, // Connection timeout
+    TLSHandshakeTimeout: 10 * time.Second, // TLS handshake timeout
+    
+    // Features
+    EnableMetrics:       true,             // Collect metrics
+    InsecureSkipVerify:  false,           // TLS verification
+}
+```
+
 ### Observability
 
 ```go
@@ -641,6 +712,8 @@ Check out the `/examples` directory for complete implementations:
 - **[Development Mode](examples/dev-mode)** - Debug endpoints, logging, and error pages
 - **[Monitoring Dashboard](examples/monitoring-dashboard)** - Real-time system monitoring
 - **[Compression](examples/compression)** - Response compression with gzip and Brotli
+- **[Static Files](examples/static-files)** - Static file server with ETag and caching
+- **[HTTP Pool](examples/http-pool)** - HTTP client connection pooling and metrics
 
 ## Testing
 
@@ -753,7 +826,8 @@ e.GET("/metrics", func(c echo.Context) error {
 | `response/` | HTTP response helpers | Stable |
 | `errors/` | Unified error handling | Stable |
 | `validation/` | Request validation | Stable |
-| `middleware/` | Rate limiting & security | Memory leak fixes needed |
+| `middleware/` | Rate limiting & security | Memory leak fixed |
+| `httpclient/` | HTTP client with connection pooling | Stable |
 
 ### Quick Reference
 
