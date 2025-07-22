@@ -3,8 +3,10 @@ package response
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/labstack/echo/v4"
+	"github.com/yshengliao/gortex/pkg/errors"
 )
 
 // StandardResponse represents a standard API response
@@ -15,6 +17,15 @@ type StandardResponse struct {
 	Code    int         `json:"code,omitempty"`
 }
 
+// SuccessResponse represents a standardized success response
+type SuccessResponse struct {
+	Success   bool                   `json:"success"`
+	Data      interface{}            `json:"data,omitempty"`
+	Meta      map[string]interface{} `json:"meta,omitempty"`
+	Timestamp time.Time              `json:"timestamp"`
+	RequestID string                 `json:"request_id,omitempty"`
+}
+
 // Success sends a successful response
 func Success(c echo.Context, statusCode int, data interface{}) error {
 	return c.JSON(statusCode, StandardResponse{
@@ -23,7 +34,20 @@ func Success(c echo.Context, statusCode int, data interface{}) error {
 	})
 }
 
-// Error sends an error response
+// SuccessWithMeta sends a successful response with metadata
+func SuccessWithMeta(c echo.Context, statusCode int, data interface{}, meta map[string]interface{}) error {
+	resp := &SuccessResponse{
+		Success:   true,
+		Data:      data,
+		Meta:      meta,
+		Timestamp: time.Now().UTC(),
+		RequestID: errors.GetRequestID(c),
+	}
+	return c.JSON(statusCode, resp)
+}
+
+// Error sends an error response (deprecated - use pkg/errors instead)
+// Kept for backward compatibility
 func Error(c echo.Context, statusCode int, message string) error {
 	return c.JSON(statusCode, StandardResponse{
 		Success: false,
@@ -32,27 +56,43 @@ func Error(c echo.Context, statusCode int, message string) error {
 	})
 }
 
-// BadRequest sends a 400 Bad Request response
+// BadRequest sends a 400 Bad Request response (deprecated - use errors.ValidationError)
 func BadRequest(c echo.Context, message string) error {
-	return Error(c, http.StatusBadRequest, message)
+	return errors.ValidationError(c, message, nil)
 }
 
-// Unauthorized sends a 401 Unauthorized response
+// Unauthorized sends a 401 Unauthorized response (deprecated - use errors.UnauthorizedError)
 func Unauthorized(c echo.Context, message string) error {
-	return Error(c, http.StatusUnauthorized, message)
+	return errors.UnauthorizedError(c, message)
 }
 
-// Forbidden sends a 403 Forbidden response
+// Forbidden sends a 403 Forbidden response (deprecated - use errors.ForbiddenError)
 func Forbidden(c echo.Context, message string) error {
-	return Error(c, http.StatusForbidden, message)
+	return errors.ForbiddenError(c, message)
 }
 
-// NotFound sends a 404 Not Found response
+// NotFound sends a 404 Not Found response (deprecated - use errors.NotFoundError)
 func NotFound(c echo.Context, message string) error {
-	return Error(c, http.StatusNotFound, message)
+	return errors.NotFoundError(c, message)
 }
 
-// InternalServerError sends a 500 Internal Server Error response
+// InternalServerError sends a 500 Internal Server Error response (deprecated - use errors.InternalServerError)
 func InternalServerError(c echo.Context, message string) error {
-	return Error(c, http.StatusInternalServerError, message)
+	err := errors.New(errors.CodeInternalServerError, message)
+	return err.Send(c, http.StatusInternalServerError)
+}
+
+// Created sends a 201 Created response
+func Created(c echo.Context, data interface{}) error {
+	return Success(c, http.StatusCreated, data)
+}
+
+// NoContent sends a 204 No Content response
+func NoContent(c echo.Context) error {
+	return c.NoContent(http.StatusNoContent)
+}
+
+// Accepted sends a 202 Accepted response
+func Accepted(c echo.Context, data interface{}) error {
+	return Success(c, http.StatusAccepted, data)
 }

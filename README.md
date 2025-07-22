@@ -147,6 +147,63 @@ type UserHandler struct {
 
 ## Production Features
 
+### Error Handling
+
+```go
+// Unified error response system with categorized error codes
+type ErrorResponse struct {
+    Code      int                    `json:"code"`      // Error code (1xxx: validation, 2xxx: auth, 3xxx: system, 4xxx: business)
+    Message   string                 `json:"message"`   // Human-readable message
+    Details   map[string]interface{} `json:"details,omitempty"` // Additional context
+    Timestamp string                 `json:"timestamp"` // ISO 8601 timestamp
+    RequestID string                 `json:"request_id,omitempty"` // Request tracking ID
+}
+
+// Using error helpers in handlers
+func (h *UserHandler) POST(c echo.Context) error {
+    var req CreateUserRequest
+    if err := c.Bind(&req); err != nil {
+        return errors.ValidationError(c, "Invalid request format", err)
+    }
+    
+    if err := validate.Struct(req); err != nil {
+        return errors.ValidationFieldsError(c, err)
+    }
+    
+    user, err := h.UserSvc.Create(req)
+    if err != nil {
+        if errors.IsConflict(err) {
+            return errors.BusinessConflict(c, "Username already exists")
+        }
+        return errors.InternalServerError(c, "Failed to create user", err)
+    }
+    
+    return response.Success(c, http.StatusCreated, user)
+}
+
+// Pre-defined error codes for consistency
+const (
+    // Validation errors (1xxx)
+    CodeValidationFailed = 1001
+    CodeInvalidFormat    = 1002
+    CodeMissingField     = 1003
+    
+    // Auth errors (2xxx)  
+    CodeUnauthorized     = 2001
+    CodeTokenExpired     = 2002
+    CodeForbidden        = 2003
+    
+    // System errors (3xxx)
+    CodeInternalError    = 3001
+    CodeServiceUnavailable = 3002
+    
+    // Business errors (4xxx)
+    CodeResourceNotFound = 4001
+    CodeConflict         = 4002
+    CodeQuotaExceeded    = 4003
+)
+```
+
 ### Authentication & Authorization
 
 ```go
@@ -263,6 +320,7 @@ Gortex has undergone comprehensive optimization with all critical issues resolve
 - Declarative routing with struct tag discovery  
 - WebSocket hub with pure channel-based concurrency
 - JWT authentication and role-based access
+- Unified error response system with categorized error codes
 - High-performance metrics (ImprovedCollector: 163ns/op, 0 allocs)
 - Configuration system with Bofry/config (YAML, .env, env vars)
 - Memory-stable rate limiting with TTL-based cleanup
@@ -270,6 +328,8 @@ Gortex has undergone comprehensive optimization with all critical issues resolve
 - Comprehensive test coverage with example automation
 - Zero external service dependencies
 ```
+
+**Development Roadmap**: See [OPTIMIZATION_PLAN.md](./OPTIMIZATION_PLAN.md) for detailed commit-level tasks organized by category (error handling, observability, performance, testing, WebSocket, security, database).
 
 ### Framework Philosophy
 
@@ -450,6 +510,7 @@ e.GET("/metrics", func(c echo.Context) error {
 | `config/` | Configuration management | Bofry/config integrated |
 | `observability/` | Metrics & tracing | Recently optimized |
 | `response/` | HTTP response helpers | Stable |
+| `errors/` | Unified error handling | Stable |
 | `validation/` | Request validation | Stable |
 | `middleware/` | Rate limiting & security | Memory leak fixes needed |
 
@@ -511,24 +572,16 @@ This entire framework was designed and developed using [Claude Code](https://cla
 
 ### Upcoming Features
 
+The framework continues to evolve with a clear roadmap. All planned enhancements are documented in [OPTIMIZATION_PLAN.md](./OPTIMIZATION_PLAN.md) with the following priority categories:
 
-#### WebSocket Hub Improvements
-- Simplified concurrency model using pure channel-based approach
-- Room/namespace support for game lobbies
-- Horizontal scaling with Redis pub/sub (optional)
-- Message compression and binary protocol support
-
-#### Production Enhancements
-- Distributed tracing with OpenTelemetry (optional)
-- Advanced circuit breaker patterns
-- Database connection pooling and migrations
-- Kubernetes-native deployment templates
-
-#### Developer Experience
-- CLI tool for project scaffolding (`gortex new`)
-- Code generation for CRUD operations
-- Built-in API documentation with Swagger
-- VS Code extension with snippets
+1. **Error Handling & Resilience** - Unified error responses, circuit breakers, retry logic
+2. **Observability & Monitoring** - Enhanced metrics, development mode tools, monitoring integration
+3. **Performance Optimizations** - Response compression, static file serving, connection pooling
+4. **Testing Tools** - Handler testing utilities, integration framework, load testing
+5. **WebSocket Enhancements** - Room support, message compression, binary protocol
+6. **Security Features** - CORS configuration, API key auth, input sanitization
+7. **Database Integration** - Connection pooling, migrations, repository pattern
+8. **Developer Experience** - Hot reload, route generation, OpenAPI docs
 
 ### Version 1.0 Goals
 - 100% test coverage on core components

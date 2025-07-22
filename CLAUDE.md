@@ -141,10 +141,15 @@ COMPLETED (2025/07/21)
 - WebSocket hub concurrency simplification: Pure channel-based model
 - Bofry/config integration: Enhanced configuration with YAML, .env, and environment variable support
 
-NEXT PRIORITIES
-- CLI tool with project scaffolding (gortex new, gortex generate)
-- Hot reload for development mode
-- OpenAPI documentation generation from struct tags
+NEXT PRIORITIES (See OPTIMIZATION_PLAN.md for detailed commit-level tasks)
+- Error handling unification and resilience patterns
+- Enhanced observability and monitoring integration  
+- Performance optimizations (compression, static files, pooling)
+- Comprehensive testing utilities and frameworks
+- WebSocket enhancements (rooms, compression, binary protocol)
+- Security features (CORS, API keys, input sanitization)
+- Database integration (connection pool, migrations, repository)
+- Developer experience improvements (hot reload, OpenAPI docs)
 ```
 
 ### Performance Targets
@@ -281,7 +286,7 @@ Each optimization commit should include:
 
 ## Related Documentation
 
-- **[Optimization Roadmap](./OPTIMIZATION_ROADMAP.md)**: Prioritized development plan with verified issues
+- **[Optimization Plan](./OPTIMIZATION_PLAN.md)**: Commit-level development tasks organized by category
 - **[README](./README.md)**: Project overview reflecting latest optimizations  
 - **Examples**: `/examples` directory (all verified working as of 2025/07/21)
 
