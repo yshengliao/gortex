@@ -192,6 +192,7 @@ cfg := config.NewConfigBuilder().
     LoadYamlFile("config.yaml").
     LoadDotEnv(".env").              // NEW: .env file support
     LoadEnvironmentVariables("GORTEX").
+    LoadCommandArguments().          // NEW: command line flags
     Validate().
     MustBuild()
 
@@ -200,6 +201,7 @@ loader := config.NewBofryLoader().
     WithYAMLFile("config.yaml").
     WithDotEnvFile(".env").
     WithEnvPrefix("GORTEX_")
+    WithCommandArguments()
 cfg := &config.Config{}
 err := loader.Load(cfg)
 

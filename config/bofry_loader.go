@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	bofryconfig "github.com/Bofry/config"
 )
@@ -13,11 +14,12 @@ import (
 // - YAML files
 // - Environment variables
 // - .env files
-// - Command line arguments (future)
+// - Command line arguments
 type BofryLoader struct {
-	yamlFile  string
-	dotEnvFile string
-	envPrefix string
+	yamlFile       string
+	dotEnvFile     string
+	envPrefix      string
+	useCommandArgs bool
 }
 
 // NewBofryLoader creates a new Bofry configuration loader
@@ -25,6 +27,12 @@ func NewBofryLoader() *BofryLoader {
 	return &BofryLoader{
 		envPrefix: "GORTEX_", // Default to GORTEX_ instead of STMP_ for new implementation
 	}
+}
+
+// WithCommandArguments enables parsing command line arguments
+func (l *BofryLoader) WithCommandArguments() *BofryLoader {
+	l.useCommandArgs = true
+	return l
 }
 
 // WithYAMLFile sets the YAML configuration file path
@@ -49,6 +57,11 @@ func (l *BofryLoader) WithEnvPrefix(prefix string) *BofryLoader {
 func (l *BofryLoader) Load(cfg *Config) error {
 	// Start with default configuration
 	*cfg = *DefaultConfig()
+
+	// Apply command line arguments as environment variables if enabled
+	if l.useCommandArgs {
+		l.applyCommandArgs()
+	}
 
 	// Bofry/config panics on errors, so we need to recover
 	var loadErr error
@@ -98,7 +111,7 @@ func (l *BofryLoader) Load(cfg *Config) error {
 		if len(envPrefix) > 0 && envPrefix[len(envPrefix)-1] == '_' {
 			envPrefix = envPrefix[:len(envPrefix)-1]
 		}
-		
+
 		// First try Bofry's native env loading
 		configService.LoadEnvironmentVariables(envPrefix)
 	}()
@@ -122,6 +135,23 @@ func (l *BofryLoader) loadEnvCompat(cfg *Config) error {
 	// Use SimpleLoader's logic for environment variables to maintain compatibility
 	loader := &SimpleLoader{envPrefix: l.envPrefix}
 	return loader.loadFromEnv(cfg)
+}
+
+// applyCommandArgs parses command line arguments in the form --name=value
+// and sets them as environment variables using the configured prefix.
+func (l *BofryLoader) applyCommandArgs() {
+	for _, arg := range os.Args[1:] {
+		if !strings.HasPrefix(arg, "--") {
+			continue
+		}
+		kv := strings.SplitN(arg[2:], "=", 2)
+		if len(kv) != 2 {
+			continue
+		}
+		name := strings.ToUpper(strings.ReplaceAll(kv[0], "-", "_"))
+		envName := l.envPrefix + name
+		os.Setenv(envName, kv[1])
+	}
 }
 
 // ConfigBuilder provides a fluent builder pattern for configuration
@@ -152,6 +182,12 @@ func (b *ConfigBuilder) LoadEnvironmentVariables(prefix string) *ConfigBuilder {
 // LoadDotEnv adds a .env file source
 func (b *ConfigBuilder) LoadDotEnv(path string) *ConfigBuilder {
 	b.loader.WithDotEnvFile(path)
+	return b
+}
+
+// LoadCommandArguments enables command line argument parsing
+func (b *ConfigBuilder) LoadCommandArguments() *ConfigBuilder {
+	b.loader.WithCommandArguments()
 	return b
 }
 
@@ -212,6 +248,6 @@ func LoadWithBofry(yamlFile string, envPrefix string, cfg *Config) error {
 		WithYAMLFile(yamlFile).
 		WithDotEnvFile(dotEnvFile).
 		WithEnvPrefix(envPrefix)
-	
+
 	return loader.Load(cfg)
 }
