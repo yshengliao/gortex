@@ -507,6 +507,29 @@ The Gortex framework has successfully completed its optimization roadmap:
     - Reduces GC pressure and allocation overhead
     - Example: memory-pool demonstrates all pool types
 
+### Circuit Breaker Implementation (2025/07/22)
+
+22. **Circuit Breaker Pattern**:
+    - Three-state circuit breaker: Closed, Open, Half-Open
+    - Configurable failure thresholds and recovery timeouts
+    - Custom ReadyToTrip function for flexible failure detection
+    - Automatic recovery testing with half-open state
+    - State change notifications via callbacks
+    - High-performance implementation with atomic operations
+    - Zero allocations in hot paths
+    - Comprehensive metrics: requests, failures, consecutive counts
+    - Example: circuit-breaker demonstrates fault tolerance
+
+23. **Circuit Breaker Middleware**:
+    - HTTP middleware for automatic circuit breaking
+    - Per-route or global circuit breakers
+    - Configurable failure detection (status codes, errors)
+    - Circuit breaker manager for multiple instances
+    - Real-time statistics endpoint
+    - Graceful error responses (503 Service Unavailable)
+    - Integration with Echo middleware stack
+    - Thread-safe with concurrent request handling
+
 The framework is now production-ready with excellent performance characteristics and zero operational dependencies.
 
 **Last Updated**: 2025/07/22 | **Framework Status**: Alpha (Production-Optimized) | **Go**: 1.24

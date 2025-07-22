@@ -535,6 +535,116 @@ fmt.Printf("Buffer pool reuse rate: %.2f%%\n", metrics.ReuseRate * 100)
 - Improves memory locality
 - Typical 90%+ reuse rates in production
 
+### Circuit Breaker Pattern
+
+Protect your services from cascading failures with the circuit breaker pattern:
+
+```go
+import "github.com/yshengliao/gortex/pkg/circuitbreaker"
+
+// Create circuit breaker with custom configuration
+cb := circuitbreaker.New("external-api", circuitbreaker.Config{
+    MaxRequests: 3,                      // Max requests in half-open state
+    Interval:    10 * time.Second,       // Reset interval for closed state
+    Timeout:     30 * time.Second,       // Time to wait in open state
+    ReadyToTrip: func(counts circuitbreaker.Counts) bool {
+        // Trip when failure ratio > 50% and at least 10 requests
+        return counts.Requests >= 10 && counts.FailureRatio() > 0.5
+    },
+    OnStateChange: func(name string, from, to circuitbreaker.State) {
+        logger.Info("Circuit breaker state changed",
+            zap.String("name", name),
+            zap.String("from", from.String()),
+            zap.String("to", to.String()))
+    },
+})
+
+// Use circuit breaker for external calls
+err := cb.Call(ctx, func(ctx context.Context) error {
+    // Make external API call
+    resp, err := client.Do(req)
+    if err != nil {
+        return err
+    }
+    if resp.StatusCode >= 500 {
+        return fmt.Errorf("server error: %d", resp.StatusCode)
+    }
+    return nil
+})
+
+if err == circuitbreaker.ErrCircuitOpen {
+    // Circuit is open, fail fast
+    return response.Error(c, 503, "Service temporarily unavailable")
+}
+
+// Circuit breaker middleware
+import cbmiddleware "github.com/yshengliao/gortex/middleware/circuitbreaker"
+
+// Protect all routes with circuit breaker
+e.Use(cbmiddleware.CircuitBreaker())
+
+// Or with custom configuration
+e.Use(cbmiddleware.CircuitBreakerWithConfig(cbmiddleware.Config{
+    CircuitBreakerConfig: circuitbreaker.Config{
+        MaxRequests: 5,
+        Timeout:     60 * time.Second,
+        ReadyToTrip: func(counts circuitbreaker.Counts) bool {
+            // Trip on 3 consecutive failures
+            return counts.ConsecutiveFailures >= 3
+        },
+    },
+    GetCircuitBreakerName: func(c echo.Context) string {
+        // Use path as circuit breaker name
+        return c.Path()
+    },
+    IsFailure: func(c echo.Context, err error) bool {
+        // Consider 5xx errors and timeouts as failures
+        if err != nil {
+            return true
+        }
+        return c.Response().Status >= 500
+    },
+}))
+
+// Circuit breaker manager for multiple breakers
+manager := cbmiddleware.NewManager(circuitbreaker.DefaultConfig())
+cb1 := manager.Get("service-1")
+cb2 := manager.Get("service-2")
+
+// Get statistics
+stats := manager.Stats()
+// {
+//   "service-1": {
+//     "state": "closed",
+//     "requests": 1000,
+//     "failures": 10,
+//     "failure_ratio": 0.01
+//   },
+//   "service-2": {
+//     "state": "open",
+//     "requests": 100,
+//     "failures": 60,
+//     "failure_ratio": 0.6
+//   }
+// }
+```
+
+**Features:**
+- Three states: Closed (normal), Open (failing), Half-Open (testing)
+- Configurable failure thresholds and timeouts
+- Automatic recovery with half-open state testing
+- Per-route or global circuit breakers
+- Real-time state change notifications
+- Concurrent-safe with high performance
+- Detailed failure metrics and statistics
+
+**Configuration Options:**
+- `MaxRequests`: Maximum requests allowed in half-open state
+- `Interval`: Time window for counting failures in closed state
+- `Timeout`: How long to stay in open state before testing
+- `ReadyToTrip`: Custom function to determine when to open circuit
+- `OnStateChange`: Callback for state transitions
+
 ### Observability
 
 ```go
@@ -784,6 +894,7 @@ Check out the `/examples` directory for complete implementations:
 - **[Static Files](examples/static-files)** - Static file server with ETag and caching
 - **[HTTP Pool](examples/http-pool)** - HTTP client connection pooling and metrics
 - **[Memory Pool](examples/memory-pool)** - Memory pooling for performance optimization
+- **[Circuit Breaker](examples/circuit-breaker)** - Circuit breaker pattern for fault tolerance
 
 ## Testing
 
@@ -899,6 +1010,7 @@ e.GET("/metrics", func(c echo.Context) error {
 | `middleware/` | Rate limiting & security | Memory leak fixed |
 | `httpclient/` | HTTP client with connection pooling | Stable |
 | `pool/` | Memory pools for buffers and objects | Stable |
+| `circuitbreaker/` | Circuit breaker pattern implementation | Stable |
 
 ### Quick Reference
 
