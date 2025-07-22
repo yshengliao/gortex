@@ -18,14 +18,15 @@ type Config struct {
 
 // ServerConfig holds HTTP server configuration
 type ServerConfig struct {
-	Port         string        `yaml:"port" env:"PORT" default:"8080"`
-	Address      string        `yaml:"address" env:"ADDRESS" default:":8080"`
-	ReadTimeout  time.Duration `yaml:"read_timeout" env:"READ_TIMEOUT" default:"30s"`
-	WriteTimeout time.Duration `yaml:"write_timeout" env:"WRITE_TIMEOUT" default:"30s"`
-	IdleTimeout  time.Duration `yaml:"idle_timeout" env:"IDLE_TIMEOUT" default:"120s"`
-	GZip         bool          `yaml:"gzip" env:"GZIP" default:"true"`
-	CORS         bool          `yaml:"cors" env:"CORS" default:"true"`
-	Recovery     bool          `yaml:"recovery" env:"RECOVERY" default:"true"`
+	Port            string        `yaml:"port" env:"PORT" default:"8080"`
+	Address         string        `yaml:"address" env:"ADDRESS" default:":8080"`
+	ReadTimeout     time.Duration `yaml:"read_timeout" env:"READ_TIMEOUT" default:"30s"`
+	WriteTimeout    time.Duration `yaml:"write_timeout" env:"WRITE_TIMEOUT" default:"30s"`
+	IdleTimeout     time.Duration `yaml:"idle_timeout" env:"IDLE_TIMEOUT" default:"120s"`
+	ShutdownTimeout time.Duration `yaml:"shutdown_timeout" env:"SHUTDOWN_TIMEOUT" default:"10s"`
+	GZip            bool          `yaml:"gzip" env:"GZIP" default:"true"`
+	CORS            bool          `yaml:"cors" env:"CORS" default:"true"`
+	Recovery        bool          `yaml:"recovery" env:"RECOVERY" default:"true"`
 }
 
 // LoggerConfig holds logging configuration
@@ -81,14 +82,15 @@ type Loader interface {
 func DefaultConfig() *Config {
 	return &Config{
 		Server: ServerConfig{
-			Port:         "8080",
-			Address:      ":8080",
-			ReadTimeout:  30 * time.Second,
-			WriteTimeout: 30 * time.Second,
-			IdleTimeout:  120 * time.Second,
-			GZip:         true,
-			CORS:         true,
-			Recovery:     true,
+			Port:            "8080",
+			Address:         ":8080",
+			ReadTimeout:     30 * time.Second,
+			WriteTimeout:    30 * time.Second,
+			IdleTimeout:     120 * time.Second,
+			ShutdownTimeout: 10 * time.Second,
+			GZip:            true,
+			CORS:            true,
+			Recovery:        true,
 		},
 		Logger: LoggerConfig{
 			Level:            "info",

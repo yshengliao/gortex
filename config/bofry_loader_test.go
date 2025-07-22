@@ -33,6 +33,7 @@ func TestBofryLoader_LoadDefaults(t *testing.T) {
 	assert.Equal(t, "8080", cfg.Server.Port)
 	assert.Equal(t, ":8080", cfg.Server.Address)
 	assert.Equal(t, 30*time.Second, cfg.Server.ReadTimeout)
+	assert.Equal(t, 10*time.Second, cfg.Server.ShutdownTimeout)
 	assert.True(t, cfg.Server.Recovery)
 	assert.Equal(t, "info", cfg.Logger.Level)
 	assert.Equal(t, "json", cfg.Logger.Encoding)
@@ -47,6 +48,7 @@ server:
   address: ":8888"
   gzip: false
   read_timeout: 45s
+  shutdown_timeout: 7s
 logger:
   level: "warn"
   encoding: "console"
@@ -84,6 +86,7 @@ database:
 	assert.Equal(t, ":8888", cfg.Server.Address)
 	assert.False(t, cfg.Server.GZip)
 	assert.Equal(t, 45*time.Second, cfg.Server.ReadTimeout)
+	assert.Equal(t, 7*time.Second, cfg.Server.ShutdownTimeout)
 	assert.Equal(t, "warn", cfg.Logger.Level)
 	assert.Equal(t, "console", cfg.Logger.Encoding)
 	assert.Equal(t, 2048, cfg.WebSocket.ReadBufferSize)
@@ -107,6 +110,7 @@ func TestBofryLoader_LoadFromEnv(t *testing.T) {
 		"GORTEX_SERVER_ADDRESS":             ":9090",
 		"GORTEX_SERVER_GZIP":                "false",
 		"GORTEX_SERVER_READ_TIMEOUT":        "60s",
+		"GORTEX_SERVER_SHUTDOWN_TIMEOUT":    "70s",
 		"GORTEX_LOGGER_LEVEL":               "debug",
 		"GORTEX_LOGGER_ENCODING":            "console",
 		"GORTEX_WEBSOCKET_READ_BUFFER_SIZE": "4096",
@@ -142,6 +146,7 @@ func TestBofryLoader_LoadFromEnv(t *testing.T) {
 	assert.Equal(t, ":9090", cfg.Server.Address)
 	assert.False(t, cfg.Server.GZip)
 	assert.Equal(t, 60*time.Second, cfg.Server.ReadTimeout)
+	assert.Equal(t, 70*time.Second, cfg.Server.ShutdownTimeout)
 	assert.Equal(t, "debug", cfg.Logger.Level)
 	assert.Equal(t, "console", cfg.Logger.Encoding)
 	assert.Equal(t, 4096, cfg.WebSocket.ReadBufferSize)
@@ -162,6 +167,7 @@ func TestBofryLoader_EnvOverridesYAML(t *testing.T) {
 server:
   port: "7777"
   address: ":7777"
+  shutdown_timeout: 40s
 logger:
   level: "error"
 jwt:
@@ -181,9 +187,11 @@ database:
 
 	// Set environment variables to override some YAML values
 	os.Setenv("GORTEX_SERVER_PORT", "9999")
+	os.Setenv("GORTEX_SERVER_SHUTDOWN_TIMEOUT", "5s")
 	os.Setenv("GORTEX_JWT_SECRET_KEY", "env-override-key")
 	defer func() {
 		os.Unsetenv("GORTEX_SERVER_PORT")
+		os.Unsetenv("GORTEX_SERVER_SHUTDOWN_TIMEOUT")
 		os.Unsetenv("GORTEX_JWT_SECRET_KEY")
 	}()
 
@@ -197,6 +205,7 @@ database:
 
 	// Environment variable should override YAML
 	assert.Equal(t, "9999", cfg.Server.Port)
+	assert.Equal(t, 5*time.Second, cfg.Server.ShutdownTimeout)
 	assert.Equal(t, "env-override-key", cfg.JWT.SecretKey)
 	// YAML value should be loaded for non-overridden fields
 	assert.Equal(t, ":7777", cfg.Server.Address)
@@ -211,6 +220,7 @@ func TestBofryLoader_LoadFromDotEnv(t *testing.T) {
 GORTEX_SERVER_PORT=6666
 GORTEX_SERVER_ADDRESS=:6666
 GORTEX_LOGGER_LEVEL=trace
+GORTEX_SERVER_SHUTDOWN_TIMEOUT=8s
 GORTEX_JWT_SECRET_KEY=dotenv-secret
 GORTEX_DATABASE_USER=dotenv-user
 GORTEX_DATABASE_PASSWORD=dotenv-pass
@@ -235,6 +245,7 @@ GORTEX_DATABASE_PASSWORD=dotenv-pass
 	assert.Equal(t, "6666", cfg.Server.Port)
 	assert.Equal(t, ":6666", cfg.Server.Address)
 	assert.Equal(t, "trace", cfg.Logger.Level)
+	assert.Equal(t, 8*time.Second, cfg.Server.ShutdownTimeout)
 	assert.Equal(t, "dotenv-secret", cfg.JWT.SecretKey)
 	assert.Equal(t, "dotenv-user", cfg.Database.User)
 	assert.Equal(t, "dotenv-pass", cfg.Database.Password)
@@ -243,6 +254,7 @@ GORTEX_DATABASE_PASSWORD=dotenv-pass
 	os.Unsetenv("GORTEX_SERVER_PORT")
 	os.Unsetenv("GORTEX_SERVER_ADDRESS")
 	os.Unsetenv("GORTEX_LOGGER_LEVEL")
+	os.Unsetenv("GORTEX_SERVER_SHUTDOWN_TIMEOUT")
 	os.Unsetenv("GORTEX_JWT_SECRET_KEY")
 	os.Unsetenv("GORTEX_DATABASE_USER")
 	os.Unsetenv("GORTEX_DATABASE_PASSWORD")
