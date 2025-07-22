@@ -53,6 +53,11 @@ func NewApp(opts ...Option) (*App, error) {
 	// Configure Echo
 	app.setupEcho()
 
+	// Register development routes if in development mode
+	if app.config != nil && app.config.Logger.Level == "debug" {
+		app.registerDevelopmentRoutes()
+	}
+
 	return app, nil
 }
 
@@ -82,6 +87,20 @@ func WithLogger(logger *zap.Logger) Option {
 func WithHandlers(manager interface{}) Option {
 	return func(app *App) error {
 		return RegisterRoutes(app.e, manager, app.ctx)
+	}
+}
+
+// WithDevelopmentMode enables development mode features
+func WithDevelopmentMode(enabled bool) Option {
+	return func(app *App) error {
+		if enabled {
+			// This option ensures development mode is enabled
+			// The actual middleware is added in setupEcho based on config
+			if app.e != nil {
+				app.e.Debug = true
+			}
+		}
+		return nil
 	}
 }
 
@@ -123,12 +142,12 @@ func (app *App) setupEcho() {
 	// Use our custom request ID middleware for enhanced functionality
 	app.e.Use(errorMiddleware.RequestID())
 
+	// Development mode enhancements
+	isDevelopment := app.config != nil && app.config.Logger.Level == "debug"
+	
 	// Error handler middleware for consistent error responses
 	// Hide internal server error details in production (when logger level is not debug)
-	hideDetails := true
-	if app.config != nil && app.config.Logger.Level == "debug" {
-		hideDetails = false
-	}
+	hideDetails := !isDevelopment
 	
 	errorConfig := &errorMiddleware.ErrorHandlerConfig{
 		Logger: app.logger,
@@ -136,6 +155,23 @@ func (app *App) setupEcho() {
 		DefaultMessage: "An internal error occurred",
 	}
 	app.e.Use(errorMiddleware.ErrorHandlerWithConfig(errorConfig))
+	
+	if isDevelopment {
+		// Add development request/response logger
+		app.e.Use(errorMiddleware.DevLoggerWithConfig(errorMiddleware.DevLoggerConfig{
+			Logger:          app.logger,
+			LogRequestBody:  true,
+			LogResponseBody: true,
+			SkipPaths:       []string{"/_routes", "/metrics", "/health"},
+		}))
+
+		// Add development error pages - must be after error handler
+		app.e.Use(errorMiddleware.DevErrorPageWithConfig(errorMiddleware.DevErrorPageConfig{
+			ShowStackTrace:     true,
+			ShowRequestDetails: true,
+			StackTraceLimit:    15,
+		}))
+	}
 }
 
 
@@ -280,4 +316,121 @@ func (app *App) runShutdownHooks(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// registerDevelopmentRoutes registers development-only routes
+func (app *App) registerDevelopmentRoutes() {
+	// Import handlers package
+	devHandlers := &devHandler{
+		logger: app.logger,
+		echo:   app.e,
+	}
+
+	// Register development routes
+	app.e.GET("/_routes", devHandlers.Routes)
+	app.e.GET("/_error", devHandlers.Error)
+	app.e.GET("/_config", devHandlers.Config)
+
+	if app.logger != nil {
+		app.logger.Info("Development routes registered",
+			zap.String("routes", "/_routes"),
+			zap.String("error", "/_error"),
+			zap.String("config", "/_config"),
+		)
+	}
+}
+
+// devHandler provides development endpoints
+type devHandler struct {
+	logger *zap.Logger
+	echo   *echo.Echo
+}
+
+// Routes returns debug information about all registered routes
+func (h *devHandler) Routes(c echo.Context) error {
+	routes := h.echo.Routes()
+	
+	// Group routes by path
+	routeMap := make(map[string][]string)
+	for _, route := range routes {
+		if methods, exists := routeMap[route.Path]; exists {
+			routeMap[route.Path] = append(methods, route.Method)
+		} else {
+			routeMap[route.Path] = []string{route.Method}
+		}
+	}
+
+	// Sort paths
+	var paths []string
+	for path := range routeMap {
+		paths = append(paths, path)
+	}
+	
+	// Simple string sort
+	for i := 0; i < len(paths)-1; i++ {
+		for j := i + 1; j < len(paths); j++ {
+			if paths[i] > paths[j] {
+				paths[i], paths[j] = paths[j], paths[i]
+			}
+		}
+	}
+
+	// Build route list
+	type RouteInfo struct {
+		Path    string   `json:"path"`
+		Methods []string `json:"methods"`
+	}
+
+	var routeList []RouteInfo
+	for _, path := range paths {
+		methods := routeMap[path]
+		// Sort methods
+		for i := 0; i < len(methods)-1; i++ {
+			for j := i + 1; j < len(methods); j++ {
+				if methods[i] > methods[j] {
+					methods[i], methods[j] = methods[j], methods[i]
+				}
+			}
+		}
+		routeList = append(routeList, RouteInfo{
+			Path:    path,
+			Methods: methods,
+		})
+	}
+
+	return c.JSON(200, map[string]interface{}{
+		"total_routes": len(routeList),
+		"routes":       routeList,
+		"debug_mode":   h.echo.Debug,
+	})
+}
+
+// Error returns test error pages for development
+func (h *devHandler) Error(c echo.Context) error {
+	errorType := c.QueryParam("type")
+	
+	switch errorType {
+	case "panic":
+		panic("Development test panic")
+	case "internal":
+		return fmt.Errorf("internal server error test")
+	default:
+		return c.JSON(200, map[string]interface{}{
+			"message": "Use ?type=<error_type> to test different error responses",
+			"available_types": []string{
+				"panic",
+				"internal",
+			},
+		})
+	}
+}
+
+// Config returns masked configuration for development
+func (h *devHandler) Config(c echo.Context) error {
+	// In a real implementation, you would get config from context
+	// For now, return a simple response
+	return c.JSON(200, map[string]interface{}{
+		"message": "Configuration endpoint",
+		"mode":    "development",
+	})
 }

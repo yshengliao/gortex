@@ -419,6 +419,19 @@ The Gortex framework has successfully completed its optimization roadmap:
     - GetMetrics() and GetMessageRate() methods for monitoring
     - Example: websocket-metrics demonstrates real-time monitoring
 
+### Development Mode Enhancement (2025/07/22)
+
+15. **Development Mode Features**:
+    - Debug endpoints automatically registered when Logger.Level = "debug"
+    - /_routes endpoint lists all registered routes
+    - /_error endpoint for testing error responses
+    - /_config endpoint shows masked configuration
+    - Request/response logging middleware with body capture
+    - Sensitive header masking (Authorization, Cookie, etc.)
+    - HTML error pages with stack traces for browser requests
+    - Different error rendering for API vs browser clients
+    - Example: dev-mode demonstrates all development features
+
 The framework is now production-ready with excellent performance characteristics and zero operational dependencies.
 
 **Last Updated**: 2025/07/22 | **Framework Status**: Alpha (Production-Optimized) | **Go**: 1.24

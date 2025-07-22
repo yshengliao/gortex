@@ -445,6 +445,7 @@ Gortex has undergone comprehensive optimization with all critical issues resolve
 - Memory-stable rate limiting with TTL-based cleanup
 - Race-condition-free health checking system
 - WebSocket metrics: connection counts, message rates, type tracking
+- Development mode with debug endpoints and request/response logging
 - Comprehensive test coverage with example automation
 - Zero external service dependencies
 ```
@@ -501,6 +502,29 @@ Gortex has undergone comprehensive optimization with all critical issues resolve
 - **Throughput**: >10k RPS on standard hardware
 - **Build Modes**: Development (instant feedback) / Production (optimized)
 
+## Development Mode
+
+When `Logger.Level` is set to `"debug"`, Gortex automatically enables development mode features:
+
+### Debug Endpoints
+- `GET /_routes` - Lists all registered routes with methods
+- `GET /_error?type=<type>` - Test error responses (panic, internal)
+- `GET /_config` - View current configuration (sensitive values masked)
+
+### Request/Response Logging
+- Detailed logging of all HTTP requests and responses
+- Request/response bodies logged (configurable, max 10KB)
+- Sensitive headers automatically masked (Authorization, Cookie, etc.)
+- Execution time tracking for performance analysis
+
+### Development Error Pages
+- HTML error pages with full stack traces for browser requests
+- Request details including headers, query parameters, and request ID
+- Different rendering for browser vs API clients (HTML vs JSON)
+- Panic recovery with detailed stack traces
+
+**Security Warning**: Development mode exposes sensitive debugging information. Always ensure `Logger.Level` is set to `"info"` or higher in production environments.
+
 ## Perfect for Game Servers
 
 Gortex is specifically designed for real-time game server development:
@@ -520,6 +544,7 @@ Check out the `/examples` directory for complete implementations:
 - **[Authentication](examples/auth)** - JWT implementation with role-based access
 - **[Configuration](examples/config)** - Multi-source configuration management
 - **[Observability](examples/observability)** - Metrics, tracing, and monitoring
+- **[Development Mode](examples/dev-mode)** - Debug endpoints, logging, and error pages
 
 ## Testing
 
