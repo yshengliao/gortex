@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 func newGenerateHandlerCmd() *cobra.Command {
@@ -62,9 +64,9 @@ func newGenerateModelCmd() *cobra.Command {
 
 func generateHandler(name, handlerType string, methods []string) error {
 	// Ensure name is capitalized
-	handlerName := strings.Title(strings.ToLower(name))
+	handlerName := cases.Title(language.Und).String(strings.ToLower(name))
 	fileName := strings.ToLower(name) + ".go"
-	
+
 	moduleName, err := getModuleName()
 	if err != nil {
 		return err
@@ -98,10 +100,10 @@ func generateHandler(name, handlerType string, methods []string) error {
 }
 
 func generateService(name string) error {
-	serviceName := strings.Title(strings.ToLower(name))
+	serviceName := cases.Title(language.Und).String(strings.ToLower(name))
 	interfaceFileName := strings.ToLower(name) + "_service.go"
 	implFileName := strings.ToLower(name) + "_service_impl.go"
-	
+
 	moduleName, err := getModuleName()
 	if err != nil {
 		return err
@@ -135,9 +137,9 @@ func generateService(name string) error {
 }
 
 func generateModel(name string, fields []string) error {
-	modelName := strings.Title(strings.ToLower(name))
+	modelName := cases.Title(language.Und).String(strings.ToLower(name))
 	fileName := strings.ToLower(name) + ".go"
-	
+
 	moduleName, err := getModuleName()
 	if err != nil {
 		return err
@@ -151,7 +153,7 @@ func generateModel(name string, fields []string) error {
 			return fmt.Errorf("invalid field format: %s (expected name:type)", field)
 		}
 		parsedFields = append(parsedFields, map[string]string{
-			"Name": strings.Title(parts[0]),
+			"Name": cases.Title(language.Und).String(parts[0]),
 			"Type": parts[1],
 			"JSON": strings.ToLower(parts[0]),
 		})
