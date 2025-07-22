@@ -15,14 +15,14 @@ import (
 // SimpleLoader is a temporary loader implementation
 // This will be replaced with Bofry/config in production
 type SimpleLoader struct {
-	yamlFile string
+	yamlFile  string
 	envPrefix string
 }
 
 // NewSimpleLoader creates a new simple configuration loader
 func NewSimpleLoader() *SimpleLoader {
 	return &SimpleLoader{
-		envPrefix: "STMP_",
+		envPrefix: "GORTEX_",
 	}
 }
 
@@ -96,7 +96,7 @@ func (l *SimpleLoader) loadStructFromEnv(v reflect.Value, prefix string) error {
 		// Parse env tag
 		envParts := strings.Split(envTag, ",")
 		envName := envParts[0]
-		
+
 		// Build full environment variable name
 		fullEnvName := prefix + envName
 
@@ -180,17 +180,17 @@ func LoadFromJSON(data []byte, cfg *Config) error {
 // Before (current implementation):
 //   loader := config.NewSimpleLoader().
 //       WithYAMLFile("config.yaml").
-//       WithEnvPrefix("STMP_")
+//       WithEnvPrefix("GORTEX_")
 //   cfg := &config.Config{}
 //   err := loader.Load(cfg)
 //
 // After (with Bofry/config):
 //   import "github.com/Bofry/config"
-//   
+//
 //   cfg := &Config{}
 //   err := config.NewConfigurationService(cfg).
 //       LoadYamlFile("config.yaml").
-//       LoadEnvironmentVariables("STMP").
+//       LoadEnvironmentVariables("GORTEX").
 //       LoadDotEnv(".env").
 //       LoadCommandArguments()
 //

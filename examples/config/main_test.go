@@ -34,7 +34,7 @@ database:
   user: "test_user"
   password: "test_password"
 `
-	
+
 	// Write config to temp file
 	tmpFile := "test_config.yaml"
 	err := os.WriteFile(tmpFile, []byte(configContent), 0644)
@@ -44,7 +44,7 @@ database:
 	t.Run("Load Config from YAML", func(t *testing.T) {
 		loader := config.NewSimpleLoader().
 			WithYAMLFile(tmpFile).
-			WithEnvPrefix("TEST_STMP_")
+			WithEnvPrefix("TEST_GORTEX_")
 
 		cfg := &config.Config{}
 		err := loader.Load(cfg)
@@ -61,14 +61,14 @@ database:
 
 	t.Run("Load Config with Environment Override", func(t *testing.T) {
 		// Set environment variables
-		os.Setenv("TEST_STMP_SERVER_ADDRESS", ":9090")
-		os.Setenv("TEST_STMP_LOGGER_LEVEL", "info")
-		defer os.Unsetenv("TEST_STMP_SERVER_ADDRESS")
-		defer os.Unsetenv("TEST_STMP_LOGGER_LEVEL")
+		os.Setenv("TEST_GORTEX_SERVER_ADDRESS", ":9090")
+		os.Setenv("TEST_GORTEX_LOGGER_LEVEL", "info")
+		defer os.Unsetenv("TEST_GORTEX_SERVER_ADDRESS")
+		defer os.Unsetenv("TEST_GORTEX_LOGGER_LEVEL")
 
 		loader := config.NewSimpleLoader().
 			WithYAMLFile(tmpFile).
-			WithEnvPrefix("TEST_STMP_")
+			WithEnvPrefix("TEST_GORTEX_")
 
 		cfg := &config.Config{}
 		err := loader.Load(cfg)
@@ -98,7 +98,7 @@ database:
 
 				var logger *zap.Logger
 				var err error
-				
+
 				if cfg.Logger.Level == "debug" {
 					logger, err = zap.NewDevelopment()
 				} else {
@@ -115,16 +115,16 @@ database:
 
 	t.Run("Missing Config File", func(t *testing.T) {
 		// Set required environment variables
-		os.Setenv("TEST_STMP_JWT_SECRET_KEY", "test-secret")
-		os.Setenv("TEST_STMP_DATABASE_USER", "test_user")
-		os.Setenv("TEST_STMP_DATABASE_PASSWORD", "test_password")
-		defer os.Unsetenv("TEST_STMP_JWT_SECRET_KEY")
-		defer os.Unsetenv("TEST_STMP_DATABASE_USER")
-		defer os.Unsetenv("TEST_STMP_DATABASE_PASSWORD")
-		
+		os.Setenv("TEST_GORTEX_JWT_SECRET_KEY", "test-secret")
+		os.Setenv("TEST_GORTEX_DATABASE_USER", "test_user")
+		os.Setenv("TEST_GORTEX_DATABASE_PASSWORD", "test_password")
+		defer os.Unsetenv("TEST_GORTEX_JWT_SECRET_KEY")
+		defer os.Unsetenv("TEST_GORTEX_DATABASE_USER")
+		defer os.Unsetenv("TEST_GORTEX_DATABASE_PASSWORD")
+
 		loader := config.NewSimpleLoader().
 			WithYAMLFile("non_existent.yaml").
-			WithEnvPrefix("TEST_STMP_")
+			WithEnvPrefix("TEST_GORTEX_")
 
 		cfg := &config.Config{}
 		err := loader.Load(cfg)
@@ -142,7 +142,7 @@ func TestConfigValidation(t *testing.T) {
 		cfg.Logger.Level = "info"
 		cfg.JWT.SecretKey = "secret-key"
 		cfg.JWT.Issuer = "test-issuer"
-		
+
 		// Normally we would validate the config here
 		// For now, just check that required fields are set
 		assert.NotEmpty(t, cfg.Server.Address)
@@ -171,7 +171,7 @@ jwt:
 		loader := config.NewSimpleLoader().
 			WithYAMLFile(tmpFile).
 			WithEnvPrefix("BENCH_")
-		
+
 		cfg := &config.Config{}
 		loader.Load(cfg)
 	}

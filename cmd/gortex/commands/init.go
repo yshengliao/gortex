@@ -96,7 +96,7 @@ func initProject(basePath, projectName string, withExamples bool) error {
 	fmt.Println("2. go mod tidy")
 	fmt.Println("3. go run cmd/server/main.go")
 	fmt.Println("\nOr use the CLI:")
-	fmt.Println("  stmp server")
+	fmt.Println("  gortex server")
 
 	return nil
 }

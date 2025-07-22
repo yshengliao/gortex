@@ -35,29 +35,29 @@ func TestDefaultConfig(t *testing.T) {
 
 func TestSimpleLoader_LoadFromEnv(t *testing.T) {
 	// Set environment variables
-	os.Setenv("STMP_SERVER_PORT", "9090")
-	os.Setenv("STMP_SERVER_ADDRESS", ":9090")
-	os.Setenv("STMP_SERVER_GZIP", "false")
-	os.Setenv("STMP_SERVER_SHUTDOWN_TIMEOUT", "20s")
-	os.Setenv("STMP_LOGGER_LEVEL", "debug")
-	os.Setenv("STMP_WEBSOCKET_READ_BUFFER_SIZE", "2048")
-	os.Setenv("STMP_JWT_SECRET_KEY", "test-secret-key")
-	os.Setenv("STMP_JWT_ISSUER", "test-issuer")
-	os.Setenv("STMP_DATABASE_USER", "test-user")
-	os.Setenv("STMP_DATABASE_PASSWORD", "test-password")
+	os.Setenv("GORTEX_SERVER_PORT", "9090")
+	os.Setenv("GORTEX_SERVER_ADDRESS", ":9090")
+	os.Setenv("GORTEX_SERVER_GZIP", "false")
+	os.Setenv("GORTEX_SERVER_SHUTDOWN_TIMEOUT", "20s")
+	os.Setenv("GORTEX_LOGGER_LEVEL", "debug")
+	os.Setenv("GORTEX_WEBSOCKET_READ_BUFFER_SIZE", "2048")
+	os.Setenv("GORTEX_JWT_SECRET_KEY", "test-secret-key")
+	os.Setenv("GORTEX_JWT_ISSUER", "test-issuer")
+	os.Setenv("GORTEX_DATABASE_USER", "test-user")
+	os.Setenv("GORTEX_DATABASE_PASSWORD", "test-password")
 
 	defer func() {
 		// Clean up
-		os.Unsetenv("STMP_SERVER_PORT")
-		os.Unsetenv("STMP_SERVER_ADDRESS")
-		os.Unsetenv("STMP_SERVER_GZIP")
-		os.Unsetenv("STMP_SERVER_SHUTDOWN_TIMEOUT")
-		os.Unsetenv("STMP_LOGGER_LEVEL")
-		os.Unsetenv("STMP_WEBSOCKET_READ_BUFFER_SIZE")
-		os.Unsetenv("STMP_JWT_SECRET_KEY")
-		os.Unsetenv("STMP_JWT_ISSUER")
-		os.Unsetenv("STMP_DATABASE_USER")
-		os.Unsetenv("STMP_DATABASE_PASSWORD")
+		os.Unsetenv("GORTEX_SERVER_PORT")
+		os.Unsetenv("GORTEX_SERVER_ADDRESS")
+		os.Unsetenv("GORTEX_SERVER_GZIP")
+		os.Unsetenv("GORTEX_SERVER_SHUTDOWN_TIMEOUT")
+		os.Unsetenv("GORTEX_LOGGER_LEVEL")
+		os.Unsetenv("GORTEX_WEBSOCKET_READ_BUFFER_SIZE")
+		os.Unsetenv("GORTEX_JWT_SECRET_KEY")
+		os.Unsetenv("GORTEX_JWT_ISSUER")
+		os.Unsetenv("GORTEX_DATABASE_USER")
+		os.Unsetenv("GORTEX_DATABASE_PASSWORD")
 	}()
 
 	loader := config.NewSimpleLoader()
@@ -143,11 +143,11 @@ database:
 	tmpFile.Close()
 
 	// Set environment variable to override YAML
-	os.Setenv("STMP_SERVER_PORT", "9999")
-	os.Setenv("STMP_SERVER_SHUTDOWN_TIMEOUT", "15s")
+	os.Setenv("GORTEX_SERVER_PORT", "9999")
+	os.Setenv("GORTEX_SERVER_SHUTDOWN_TIMEOUT", "15s")
 	defer func() {
-		os.Unsetenv("STMP_SERVER_PORT")
-		os.Unsetenv("STMP_SERVER_SHUTDOWN_TIMEOUT")
+		os.Unsetenv("GORTEX_SERVER_PORT")
+		os.Unsetenv("GORTEX_SERVER_SHUTDOWN_TIMEOUT")
 	}()
 
 	// Load configuration

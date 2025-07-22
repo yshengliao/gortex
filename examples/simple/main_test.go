@@ -42,11 +42,11 @@ func TestSimpleExample(t *testing.T) {
 	t.Run("Health Check", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/health", nil)
 		rec := httptest.NewRecorder()
-		
+
 		e.ServeHTTP(rec, req)
-		
+
 		assert.Equal(t, http.StatusOK, rec.Code)
-		
+
 		var response map[string]string
 		err := json.Unmarshal(rec.Body.Bytes(), &response)
 		require.NoError(t, err)
@@ -56,26 +56,26 @@ func TestSimpleExample(t *testing.T) {
 	t.Run("Default Endpoint", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		rec := httptest.NewRecorder()
-		
+
 		e.ServeHTTP(rec, req)
-		
+
 		assert.Equal(t, http.StatusOK, rec.Code)
-		
+
 		var response map[string]interface{}
 		err := json.Unmarshal(rec.Body.Bytes(), &response)
 		require.NoError(t, err)
-		assert.Equal(t, "Welcome to STMP Framework", response["message"])
+		assert.Equal(t, "Welcome to Gortex Framework", response["message"])
 		assert.Equal(t, "1.0.0", response["version"])
 	})
 
 	t.Run("API Endpoint", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/api", nil)
 		rec := httptest.NewRecorder()
-		
+
 		e.ServeHTTP(rec, req)
-		
+
 		assert.Equal(t, http.StatusOK, rec.Code)
-		
+
 		var response map[string]interface{}
 		err := json.Unmarshal(rec.Body.Bytes(), &response)
 		require.NoError(t, err)
@@ -85,18 +85,18 @@ func TestSimpleExample(t *testing.T) {
 	t.Run("API Echo", func(t *testing.T) {
 		payload := map[string]interface{}{
 			"message": "test echo",
-			"number": 42,
+			"number":  42,
 		}
 		body, _ := json.Marshal(payload)
-		
+
 		req := httptest.NewRequest(http.MethodPost, "/api/echo", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
-		
+
 		e.ServeHTTP(rec, req)
-		
+
 		assert.Equal(t, http.StatusOK, rec.Code)
-		
+
 		var response map[string]interface{}
 		err := json.Unmarshal(rec.Body.Bytes(), &response)
 		require.NoError(t, err)
@@ -180,7 +180,7 @@ func BenchmarkHandlers(b *testing.B) {
 	b.Run("Health", func(b *testing.B) {
 		req := httptest.NewRequest(http.MethodGet, "/health", nil)
 		b.ResetTimer()
-		
+
 		for i := 0; i < b.N; i++ {
 			rec := httptest.NewRecorder()
 			e.ServeHTTP(rec, req)
@@ -190,7 +190,7 @@ func BenchmarkHandlers(b *testing.B) {
 	b.Run("API", func(b *testing.B) {
 		req := httptest.NewRequest(http.MethodGet, "/api", nil)
 		b.ResetTimer()
-		
+
 		for i := 0; i < b.N; i++ {
 			rec := httptest.NewRecorder()
 			e.ServeHTTP(rec, req)

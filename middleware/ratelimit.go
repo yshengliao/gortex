@@ -1,4 +1,4 @@
-// Package middleware provides common middleware for the STMP framework
+// Package middleware provides common middleware for the Gortex framework
 package middleware
 
 import (
