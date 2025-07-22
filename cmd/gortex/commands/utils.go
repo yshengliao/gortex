@@ -8,6 +8,9 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 func generateFile(path string, tmplContent string, data interface{}) error {
@@ -27,7 +30,7 @@ func generateFile(path string, tmplContent string, data interface{}) error {
 	funcMap := template.FuncMap{
 		"upper": strings.ToUpper,
 		"lower": strings.ToLower,
-		"title": strings.Title,
+		"title": cases.Title(language.Und).String,
 	}
 
 	tmpl, err := template.New("file").Funcs(funcMap).Parse(tmplContent)
