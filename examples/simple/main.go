@@ -11,9 +11,9 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/labstack/echo/v4"
-	"go.uber.org/zap"
 	"github.com/yshengliao/gortex/app"
 	"github.com/yshengliao/gortex/hub"
+	"go.uber.org/zap"
 )
 
 // Define your handlers using struct tags for declarative routing
@@ -31,7 +31,7 @@ type DefaultHandler struct{}
 
 func (h *DefaultHandler) GET(c echo.Context) error {
 	return c.JSON(200, map[string]string{
-		"message": "Welcome to STMP Framework",
+		"message": "Welcome to Gortex Framework",
 		"version": "1.0.0",
 	})
 }
@@ -57,7 +57,7 @@ func (h *WebSocketHandler) HandleConnection(c echo.Context) error {
 			return true // Configure appropriately for production
 		},
 	}
-	
+
 	// Upgrade to WebSocket
 	conn, err := upgrader.Upgrade(c.Response(), c.Request(), nil)
 	if err != nil {
@@ -109,7 +109,7 @@ func main() {
 
 	// Create WebSocket hub
 	wsHub := hub.NewHub(logger)
-	
+
 	// Create handlers
 	handlers := &HandlersManager{
 		Default: &DefaultHandler{},
