@@ -22,13 +22,13 @@ func TestBofryLoader_LoadDefaults(t *testing.T) {
 		os.Unsetenv("GORTEX_DATABASE_USER")
 		os.Unsetenv("GORTEX_DATABASE_PASSWORD")
 	}()
-	
+
 	loader := config.NewBofryLoader().WithEnvPrefix("GORTEX_")
 	cfg := &config.Config{}
-	
+
 	err := loader.Load(cfg)
 	require.NoError(t, err)
-	
+
 	// Verify defaults are loaded
 	assert.Equal(t, "8080", cfg.Server.Port)
 	assert.Equal(t, ":8080", cfg.Server.Address)
@@ -103,28 +103,28 @@ database:
 func TestBofryLoader_LoadFromEnv(t *testing.T) {
 	// Set environment variables
 	envVars := map[string]string{
-		"GORTEX_SERVER_PORT":               "9090",
-		"GORTEX_SERVER_ADDRESS":            ":9090",
-		"GORTEX_SERVER_GZIP":               "false",
-		"GORTEX_SERVER_READ_TIMEOUT":       "60s",
-		"GORTEX_LOGGER_LEVEL":              "debug",
-		"GORTEX_LOGGER_ENCODING":           "console",
+		"GORTEX_SERVER_PORT":                "9090",
+		"GORTEX_SERVER_ADDRESS":             ":9090",
+		"GORTEX_SERVER_GZIP":                "false",
+		"GORTEX_SERVER_READ_TIMEOUT":        "60s",
+		"GORTEX_LOGGER_LEVEL":               "debug",
+		"GORTEX_LOGGER_ENCODING":            "console",
 		"GORTEX_WEBSOCKET_READ_BUFFER_SIZE": "4096",
-		"GORTEX_JWT_SECRET_KEY":            "env-secret-key",
-		"GORTEX_JWT_ISSUER":                "env-issuer",
-		"GORTEX_JWT_ACCESS_TOKEN_TTL":      "30m",
-		"GORTEX_DATABASE_HOST":             "db.example.com",
-		"GORTEX_DATABASE_PORT":             "5433",
-		"GORTEX_DATABASE_USER":             "env-user",
-		"GORTEX_DATABASE_PASSWORD":         "env-password",
-		"GORTEX_DATABASE_DATABASE":         "envdb",
+		"GORTEX_JWT_SECRET_KEY":             "env-secret-key",
+		"GORTEX_JWT_ISSUER":                 "env-issuer",
+		"GORTEX_JWT_ACCESS_TOKEN_TTL":       "30m",
+		"GORTEX_DATABASE_HOST":              "db.example.com",
+		"GORTEX_DATABASE_PORT":              "5433",
+		"GORTEX_DATABASE_USER":              "env-user",
+		"GORTEX_DATABASE_PASSWORD":          "env-password",
+		"GORTEX_DATABASE_DATABASE":          "envdb",
 	}
 
 	// Set all env vars
 	for k, v := range envVars {
 		os.Setenv(k, v)
 	}
-	
+
 	// Clean up after test
 	defer func() {
 		for k := range envVars {
@@ -238,7 +238,7 @@ GORTEX_DATABASE_PASSWORD=dotenv-pass
 	assert.Equal(t, "dotenv-secret", cfg.JWT.SecretKey)
 	assert.Equal(t, "dotenv-user", cfg.Database.User)
 	assert.Equal(t, "dotenv-pass", cfg.Database.Password)
-	
+
 	// Clean up environment variables set by LoadDotEnvFile
 	os.Unsetenv("GORTEX_SERVER_PORT")
 	os.Unsetenv("GORTEX_SERVER_ADDRESS")
@@ -296,12 +296,12 @@ GORTEX_DATABASE_PASSWORD=dotenv-pass
 	require.NoError(t, err)
 
 	// Verify precedence: env > .env > yaml > defaults
-	assert.Equal(t, "3333", cfg.Server.Port) // from env var (highest priority)
-	assert.Equal(t, ":1111", cfg.Server.Address) // from yaml (no override)
-	assert.Equal(t, "warn", cfg.Logger.Level) // from yaml (no override)
-	assert.Equal(t, "console", cfg.Logger.Encoding) // from .env
-	assert.Equal(t, "yaml-secret", cfg.JWT.SecretKey) // from yaml (no override)
-	assert.Equal(t, "yaml-user", cfg.Database.User) // from yaml (no override)
+	assert.Equal(t, "3333", cfg.Server.Port)              // from env var (highest priority)
+	assert.Equal(t, ":1111", cfg.Server.Address)          // from yaml (no override)
+	assert.Equal(t, "warn", cfg.Logger.Level)             // from yaml (no override)
+	assert.Equal(t, "console", cfg.Logger.Encoding)       // from .env
+	assert.Equal(t, "yaml-secret", cfg.JWT.SecretKey)     // from yaml (no override)
+	assert.Equal(t, "yaml-user", cfg.Database.User)       // from yaml (no override)
 	assert.Equal(t, "dotenv-pass", cfg.Database.Password) // from .env
 }
 
@@ -329,14 +329,14 @@ database:
 	loader := config.NewBofryLoader().WithYAMLFile(tmpFile.Name())
 	cfg := &config.Config{}
 	err = loader.Load(cfg)
-	
+
 	// Should return validation error (one of the required fields is missing)
 	require.Error(t, err)
 	// The error could be about JWT secret key, database user, or database password
-	assert.True(t, 
+	assert.True(t,
 		strings.Contains(err.Error(), "JWT secret key is required") ||
-		strings.Contains(err.Error(), "database user is required") ||
-		strings.Contains(err.Error(), "database password is required"),
+			strings.Contains(err.Error(), "database user is required") ||
+			strings.Contains(err.Error(), "database password is required"),
 		"Expected validation error, got: %v", err)
 }
 
@@ -344,7 +344,7 @@ database:
 func TestBofryLoader_BackwardCompatibility(t *testing.T) {
 	// This test ensures that switching from SimpleLoader to BofryLoader
 	// doesn't break existing configurations
-	
+
 	// Set up environment like the old tests
 	os.Setenv("STMP_SERVER_PORT", "9090")
 	os.Setenv("STMP_JWT_SECRET_KEY", "test-secret-key")
@@ -378,17 +378,17 @@ func TestBofryLoader_MissingFiles(t *testing.T) {
 		os.Unsetenv("GORTEX_DATABASE_USER")
 		os.Unsetenv("GORTEX_DATABASE_PASSWORD")
 	}()
-	
+
 	// Load with non-existent files should not error if files are optional
 	loader := config.NewBofryLoader().
 		WithYAMLFile("/non/existent/file.yaml").
 		WithDotEnvFile("/non/existent/.env").
 		WithEnvPrefix("GORTEX_")
-	
+
 	cfg := &config.Config{}
 	err := loader.Load(cfg)
 	require.NoError(t, err)
-	
+
 	// Should load defaults
 	assert.Equal(t, "8080", cfg.Server.Port)
 	assert.Equal(t, "info", cfg.Logger.Level)
@@ -405,19 +405,68 @@ func TestBofryLoader_BuilderPattern(t *testing.T) {
 		os.Unsetenv("GORTEX_DATABASE_USER")
 		os.Unsetenv("GORTEX_DATABASE_PASSWORD")
 	}()
-	
+
 	// Test the fluent builder pattern works correctly
 	cfg := &config.Config{}
-	
+
 	err := config.NewBofryLoader().
 		WithYAMLFile("config.yaml").
 		WithDotEnvFile(".env").
 		WithEnvPrefix("GORTEX_").
 		Load(cfg)
-	
+
 	require.NoError(t, err)
-	
+
 	// Should at least load defaults
 	assert.NotNil(t, cfg)
 	assert.Equal(t, "8080", cfg.Server.Port)
+}
+
+func TestBofryLoader_CommandArgsOverride(t *testing.T) {
+	yamlContent := `
+server:
+  port: "1111"
+jwt:
+  secret_key: "yaml-key"
+database:
+  user: "yaml-user"
+`
+	yamlFile, err := os.CreateTemp("", "flags-*.yaml")
+	require.NoError(t, err)
+	defer os.Remove(yamlFile.Name())
+	_, err = yamlFile.WriteString(yamlContent)
+	require.NoError(t, err)
+	yamlFile.Close()
+
+	envContent := `
+GORTEX_SERVER_PORT=2222
+GORTEX_DATABASE_PASSWORD=dotenv-pass
+`
+	envFile, err := os.CreateTemp("", ".env")
+	require.NoError(t, err)
+	defer os.Remove(envFile.Name())
+	_, err = envFile.WriteString(envContent)
+	require.NoError(t, err)
+	envFile.Close()
+
+	os.Setenv("GORTEX_SERVER_PORT", "3333")
+	defer os.Unsetenv("GORTEX_SERVER_PORT")
+
+	origArgs := os.Args
+	os.Args = append([]string{origArgs[0]}, "--server-port=4444")
+	defer func() { os.Args = origArgs }()
+
+	loader := config.NewBofryLoader().
+		WithYAMLFile(yamlFile.Name()).
+		WithDotEnvFile(envFile.Name()).
+		WithEnvPrefix("GORTEX_").
+		WithCommandArguments()
+	cfg := &config.Config{}
+	err = loader.Load(cfg)
+	require.NoError(t, err)
+
+	assert.Equal(t, "4444", cfg.Server.Port)
+	assert.Equal(t, "yaml-key", cfg.JWT.SecretKey)
+	assert.Equal(t, "yaml-user", cfg.Database.User)
+	assert.Equal(t, "dotenv-pass", cfg.Database.Password)
 }
