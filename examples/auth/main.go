@@ -70,7 +70,10 @@ func main() {
 	}
 
 	// Create application with functional options
+	cfg := &app.Config{}
+	cfg.Server.Address = ":8081"
 	application, err := app.NewApp(
+		app.WithConfig(cfg),
 		app.WithHandlers(handlers),
 		app.WithLogger(logger),
 	)
@@ -89,7 +92,7 @@ func main() {
 
 	// Start server
 	go func() {
-		logger.Info("Starting server on :8080")
+		logger.Info("Starting auth server on :8081")
 		if err := application.Run(); err != nil && err != http.ErrServerClosed {
 			logger.Fatal("Server error", zap.Error(err))
 		}

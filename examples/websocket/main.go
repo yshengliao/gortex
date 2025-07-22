@@ -71,7 +71,10 @@ func main() {
 	}
 
 	// Create application with functional options
+	cfg := &app.Config{}
+	cfg.Server.Address = ":8082"
 	application, err := app.NewApp(
+		app.WithConfig(cfg),
 		app.WithHandlers(handlers),
 		app.WithLogger(logger),
 	)
@@ -88,7 +91,7 @@ func main() {
 
 	// Start server
 	go func() {
-		logger.Info("WebSocket server started on :8080", zap.String("websocket", "/ws"))
+		logger.Info("WebSocket server started on :8082", zap.String("websocket", "/ws"))
 		if err := application.Run(); err != nil && err != http.ErrServerClosed {
 			logger.Fatal("Server error", zap.Error(err))
 		}

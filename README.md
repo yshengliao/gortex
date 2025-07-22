@@ -378,6 +378,7 @@ app.Use(compression.Brotli())
 ```
 
 **Features:**
+
 - Automatic content negotiation based on Accept-Encoding
 - Configurable compression levels (speed vs compression ratio)
 - Minimum size threshold to avoid compressing small responses
@@ -386,6 +387,7 @@ app.Use(compression.Brotli())
 - Brotli preference when both encodings are supported
 
 **Performance Impact:**
+
 - Gzip: ~30-70% size reduction for text content
 - Brotli: ~20-30% better compression than gzip
 - CPU usage increases with compression level
@@ -435,6 +437,7 @@ for name, m := range metrics {
 ```
 
 **Features:**
+
 - Configurable connection limits per host
 - Automatic connection reuse tracking
 - Request/response metrics collection
@@ -443,6 +446,7 @@ for name, m := range metrics {
 - Graceful connection cleanup
 
 **Configuration Options:**
+
 ```go
 config := httpclient.Config{
     // Connection pool settings
@@ -518,6 +522,7 @@ fmt.Printf("Buffer pool reuse rate: %.2f%%\n", metrics.ReuseRate * 100)
 ```
 
 **Features:**
+
 - Buffer pools for `bytes.Buffer` with automatic reset
 - Byte slice pools with size buckets (512B to 1MB)
 - Generic object pools with type safety
@@ -526,6 +531,7 @@ fmt.Printf("Buffer pool reuse rate: %.2f%%\n", metrics.ReuseRate * 100)
 - Thread-safe concurrent access
 
 **Performance Benefits:**
+
 - Reduces garbage collection pressure
 - Eliminates allocation overhead for frequently used objects
 - Improves memory locality
@@ -626,6 +632,7 @@ stats := manager.Stats()
 ```
 
 **Features:**
+
 - Three states: Closed (normal), Open (failing), Half-Open (testing)
 - Configurable failure thresholds and timeouts
 - Automatic recovery with half-open state testing
@@ -635,6 +642,7 @@ stats := manager.Stats()
 - Detailed failure metrics and statistics
 
 **Configuration Options:**
+
 - `MaxRequests`: Maximum requests allowed in half-open state
 - `Interval`: Time window for counting failures in closed state
 - `Timeout`: How long to stay in open state before testing
@@ -725,6 +733,7 @@ if err := app.Shutdown(shutdownCtx); err != nil {
 ```
 
 **Key Features:**
+
 - Configurable shutdown timeout with context propagation
 - Parallel execution of shutdown hooks for efficiency
 - WebSocket clients receive proper close messages before disconnection
@@ -756,10 +765,10 @@ Gortex has undergone comprehensive optimization with all critical issues resolve
 - Zero external service dependencies
 ```
 
-
 ### Framework Philosophy
 
 **Self-Contained & Lightweight**: Zero operational complexity
+
 - **No External Services**: No Redis, Jaeger, Prometheus required
 - **12 Core Go Libraries**: Only essential packages
 - **Built-in Everything**: Metrics, tracing, rate limiting, health checks
@@ -798,6 +807,7 @@ Gortex has undergone comprehensive optimization with all critical issues resolve
    - Zero race conditions across entire codebase
 
 ### Performance Targets
+
 - **Metrics Collection**: 163ns/op (25%+ faster than previous)
 - **Memory Stability**: Fixed unbounded growth issues in metrics and rate limiter
 - **Router Performance**: Optimized reflection-based routing
@@ -812,25 +822,30 @@ Gortex has undergone comprehensive optimization with all critical issues resolve
 When `Logger.Level` is set to `"debug"`, Gortex automatically enables development mode features:
 
 ### Debug Endpoints
+
 - `GET /_routes` - Lists all registered routes with methods
 - `GET /_error?type=<type>` - Test error responses (panic, internal)
 - `GET /_config` - View current configuration (sensitive values masked)
 - `GET /_monitor` - System monitoring dashboard with memory usage, goroutines, and GC stats
 
 ### Request/Response Logging
+
 - Detailed logging of all HTTP requests and responses
 - Request/response bodies logged (configurable, max 10KB)
 - Sensitive headers automatically masked (Authorization, Cookie, etc.)
 - Execution time tracking for performance analysis
 
 ### Development Error Pages
+
 - HTML error pages with full stack traces for browser requests
 - Request details including headers, query parameters, and request ID
 - Different rendering for browser vs API clients (HTML vs JSON)
 - Panic recovery with detailed stack traces
 
 ### System Monitoring Dashboard
+
 The `/_monitor` endpoint provides real-time system metrics:
+
 - **System Info**: Goroutine count, CPU count, Go version, uptime
 - **Memory Stats**: Heap allocation, GC statistics, memory usage breakdown
 - **GC History**: Last 5 garbage collection pause times
@@ -838,6 +853,7 @@ The `/_monitor` endpoint provides real-time system metrics:
 - **Server Info**: Debug mode status, route count
 
 Example response:
+
 ```json
 {
   "status": "healthy",
@@ -918,21 +934,25 @@ All examples include comprehensive test suites with unit tests and benchmarks:
 ### Benchmark Results
 
 **Observability Performance:**
+
 - `RecordRequest`: 69.42 ns/op (0 allocs)
 - `RecordBusinessMetric`: 25.70 ns/op (0 allocs)
 - `StartFinishSpan`: 1045 ns/op (7 allocs)
 - `GetStats`: 210.6 ns/op (6 allocs)
 
 **JWT Performance:**
+
 - `GenerateToken`: 2348 ns/op (36 allocs)
 - `ValidateToken`: 3873 ns/op (55 allocs)
 
 **Config Loading:**
+
 - `LoadConfig`: 21666 ns/op (189 allocs)
 
 ## Production Deployment
 
 ### Security Checklist
+
 - [ ] Use HTTPS in production
 - [ ] Store secrets in environment variables  
 - [ ] Enable CORS for trusted origins only
@@ -942,6 +962,7 @@ All examples include comprehensive test suites with unit tests and benchmarks:
 - [ ] Enable request logging and monitoring
 
 ### Performance Optimization
+
 - [ ] Use optimized build flags: `go build -ldflags="-s -w"`
 - [ ] Enable response compression (gzip/Brotli) in configuration
 - [ ] Configure appropriate timeouts
@@ -1059,40 +1080,48 @@ This entire framework was designed and developed using [Claude Code](https://cla
 The framework continues to evolve with a focus on production readiness and developer experience:
 
 #### Error Handling & Resilience
+
 - **Retry Logic** - Exponential backoff retry mechanism with circuit breaker coordination
 - **Resilience Patterns** - Bulkhead pattern, timeout handling, fallback strategies
 
 #### Testing & Quality
+
 - **Handler Testing Utilities** - Test server builder, request/response assertion helpers  
 - **Integration Test Framework** - Database test fixtures, test data seeding tools
 - **Load Testing Tools** - WebSocket load testing, performance benchmarking CLI
 
 #### Documentation & Examples  
+
 - **OpenAPI Generation** - Auto-generate OpenAPI 3.0 specs from struct tags
 - **Extended Examples** - E-commerce, IoT gateway, GraphQL, microservices patterns
 
 #### WebSocket Enhancements
+
 - **Room/Namespace Support** - Room-based message routing, dynamic room management
 - **Message Compression** - Per-message deflate with compression negotiation
 - **Binary Protocol** - Efficient binary message format with custom encoder/decoder
 
 #### Security Features
+
 - **CORS Configuration** - Flexible per-route CORS with preflight caching
 - **API Key Authentication** - Key generation, rotation, and management tools
 - **Input Sanitization** - HTML sanitization, SQL injection protection, XSS prevention
 
 #### Database Integration
+
 - **Connection Pool Abstraction** - PostgreSQL support with health check integration
 - **Migration System** - Version tracking, rollback support, automated migrations
 - **Repository Pattern** - Generic repository interface with transaction support
 - **Caching Layer** - Memory cache implementation with TTL and eviction policies
 
 #### Developer Experience
+
 - **Hot Reload** - File watcher with graceful server restart and build caching
 - **Project Templates** - Starter templates for common application patterns
 - **Plugin System** - Plugin interface design with lifecycle hooks
 
 ### Version 1.0 Goals
+
 - 100% test coverage on core components
 - Sub-millisecond latency for WebSocket messages  
 - Production deployments handling 100k+ concurrent connections
@@ -1107,7 +1136,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 <p align="center">
   <strong>Ready to build your next real-time application?</strong><br>
-  <a href="#-quick-start">Get Started</a> • 
+  <a href="#-quick-start">Get Started</a> •
   <a href="/examples">Examples</a> •
   <a href="#-contributing">Contribute</a>
 </p>
