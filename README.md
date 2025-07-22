@@ -216,6 +216,15 @@ database:
   url: ${DATABASE_URL}
 ```
 
+**Prefix Compatibility**
+
+`SimpleLoader` continues to use the historical `STMP_` prefix when loading
+environment variables. The newer `BofryLoader` and the `ConfigBuilder`
+default to the `GORTEX_` prefix. If you have existing `STMP_` variables, call
+`WithEnvPrefix("STMP_")` on the loader or use `config.NewSimpleLoaderCompat()`
+as a drop-in replacement. Helpers such as `config.LoadWithBofry` and
+`config.LoadFromDotEnv` can further ease the transition.
+
 ### Observability
 
 ```go

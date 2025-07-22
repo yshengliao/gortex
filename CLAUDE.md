@@ -182,6 +182,13 @@ err := loader.Load(cfg)
 - Backward compatible with SimpleLoader
 - Full validation support
 
+`SimpleLoader` still reads environment variables with the legacy `STMP_`
+prefix. `BofryLoader` and the builder pattern default to `GORTEX_`. To keep
+existing `STMP_` variables, pass `WithEnvPrefix("STMP_")` or construct the
+loader with `config.NewSimpleLoaderCompat()`. Helper functions like
+`config.LoadWithBofry` and `config.LoadFromDotEnv` are available to make the
+migration painless.
+
 ## Development Standards
 
 ### Code Conventions
