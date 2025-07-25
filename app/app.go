@@ -14,10 +14,24 @@ import (
 	"github.com/yshengliao/gortex/config"
 	errorMiddleware "github.com/yshengliao/gortex/middleware"
 	"github.com/yshengliao/gortex/middleware/compression"
+	"github.com/yshengliao/gortex/pkg/compat"
 )
 
 // ShutdownHook is a function that gets called during shutdown
 type ShutdownHook func(ctx context.Context) error
+
+// RuntimeMode re-exported from compat package
+type RuntimeMode = compat.RuntimeMode
+
+// Runtime mode constants
+const (
+	ModeEcho   = compat.ModeEcho   // Use Echo (default)
+	ModeGortex = compat.ModeGortex  // Use Gortex
+	ModeDual   = compat.ModeDual    // Dual system for testing
+)
+
+// Type aliases for compatibility layer
+type EchoAdapter = compat.EchoAdapter
 
 // startTime tracks when the application started
 var startTime = time.Now()
@@ -31,6 +45,10 @@ type App struct {
 	shutdownHooks   []ShutdownHook
 	shutdownTimeout time.Duration
 	mu              sync.RWMutex
+	
+	// Compatibility layer fields
+	runtimeMode     RuntimeMode    // Framework runtime mode
+	echoAdapter     *EchoAdapter   // Echo compatibility adapter
 }
 
 // Config is re-exported from the config package for convenience
@@ -46,6 +64,7 @@ func NewApp(opts ...Option) (*App, error) {
 		ctx:             NewContext(),
 		shutdownHooks:   make([]ShutdownHook, 0),
 		shutdownTimeout: 30 * time.Second, // Default 30 seconds
+		runtimeMode:     ModeEcho,          // Default to Echo for backward compatibility
 	}
 
 	// Apply all options
@@ -116,6 +135,19 @@ func WithShutdownTimeout(timeout time.Duration) Option {
 			return fmt.Errorf("shutdown timeout must be positive")
 		}
 		app.shutdownTimeout = timeout
+		return nil
+	}
+}
+
+// WithRuntimeMode sets the framework runtime mode
+func WithRuntimeMode(mode RuntimeMode) Option {
+	return func(app *App) error {
+		app.runtimeMode = mode
+		if mode != ModeEcho {
+			// Initialize Echo adapter for Gortex or Dual mode
+			app.echoAdapter = compat.NewEchoAdapter(nil) // Will set router later
+			app.echoAdapter.SetRuntimeMode(mode)
+		}
 		return nil
 	}
 }
