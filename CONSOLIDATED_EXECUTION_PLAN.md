@@ -56,7 +56,7 @@
   - 增加對更多參數來源的支援：請求標頭 (Request Headers)、JWT Claims、以及透過 DI 容器注入的服務。
   - 整合 `validator` 套件，在綁定後自動執行結構體驗證。
 
-- **[ ] 任務 2.3: 建立程式碼產生器 CLI (`gortex-gen`)**
+- **[x] 任務 2.3: 建立程式碼產生器 CLI (`gortex-gen`)**
   - 建立 `gortex-gen` CLI 工具的基本骨架。
   - 實現一個 AST 解析器，用於掃描專案中的 Go 原始碼，並找出標記了 `//go:generate gortex-gen handler` 的業務邏輯方法。
 
