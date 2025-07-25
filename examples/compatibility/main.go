@@ -78,9 +78,15 @@ func main() {
 	
 	// Add a route to show current mode
 	application.Echo().GET("/mode", func(c echo.Context) error {
+		mode := "Echo"
+		switch cfg.Logger.Level {
+		case "debug":
+			mode = "Echo (Debug)"
+		}
 		return c.JSON(http.StatusOK, map[string]string{
-			"runtime_mode": "Echo",
+			"runtime_mode": mode,
 			"message":      "Running in Echo compatibility mode",
+			"router":      "Echo v4",
 		})
 	})
 	

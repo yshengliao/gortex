@@ -7,7 +7,7 @@ import (
 
 // router implements the Router interface
 type router struct {
-	routes      map[string]map[string]HandlerFunc // method -> path -> handler
+	trees       map[string]*node // method -> root node
 	groups      []*routeGroup
 	middlewares []Middleware
 	mu          sync.RWMutex
@@ -16,7 +16,7 @@ type router struct {
 // NewRouter creates a new router instance
 func NewRouter() Router {
 	return &router{
-		routes:      make(map[string]map[string]HandlerFunc),
+		trees:       make(map[string]*node),
 		groups:      make([]*routeGroup, 0),
 		middlewares: make([]Middleware, 0),
 	}
@@ -87,8 +87,8 @@ func (r *router) addRoute(method, path string, h HandlerFunc, m ...Middleware) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	
-	if r.routes[method] == nil {
-		r.routes[method] = make(map[string]HandlerFunc)
+	if r.trees[method] == nil {
+		r.trees[method] = &node{}
 	}
 	
 	// Apply middleware chain
@@ -102,7 +102,7 @@ func (r *router) addRoute(method, path string, h HandlerFunc, m ...Middleware) {
 		handler = r.middlewares[i](handler)
 	}
 	
-	r.routes[method][path] = handler
+	r.trees[method].insertRoute(path, handler)
 }
 
 // ServeHTTP implements http.Handler interface
@@ -113,11 +113,13 @@ func (r *router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	method := req.Method
 	path := req.URL.Path
 	
-	if routes, ok := r.routes[method]; ok {
-		if handler, ok := routes[path]; ok {
+	if root, ok := r.trees[method]; ok {
+		params := make(map[string]string)
+		if handler := root.search(path, params); handler != nil {
 			ctx := &httpContext{
 				request:  req,
 				response: w,
+				params:   params,
 				values:   make(map[string]interface{}),
 			}
 			if err := handler(ctx); err != nil {

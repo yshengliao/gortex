@@ -16,12 +16,12 @@ const (
 
 // EchoAdapter provides Echo Context to Gortex Context conversion
 type EchoAdapter struct {
-	router *router.Router
+	router router.Router
 	mode   RuntimeMode
 }
 
 // NewEchoAdapter creates a new Echo adapter
-func NewEchoAdapter(r *router.Router) *EchoAdapter {
+func NewEchoAdapter(r router.Router) *EchoAdapter {
 	return &EchoAdapter{
 		router: r,
 		mode:   ModeEcho, // Default to Echo mode for compatibility

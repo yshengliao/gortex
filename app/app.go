@@ -4,6 +4,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"runtime"
 	"sync"
 	"time"
@@ -36,6 +37,20 @@ type EchoAdapter = compat.EchoAdapter
 // startTime tracks when the application started
 var startTime = time.Now()
 
+// getRuntimeModeName returns the string name of runtime mode
+func getRuntimeModeName(mode RuntimeMode) string {
+	switch mode {
+	case ModeEcho:
+		return "Echo"
+	case ModeGortex:
+		return "Gortex"
+	case ModeDual:
+		return "Dual"
+	default:
+		return "Unknown"
+	}
+}
+
 // App represents the main application instance
 type App struct {
 	e               *echo.Echo
@@ -47,8 +62,8 @@ type App struct {
 	mu              sync.RWMutex
 	
 	// Compatibility layer fields
-	runtimeMode     RuntimeMode    // Framework runtime mode
-	echoAdapter     *EchoAdapter   // Echo compatibility adapter
+	runtimeMode     RuntimeMode       // Framework runtime mode
+	routerAdapter   *RouterAdapter    // Router adapter for mode switching
 }
 
 // Config is re-exported from the config package for convenience
@@ -110,7 +125,8 @@ func WithLogger(logger *zap.Logger) Option {
 // WithHandlers registers handlers using reflection
 func WithHandlers(manager any) Option {
 	return func(app *App) error {
-		return RegisterRoutes(app.e, manager, app.ctx)
+		// Use compatibility registration with router adapter
+		return RegisterRoutesCompat(app, manager)
 	}
 }
 
@@ -143,17 +159,16 @@ func WithShutdownTimeout(timeout time.Duration) Option {
 func WithRuntimeMode(mode RuntimeMode) Option {
 	return func(app *App) error {
 		app.runtimeMode = mode
-		if mode != ModeEcho {
-			// Initialize Echo adapter for Gortex or Dual mode
-			app.echoAdapter = compat.NewEchoAdapter(nil) // Will set router later
-			app.echoAdapter.SetRuntimeMode(mode)
-		}
+		// Router adapter will be initialized in setupEcho
 		return nil
 	}
 }
 
 // setupEcho configures the Echo instance with middleware and settings
 func (app *App) setupEcho() {
+	// Initialize router adapter
+	app.routerAdapter = NewRouterAdapter(app.runtimeMode, app.e)
+	
 	// Disable Echo's banner
 	app.e.HideBanner = true
 	app.e.HidePort = true
@@ -259,9 +274,28 @@ func (app *App) Run() error {
 	}
 
 	if app.logger != nil {
-		app.logger.Info("Starting server", zap.String("address", address))
+		app.logger.Info("Starting server", 
+			zap.String("address", address),
+			zap.String("runtime_mode", getRuntimeModeName(app.runtimeMode)))
 	}
 
+	switch app.runtimeMode {
+	case ModeEcho:
+		// Use Echo server
+		return app.e.Start(address)
+	case ModeGortex:
+		// Use custom router with standard http server
+		router := app.routerAdapter.GetGortexRouter()
+		if httpRouter, ok := router.(http.Handler); ok {
+			return http.ListenAndServe(address, httpRouter)
+		}
+		return fmt.Errorf("gortex router does not implement http.Handler")
+	case ModeDual:
+		// For now, use Echo in dual mode
+		// TODO: Implement A/B testing framework
+		return app.e.Start(address)
+	}
+	
 	return app.e.Start(address)
 }
 
