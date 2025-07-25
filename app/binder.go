@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-playground/validator/v10"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v4"
 )
 
@@ -15,12 +17,26 @@ import (
 type ParameterBinder struct {
 	// tagName is the struct tag name to use for binding hints
 	tagName string
+	// validator for struct validation
+	validator *validator.Validate
+	// context for dependency injection
+	diContext *Context
 }
 
 // NewParameterBinder creates a new parameter binder
 func NewParameterBinder() *ParameterBinder {
 	return &ParameterBinder{
-		tagName: "bind",
+		tagName:   "bind",
+		validator: validator.New(),
+	}
+}
+
+// NewParameterBinderWithContext creates a new parameter binder with DI context
+func NewParameterBinderWithContext(ctx *Context) *ParameterBinder {
+	return &ParameterBinder{
+		tagName:   "bind",
+		validator: validator.New(),
+		diContext: ctx,
 	}
 }
 
@@ -40,6 +56,14 @@ func (pb *ParameterBinder) BindMethodParams(c echo.Context, method reflect.Metho
 			continue
 		}
 
+		// Try to get from DI container first
+		if pb.diContext != nil {
+			if service, err := pb.getFromDI(paramType); err == nil {
+				params = append(params, service)
+				continue
+			}
+		}
+
 		// Create new instance of parameter type
 		var paramValue reflect.Value
 		if paramType.Kind() == reflect.Ptr {
@@ -53,6 +77,13 @@ func (pb *ParameterBinder) BindMethodParams(c echo.Context, method reflect.Metho
 		// Bind based on parameter type
 		if err := pb.bindParameter(c, paramValue); err != nil {
 			return nil, fmt.Errorf("failed to bind parameter %d: %w", i, err)
+		}
+
+		// Validate if it's a struct
+		if pb.validator != nil && paramValue.Elem().Kind() == reflect.Struct {
+			if err := pb.validator.Struct(paramValue.Interface()); err != nil {
+				return nil, fmt.Errorf("validation failed for parameter %d: %w", i, err)
+			}
 		}
 
 		// If parameter is not a pointer, dereference it
@@ -171,6 +202,20 @@ func (pb *ParameterBinder) bindField(c echo.Context, fieldValue reflect.Value, f
 	case "form":
 		value = c.FormValue(name)
 		found = value != ""
+	case "jwt", "claims":
+		// Try to get from JWT claims
+		if claims := pb.getJWTClaims(c); claims != nil {
+			if val, ok := claims[name]; ok {
+				value = fmt.Sprintf("%v", val)
+				found = true
+			}
+		}
+	case "context":
+		// Try to get from echo context
+		if val := c.Get(name); val != nil {
+			value = fmt.Sprintf("%v", val)
+			found = true
+		}
 	default: // "auto"
 		// Try path first, then query, then form
 		if value = c.Param(name); value != "" {
@@ -296,5 +341,46 @@ func (pb *ParameterBinder) setFieldValue(fieldValue reflect.Value, value string)
 		return fmt.Errorf("unsupported field type: %v", fieldType)
 	}
 
+	return nil
+}
+
+// getFromDI tries to get a service from the DI container
+func (pb *ParameterBinder) getFromDI(paramType reflect.Type) (reflect.Value, error) {
+	if pb.diContext == nil {
+		return reflect.Value{}, fmt.Errorf("DI context not available")
+	}
+
+	// Direct access to context services
+	pb.diContext.mu.RLock()
+	defer pb.diContext.mu.RUnlock()
+	
+	if service, ok := pb.diContext.services[paramType]; ok {
+		return reflect.ValueOf(service), nil
+	}
+	
+	return reflect.Value{}, fmt.Errorf("service %v not found in DI container", paramType)
+}
+
+// getJWTClaims extracts JWT claims from the echo context
+func (pb *ParameterBinder) getJWTClaims(c echo.Context) jwt.MapClaims {
+	// Try to get JWT token from context (commonly set by JWT middleware)
+	if token := c.Get("user"); token != nil {
+		switch t := token.(type) {
+		case *jwt.Token:
+			if claims, ok := t.Claims.(jwt.MapClaims); ok {
+				return claims
+			}
+		case jwt.MapClaims:
+			return t
+		}
+	}
+	
+	// Try to get claims directly
+	if claims := c.Get("claims"); claims != nil {
+		if mapClaims, ok := claims.(jwt.MapClaims); ok {
+			return mapClaims
+		}
+	}
+	
 	return nil
 }

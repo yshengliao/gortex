@@ -208,13 +208,25 @@ func createHandlerFunc(handler any, method reflect.Method) echo.HandlerFunc {
 		usesBinder = true
 	}
 	
-	// Create parameter binder if needed
-	var binder *ParameterBinder
-	if usesBinder {
-		binder = NewParameterBinder()
-	}
-	
 	return func(c echo.Context) error {
+		// Get DI context from echo context if available
+		var diContext *Context
+		if ctx := c.Get("di_context"); ctx != nil {
+			if diCtx, ok := ctx.(*Context); ok {
+				diContext = diCtx
+			}
+		}
+		
+		// Create parameter binder if needed
+		var binder *ParameterBinder
+		if usesBinder {
+			if diContext != nil {
+				binder = NewParameterBinderWithContext(diContext)
+			} else {
+				binder = NewParameterBinder()
+			}
+		}
+		
 		var args []reflect.Value
 		
 		if usesBinder {
