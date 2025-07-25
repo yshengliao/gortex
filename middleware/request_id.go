@@ -3,32 +3,36 @@ package middleware
 
 import (
 	"github.com/google/uuid"
-	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
+	"github.com/yshengliao/gortex/context"
 )
 
 // RequestIDConfig defines the config for RequestID middleware.
 type RequestIDConfig struct {
 	// Skipper defines a function to skip middleware.
-	Skipper middleware.Skipper
+	Skipper func(context.Context) bool
 
 	// Generator defines a function to generate an ID.
 	// Optional. Defaults to UUID v4.
 	Generator func() string
 
 	// RequestIDHandler defines a function which is executed for a request id.
-	RequestIDHandler func(echo.Context, string)
+	RequestIDHandler func(context.Context, string)
 
 	// TargetHeader defines the header name to look for existing request ID.
 	// Optional. Defaults to X-Request-ID
 	TargetHeader string
 }
 
+// DefaultSkipper returns false which processes the middleware for all requests.
+func DefaultSkipper(context.Context) bool {
+	return false
+}
+
 // DefaultRequestIDConfig is the default RequestID middleware config.
 var DefaultRequestIDConfig = RequestIDConfig{
-	Skipper:      middleware.DefaultSkipper,
+	Skipper:      DefaultSkipper,
 	Generator:    generateRequestID,
-	TargetHeader: echo.HeaderXRequestID,
+	TargetHeader: "X-Request-ID",
 }
 
 // generateRequestID generates a new request ID using UUID v4
@@ -42,12 +46,12 @@ func generateRequestID() string {
 // 2. Generate a new UUID v4 if no existing ID is found
 // 3. Set the request ID in both the context and response headers
 // 4. Make the request ID available throughout the request lifecycle
-func RequestID() echo.MiddlewareFunc {
+func RequestID() MiddlewareFunc {
 	return RequestIDWithConfig(DefaultRequestIDConfig)
 }
 
 // RequestIDWithConfig returns a RequestID middleware with config.
-func RequestIDWithConfig(config RequestIDConfig) echo.MiddlewareFunc {
+func RequestIDWithConfig(config RequestIDConfig) MiddlewareFunc {
 	// Defaults
 	if config.Skipper == nil {
 		config.Skipper = DefaultRequestIDConfig.Skipper
@@ -59,16 +63,16 @@ func RequestIDWithConfig(config RequestIDConfig) echo.MiddlewareFunc {
 		config.TargetHeader = DefaultRequestIDConfig.TargetHeader
 	}
 
-	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+	return func(next HandlerFunc) HandlerFunc {
+		return func(c context.Context) error {
 			if config.Skipper(c) {
 				return next(c)
 			}
 
 			req := c.Request()
 			res := c.Response()
-
-			// Check if request ID already exists in the request headers
+			
+			// Try to get request ID from header
 			rid := req.Header.Get(config.TargetHeader)
 			if rid == "" {
 				// Generate new request ID
@@ -77,11 +81,11 @@ func RequestIDWithConfig(config RequestIDConfig) echo.MiddlewareFunc {
 
 			// Set request ID in response header
 			res.Header().Set(config.TargetHeader, rid)
-
-			// Store request ID in context for easy access
+			
+			// Store request ID in context for later use
 			c.Set("request_id", rid)
 
-			// Execute handler if configured
+			// Call the handler if configured
 			if config.RequestIDHandler != nil {
 				config.RequestIDHandler(c, rid)
 			}
@@ -89,4 +93,14 @@ func RequestIDWithConfig(config RequestIDConfig) echo.MiddlewareFunc {
 			return next(c)
 		}
 	}
+}
+
+// GetRequestID retrieves the request ID from context
+func GetRequestID(c context.Context) string {
+	if rid := c.Get("request_id"); rid != nil {
+		if ridStr, ok := rid.(string); ok {
+			return ridStr
+		}
+	}
+	return ""
 }
