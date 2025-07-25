@@ -31,6 +31,7 @@ func (s *UserService) GET(c echo.Context) error {
 			expectedImports: []string{
 				`"github.com/labstack/echo/v4"`,
 				`"github.com/yshengliao/gortex/pkg/response"`,
+				`"github.com/yshengliao/gortex/pkg/errors"`,
 			},
 			expectedContains: []string{
 				"type UserServiceHandler struct",
@@ -139,6 +140,36 @@ func (s *DataService) ProcessData(data string) (string, error) {
 			expectedContains: []string{
 				`data := c.Param("data")`,
 				"result0, err := h.service.ProcessData(data)",
+			},
+		},
+		{
+			name: "handler with error handling",
+			serviceCode: `package service
+
+type OrderService struct{}
+
+//go:generate gortex-gen handler
+func (s *OrderService) CreateOrder(c echo.Context, req *CreateOrderRequest) (*Order, error) {
+	return nil, nil
+}
+
+type CreateOrderRequest struct {
+	ProductID string
+	Quantity  int
+}
+
+type Order struct {
+	ID string
+}`,
+			expectedImports: []string{
+				`"github.com/yshengliao/gortex/pkg/errors"`,
+			},
+			expectedContains: []string{
+				"// Use error registry to map business errors to HTTP errors",
+				"httpStatus, errResp := errors.HandleBusinessError(err)",
+				"if errResp != nil {",
+				"return errResp.Send(c, httpStatus)",
+				"// Fallback to generic error",
 			},
 		},
 	}

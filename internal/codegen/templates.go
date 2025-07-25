@@ -73,6 +73,12 @@ func (h *{{$.HandlerName}}) {{.HTTPMethod}}(c echo.Context) error {
 	
 	{{- if .ReturnsError}}
 	if err != nil {
+		// Use error registry to map business errors to HTTP errors
+		httpStatus, errResp := errors.HandleBusinessError(err)
+		if errResp != nil {
+			return errResp.Send(c, httpStatus)
+		}
+		// Fallback to generic error
 		return response.Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Service error", err.Error())
 	}
 	{{- end}}
@@ -162,6 +168,7 @@ func prepareTemplateData(spec HandlerSpec, methodInfo *MethodInfo) TemplateData 
 	imports := []ImportInfo{
 		{"", "github.com/labstack/echo/v4"},
 		{"", "github.com/yshengliao/gortex/pkg/response"},
+		{"", "github.com/yshengliao/gortex/pkg/errors"},
 	}
 	
 	// Check if we need the app package for binder

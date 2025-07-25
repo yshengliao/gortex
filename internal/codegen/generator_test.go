@@ -300,7 +300,7 @@ type User struct {
 		err = gen.Generate()
 		require.NoError(t, err)
 		
-		// For now, just check that it completes without error
-		// TODO: Add assertions when actual generation is implemented
+		// Check that generation completes without error
+		// The actual generation is tested in templates_test.go
 	})
 }
