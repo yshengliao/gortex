@@ -37,6 +37,14 @@ Thumbs.db
 coverage.html
 coverage.out
 
+# Example binaries
+examples/*/auth
+examples/*/simple
+examples/*/websocket
+examples/auth/auth
+examples/simple/simple
+examples/websocket/websocket
+
 # Configuration
 .env
 .env.local
