@@ -5,6 +5,7 @@ package app
 
 import (
 	"fmt"
+	"net/http"
 	"reflect"
 	"strings"
 
@@ -198,8 +199,36 @@ func registerCustomMethodWithMiddleware(e *echo.Echo, path string, handler any, 
 
 // createHandlerFunc creates an echo.HandlerFunc from a reflect.Method
 func createHandlerFunc(handler any, method reflect.Method) echo.HandlerFunc {
+	// Check if method uses automatic parameter binding
+	methodType := method.Type
+	usesBinder := false
+	
+	// Check if method has parameters beyond receiver and echo.Context
+	if methodType.NumIn() > 2 {
+		usesBinder = true
+	}
+	
+	// Create parameter binder if needed
+	var binder *ParameterBinder
+	if usesBinder {
+		binder = NewParameterBinder()
+	}
+	
 	return func(c echo.Context) error {
-		args := []reflect.Value{reflect.ValueOf(handler), reflect.ValueOf(c)}
+		var args []reflect.Value
+		
+		if usesBinder {
+			// Use parameter binder for automatic binding
+			params, err := binder.BindMethodParams(c, method)
+			if err != nil {
+				return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+			}
+			args = append([]reflect.Value{reflect.ValueOf(handler)}, params...)
+		} else {
+			// Legacy mode: just pass echo.Context
+			args = []reflect.Value{reflect.ValueOf(handler), reflect.ValueOf(c)}
+		}
+		
 		results := method.Func.Call(args)
 
 		if len(results) > 0 && results[0].Interface() != nil {
