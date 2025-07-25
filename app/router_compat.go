@@ -105,6 +105,11 @@ func RegisterRoutesCompat(app *App, manager any) error {
 
 // registerHandlerMethods registers all HTTP methods for a handler
 func registerHandlerMethods(app *App, basePath string, handler any, isWebSocket bool, logger *zap.Logger) error {
+	// Use optimized router if available
+	if app.optimizedRouter != nil {
+		return app.optimizedRouter.RegisterHandler(basePath, handler, isWebSocket)
+	}
+	
 	handlerValue := reflect.ValueOf(handler)
 	handlerType := handlerValue.Type()
 
@@ -112,7 +117,11 @@ func registerHandlerMethods(app *App, basePath string, handler any, isWebSocket 
 	if isWebSocket {
 		// Convert to Echo handler
 		if echoHandler, ok := handler.(echo.HandlerFunc); ok {
-			app.routerAdapter.RegisterEchoRoute("GET", basePath, echoHandler)
+			if app.routerAdapter != nil {
+				app.routerAdapter.RegisterEchoRoute("GET", basePath, echoHandler)
+			} else {
+				app.e.GET(basePath, echoHandler)
+			}
 		} else {
 			// Try to find a method that can serve as WebSocket handler
 			for i := 0; i < handlerType.NumMethod(); i++ {
@@ -120,7 +129,11 @@ func registerHandlerMethods(app *App, basePath string, handler any, isWebSocket 
 				if isWebSocketMethod(method) {
 					methodFunc := handlerValue.Method(i).Interface()
 					if echoFunc, ok := methodFunc.(func(echo.Context) error); ok {
-						app.routerAdapter.RegisterEchoRoute("GET", basePath, echoFunc)
+						if app.routerAdapter != nil {
+							app.routerAdapter.RegisterEchoRoute("GET", basePath, echoFunc)
+						} else {
+							app.e.GET(basePath, echoFunc)
+						}
 						break
 					}
 				}
@@ -162,13 +175,36 @@ func registerHandlerMethods(app *App, basePath string, handler any, isWebSocket 
 		}
 
 		// Register with router adapter
-		app.routerAdapter.RegisterEchoRoute(httpMethod, basePath, echoFunc)
-		methodsRegistered++
+		if app.routerAdapter != nil {
+			app.routerAdapter.RegisterEchoRoute(httpMethod, basePath, echoFunc)
+			methodsRegistered++
 
-		if logger != nil {
-			logger.Debug("Registered route",
-				zap.String("method", httpMethod),
-				zap.String("path", basePath))
+			if logger != nil {
+				logger.Debug("Registered route",
+					zap.String("method", httpMethod),
+					zap.String("path", basePath))
+			}
+		} else {
+			// Fallback to direct Echo registration if no adapter
+			switch httpMethod {
+			case "GET":
+				app.e.GET(basePath, echoFunc)
+			case "POST":
+				app.e.POST(basePath, echoFunc)
+			case "PUT":
+				app.e.PUT(basePath, echoFunc)
+			case "DELETE":
+				app.e.DELETE(basePath, echoFunc)
+			case "PATCH":
+				app.e.PATCH(basePath, echoFunc)
+			}
+			methodsRegistered++
+			
+			if logger != nil {
+				logger.Debug("Registered route (direct)",
+					zap.String("method", httpMethod),
+					zap.String("path", basePath))
+			}
 		}
 	}
 
@@ -202,8 +238,11 @@ func registerHandlerMethods(app *App, basePath string, handler any, isWebSocket 
 		httpMethod := "GET" // Default
 		for prefix, method := range map[string]string{
 			"Post":   "POST",
+			"Create": "POST",  // Create is also a POST operation
 			"Put":    "PUT",
+			"Update": "PUT",   // Update is a PUT operation
 			"Delete": "DELETE",
+			"Remove": "DELETE", // Remove is also DELETE
 			"Patch":  "PATCH",
 		} {
 			if strings.HasPrefix(methodName, prefix) {
@@ -213,14 +252,38 @@ func registerHandlerMethods(app *App, basePath string, handler any, isWebSocket 
 		}
 
 		// Register with router adapter
-		app.routerAdapter.RegisterEchoRoute(httpMethod, fullPath, echoFunc)
-		methodsRegistered++
+		if app.routerAdapter != nil {
+			app.routerAdapter.RegisterEchoRoute(httpMethod, fullPath, echoFunc)
+			methodsRegistered++
 
-		if logger != nil {
-			logger.Debug("Registered route",
-				zap.String("method", httpMethod),
-				zap.String("path", fullPath),
-				zap.String("handler_method", methodName))
+			if logger != nil {
+				logger.Debug("Registered route",
+					zap.String("method", httpMethod),
+					zap.String("path", fullPath),
+					zap.String("handler_method", methodName))
+			}
+		} else {
+			// Fallback to direct Echo registration if no adapter
+			switch httpMethod {
+			case "GET":
+				app.e.GET(fullPath, echoFunc)
+			case "POST":
+				app.e.POST(fullPath, echoFunc)
+			case "PUT":
+				app.e.PUT(fullPath, echoFunc)
+			case "DELETE":
+				app.e.DELETE(fullPath, echoFunc)
+			case "PATCH":
+				app.e.PATCH(fullPath, echoFunc)
+			}
+			methodsRegistered++
+			
+			if logger != nil {
+				logger.Debug("Registered route (direct)",
+					zap.String("method", httpMethod),
+					zap.String("path", fullPath),
+					zap.String("handler_method", methodName))
+			}
 		}
 	}
 
@@ -257,7 +320,7 @@ func isValidEchoHandler(method reflect.Method) bool {
 func isWebSocketMethod(method reflect.Method) bool {
 	// WebSocket methods typically have different signatures
 	// This is a simplified check
-	return method.Name == "WebSocket" || method.Name == "WS" || method.Name == "Hijack"
+	return method.Name == "WebSocket" || method.Name == "WS" || method.Name == "Hijack" || method.Name == "HandleConnection"
 }
 
 func methodNameToPath(name string) string {

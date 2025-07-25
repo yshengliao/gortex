@@ -140,13 +140,19 @@ func TestIntegrationGracefulShutdown(t *testing.T) {
 		// Monitor for close message in background
 		closeReceived := make(chan bool, 1)
 		go func() {
+			conn.SetCloseHandler(func(code int, text string) error {
+				closeReceived <- true
+				return nil
+			})
+			
+			// Keep reading to process close frame
 			for {
-				msgType, _, err := conn.ReadMessage()
+				_, _, err := conn.ReadMessage()
 				if err != nil {
-					return
-				}
-				if msgType == websocket.CloseMessage {
-					closeReceived <- true
+					// Check if it's a close error
+					if websocket.IsCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
+						closeReceived <- true
+					}
 					return
 				}
 			}
@@ -204,7 +210,7 @@ func TestIntegrationGracefulShutdown(t *testing.T) {
 		
 		// Should timeout
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "timeout")
+		assert.Contains(t, err.Error(), "timed out")
 		assert.Less(t, duration, 200*time.Millisecond)
 	})
 }

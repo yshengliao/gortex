@@ -1,68 +1,142 @@
 package main
 
 import (
-	"context"
 	"log"
 	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/yshengliao/gortex/app"
+	"github.com/yshengliao/gortex/response"
 	"go.uber.org/zap"
 )
 
-// HandlersManager defines all handlers with declarative routing
+// HandlersManager demonstrates struct tag routing
+// The framework automatically discovers routes from struct tags
 type HandlersManager struct {
-	Home   *HomeHandler   `url:"/"`
-	Health *HealthHandler `url:"/health"`
-	API    *APIHandler    `url:"/api"`
+	// Basic routes using url tags
+	Home    *HomeHandler    `url:"/"`
+	Health  *HealthHandler  `url:"/health"`
+	
+	// Dynamic parameter routes
+	User    *UserHandler    `url:"/users/:id"`
+	
+	// Wildcard routes for static files
+	Static  *StaticHandler  `url:"/static/*"`
+	
+	// Nested groups for API versioning
+	API     *APIGroup       `url:"/api"`
 }
 
-// HomeHandler serves the root endpoint
+// APIGroup demonstrates nested routing groups
+type APIGroup struct {
+	// Nested groups create hierarchical routes
+	V1 *APIv1Group `url:"/v1"`
+	V2 *APIv2Group `url:"/v2"`
+}
+
+// APIv1Group contains v1 API endpoints
+type APIv1Group struct {
+	// Routes become /api/v1/users/:id
+	Users   *UserAPIHandler   `url:"/users/:id"`
+	// Routes become /api/v1/products/:id
+	Products *ProductHandler  `url:"/products/:id"`
+}
+
+// APIv2Group contains v2 API endpoints
+type APIv2Group struct {
+	// Routes become /api/v2/users/:id
+	Users   *UserAPIHandlerV2 `url:"/users/:id"`
+}
+
+// HomeHandler handles the root route
 type HomeHandler struct{}
 
 func (h *HomeHandler) GET(c echo.Context) error {
 	return c.JSON(200, map[string]string{
-		"message": "Welcome to Gortex Framework",
-		"version": "1.0.0",
+		"message": "Welcome to Gortex",
+		"version": "v0.3.0",
 	})
 }
 
-// HealthHandler provides health check endpoint
+// HealthHandler demonstrates simple health check
 type HealthHandler struct{}
 
 func (h *HealthHandler) GET(c echo.Context) error {
 	return c.JSON(200, map[string]string{
 		"status": "healthy",
-		"time":   time.Now().Format(time.RFC3339),
 	})
 }
 
-// APIHandler demonstrates API endpoints
-type APIHandler struct {
-	Logger *zap.Logger
+// UserHandler demonstrates dynamic parameters
+type UserHandler struct{}
+
+// GET /users/:id
+func (h *UserHandler) GET(c echo.Context) error {
+	id := c.Param("id")
+	return c.JSON(200, map[string]interface{}{
+		"id":   id,
+		"name": "User " + id,
+	})
 }
 
-// GET /api
-func (h *APIHandler) GET(c echo.Context) error {
-	h.Logger.Info("API endpoint called")
+// POST /users/:id
+func (h *UserHandler) POST(c echo.Context) error {
+	id := c.Param("id")
+	return response.Success(c, 201, map[string]string{
+		"message": "User created",
+		"id":      id,
+	})
+}
+
+// Profile creates a sub-route: POST /users/:id/profile
+func (h *UserHandler) Profile(c echo.Context) error {
+	id := c.Param("id")
 	return c.JSON(200, map[string]string{
-		"message": "API endpoint",
-		"method":  "GET",
+		"userId":  id,
+		"profile": "User profile data",
 	})
 }
 
-// POST /api/echo
-func (h *APIHandler) Echo(c echo.Context) error {
-	var body map[string]any
-	if err := c.Bind(&body); err != nil {
-		return c.JSON(400, map[string]string{"error": "Invalid JSON"})
-	}
-	h.Logger.Info("Echo endpoint called", zap.Any("body", body))
-	return c.JSON(200, body)
+// StaticHandler demonstrates wildcard routes
+type StaticHandler struct{}
+
+func (h *StaticHandler) GET(c echo.Context) error {
+	filepath := c.Param("*")
+	return c.JSON(200, map[string]string{
+		"file": filepath,
+		"type": "static file",
+	})
+}
+
+// UserAPIHandler for API v1
+type UserAPIHandler struct{}
+
+func (h *UserAPIHandler) GET(c echo.Context) error {
+	return c.JSON(200, map[string]string{
+		"version": "v1",
+		"user":    c.Param("id"),
+	})
+}
+
+// ProductHandler for API v1
+type ProductHandler struct{}
+
+func (h *ProductHandler) GET(c echo.Context) error {
+	return c.JSON(200, map[string]string{
+		"version": "v1",
+		"product": c.Param("id"),
+	})
+}
+
+// UserAPIHandlerV2 for API v2
+type UserAPIHandlerV2 struct{}
+
+func (h *UserAPIHandlerV2) GET(c echo.Context) error {
+	return c.JSON(200, map[string]string{
+		"version": "v2",
+		"user":    c.Param("id"),
+		"features": "enhanced",
+	})
 }
 
 func main() {
@@ -70,22 +144,30 @@ func main() {
 	logger, _ := zap.NewDevelopment()
 	defer logger.Sync()
 
-	// Create configuration
-	cfg := &app.Config{}
-	cfg.Server.Address = ":8080"
-	cfg.Server.Recovery = true
-	cfg.Server.CORS = true
-
-	// Create handlers
+	// Create handlers structure
+	// No manual route registration needed!
 	handlers := &HandlersManager{
 		Home:   &HomeHandler{},
 		Health: &HealthHandler{},
-		API: &APIHandler{
-			Logger: logger,
+		User:   &UserHandler{},
+		Static: &StaticHandler{},
+		API: &APIGroup{
+			V1: &APIv1Group{
+				Users:    &UserAPIHandler{},
+				Products: &ProductHandler{},
+			},
+			V2: &APIv2Group{
+				Users: &UserAPIHandlerV2{},
+			},
 		},
 	}
 
-	// Create application
+	// Simple configuration
+	cfg := &app.Config{}
+	cfg.Server.Address = ":8080"
+	cfg.Logger.Level = "debug"
+
+	// Create and run application
 	application, err := app.NewApp(
 		app.WithConfig(cfg),
 		app.WithLogger(logger),
@@ -95,29 +177,21 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Setup graceful shutdown
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
+	logger.Info("Starting Gortex server", 
+		zap.String("address", cfg.Server.Address))
+	logger.Info("Routes automatically discovered from struct tags!")
+	logger.Info("Example routes:",
+		zap.String("home", "GET /"),
+		zap.String("health", "GET /health"),
+		zap.String("user", "GET,POST /users/:id"),
+		zap.String("user-profile", "POST /users/:id/profile"),
+		zap.String("static", "GET /static/*"),
+		zap.String("api-v1-users", "GET /api/v1/users/:id"),
+		zap.String("api-v1-products", "GET /api/v1/products/:id"),
+		zap.String("api-v2-users", "GET /api/v2/users/:id"),
+	)
 
-	// Start server
-	go func() {
-		logger.Info("Starting server", zap.String("address", cfg.Server.Address))
-		if err := application.Run(); err != nil && err != http.ErrServerClosed {
-			logger.Fatal("Server error", zap.Error(err))
-		}
-	}()
-
-	// Wait for interrupt signal
-	<-ctx.Done()
-
-	// Graceful shutdown
-	logger.Info("Shutting down server...")
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	if err := application.Shutdown(shutdownCtx); err != nil {
-		logger.Error("Shutdown error", zap.Error(err))
+	if err := application.Run(); err != nil && err != http.ErrServerClosed {
+		logger.Fatal("Server error", zap.Error(err))
 	}
-
-	logger.Info("Server stopped")
 }

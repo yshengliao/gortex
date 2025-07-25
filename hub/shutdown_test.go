@@ -113,7 +113,7 @@ func TestHubShutdown(t *testing.T) {
 		duration := time.Since(start)
 		
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "timeout")
+		assert.Contains(t, err.Error(), "timed out")
 		assert.Less(t, duration, 200*time.Millisecond)
 	})
 	

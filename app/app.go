@@ -64,6 +64,7 @@ type App struct {
 	// Compatibility layer fields
 	runtimeMode     RuntimeMode       // Framework runtime mode
 	routerAdapter   *RouterAdapter    // Router adapter for mode switching
+	optimizedRouter *OptimizedRouter  // Optimized router with caching
 }
 
 // Config is re-exported from the config package for convenience
@@ -169,6 +170,11 @@ func (app *App) setupEcho() {
 	// Initialize router adapter
 	app.routerAdapter = NewRouterAdapter(app.runtimeMode, app.e)
 	
+	// Initialize optimized router if not in echo-only mode
+	if app.runtimeMode != ModeEcho {
+		app.optimizedRouter = NewOptimizedRouter(app.e, app.ctx, app.logger)
+	}
+	
 	// Disable Echo's banner
 	app.e.HideBanner = true
 	app.e.HidePort = true
@@ -226,6 +232,23 @@ func (app *App) setupEcho() {
 	// Development mode enhancements
 	isDevelopment := app.config != nil && app.config.Logger.Level == "debug"
 	
+	if isDevelopment {
+		// Add development request/response logger
+		app.e.Use(errorMiddleware.DevLoggerWithConfig(errorMiddleware.DevLoggerConfig{
+			Logger:          app.logger,
+			LogRequestBody:  true,
+			LogResponseBody: true,
+			SkipPaths:       []string{"/_routes", "/metrics", "/health"},
+		}))
+
+		// Add development error pages - must be BEFORE error handler to intercept HTML requests
+		app.e.Use(errorMiddleware.DevErrorPageWithConfig(errorMiddleware.DevErrorPageConfig{
+			ShowStackTrace:     true,
+			ShowRequestDetails: true,
+			StackTraceLimit:    15,
+		}))
+	}
+	
 	// Error handler middleware for consistent error responses
 	// Hide internal server error details in production (when logger level is not debug)
 	hideDetails := !isDevelopment
@@ -236,23 +259,6 @@ func (app *App) setupEcho() {
 		DefaultMessage: "An internal error occurred",
 	}
 	app.e.Use(errorMiddleware.ErrorHandlerWithConfig(errorConfig))
-	
-	if isDevelopment {
-		// Add development request/response logger
-		app.e.Use(errorMiddleware.DevLoggerWithConfig(errorMiddleware.DevLoggerConfig{
-			Logger:          app.logger,
-			LogRequestBody:  true,
-			LogResponseBody: true,
-			SkipPaths:       []string{"/_routes", "/metrics", "/health"},
-		}))
-
-		// Add development error pages - must be after error handler
-		app.e.Use(errorMiddleware.DevErrorPageWithConfig(errorMiddleware.DevErrorPageConfig{
-			ShowStackTrace:     true,
-			ShowRequestDetails: true,
-			StackTraceLimit:    15,
-		}))
-	}
 }
 
 

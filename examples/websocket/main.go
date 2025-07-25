@@ -2,12 +2,8 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -17,41 +13,180 @@ import (
 	"go.uber.org/zap"
 )
 
-// HandlersManager defines all handlers with declarative routing
+// HandlersManager demonstrates WebSocket with struct tags
 type HandlersManager struct {
-	WebSocket *WebSocketHandler `url:"/ws" hijack:"ws"`
+	// Regular HTTP endpoints
+	Home   *HomeHandler   `url:"/"`
+	Status *StatusHandler `url:"/status"`
+	
+	// WebSocket endpoint with hijack tag
+	WS     *WSHandler     `url:"/ws" hijack:"ws"`
+	
+	// API for sending messages
+	API    *APIHandler    `url:"/api"`
 }
 
-// WebSocketHandler demonstrates WebSocket handling
-type WebSocketHandler struct {
-	Hub    *hub.Hub
-	Logger *zap.Logger
+// HomeHandler serves the WebSocket client page
+type HomeHandler struct{}
+
+func (h *HomeHandler) GET(c echo.Context) error {
+	html := `<!DOCTYPE html>
+<html>
+<head>
+    <title>Gortex WebSocket Example</title>
+</head>
+<body>
+    <h1>WebSocket Chat</h1>
+    <div id="messages" style="height:300px;overflow:auto;border:1px solid #ccc;margin:10px 0;padding:10px;"></div>
+    <input type="text" id="messageInput" placeholder="Type a message..." style="width:70%;">
+    <button onclick="sendMessage()">Send</button>
+    <button onclick="connect()">Connect</button>
+    <button onclick="disconnect()">Disconnect</button>
+    
+    <script>
+        let ws;
+        
+        function connect() {
+            ws = new WebSocket('ws://localhost:8082/ws');
+            
+            ws.onopen = function() {
+                appendMessage('Connected to server');
+            };
+            
+            ws.onmessage = function(event) {
+                appendMessage('Server: ' + event.data);
+            };
+            
+            ws.onclose = function() {
+                appendMessage('Disconnected from server');
+            };
+            
+            ws.onerror = function(error) {
+                appendMessage('Error: ' + error);
+            };
+        }
+        
+        function disconnect() {
+            if (ws) {
+                ws.close();
+            }
+        }
+        
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(input.value);
+                appendMessage('You: ' + input.value);
+                input.value = '';
+            } else {
+                alert('Not connected!');
+            }
+        }
+        
+        function appendMessage(msg) {
+            const messages = document.getElementById('messages');
+            messages.innerHTML += '<div>' + new Date().toLocaleTimeString() + ' - ' + msg + '</div>';
+            messages.scrollTop = messages.scrollHeight;
+        }
+        
+        // Connect automatically
+        connect();
+    </script>
+</body>
+</html>`
+	
+	return c.HTML(200, html)
 }
 
-func (h *WebSocketHandler) HandleConnection(c echo.Context) error {
-	upgrader := websocket.Upgrader{
-		CheckOrigin: func(r *http.Request) bool {
-			return true // Configure appropriately for production
+// StatusHandler shows WebSocket hub status
+type StatusHandler struct {
+	hub *hub.Hub
+}
+
+func (h *StatusHandler) GET(c echo.Context) error {
+	metrics := h.hub.GetMetrics()
+	sentRate, receivedRate := h.hub.GetMessageRate()
+	return c.JSON(200, map[string]interface{}{
+		"connections": metrics.CurrentConnections,
+		"total":       metrics.TotalConnections,
+		"messages": map[string]interface{}{
+			"sent":     metrics.MessagesSent,
+			"received": metrics.MessagesReceived,
+			"rate": map[string]float64{
+				"sent":     sentRate,
+				"received": receivedRate,
+			},
 		},
-	}
+	})
+}
 
-	conn, err := upgrader.Upgrade(c.Response(), c.Request(), nil)
+// WSHandler handles WebSocket connections
+type WSHandler struct {
+	hub      *hub.Hub
+	upgrader websocket.Upgrader
+	logger   *zap.Logger
+}
+
+// GET upgrades HTTP to WebSocket (marked with hijack:"ws")
+func (h *WSHandler) GET(c echo.Context) error {
+	// Upgrade HTTP connection to WebSocket
+	conn, err := h.upgrader.Upgrade(c.Response(), c.Request(), nil)
 	if err != nil {
-		h.Logger.Error("Failed to upgrade connection", zap.Error(err))
 		return err
 	}
-
-	// Create client
-	clientID := fmt.Sprintf("client-%d", time.Now().UnixNano())
-	client := hub.NewClient(h.Hub, conn, clientID, h.Logger)
-	h.Hub.RegisterClient(client)
-
-	// Start client message pumps
+	
+	// Create client with unique ID
+	clientID := "client-" + time.Now().Format("20060102150405")
+	client := hub.NewClient(h.hub, conn, clientID, h.logger)
+	
+	// Register with hub
+	h.hub.RegisterClient(client)
+	
+	// Start client goroutines
 	go client.WritePump()
 	go client.ReadPump()
-
-	h.Logger.Info("Client connected", zap.String("client_id", clientID))
+	
+	// Send welcome message
+	client.Send(&hub.Message{
+		Type: "chat",
+		Data: map[string]any{
+			"message": "Welcome to Gortex WebSocket!",
+		},
+	})
+	
 	return nil
+}
+
+// APIHandler provides HTTP API to interact with WebSocket
+type APIHandler struct {
+	hub *hub.Hub
+}
+
+// Broadcast sends message to all connected clients
+func (h *APIHandler) Broadcast(c echo.Context) error {
+	var req struct {
+		Message string `json:"message"`
+	}
+	
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(400, map[string]string{"error": "Invalid request"})
+	}
+	
+	// Broadcast to all clients
+	h.hub.Broadcast(&hub.Message{
+		Type: "broadcast",
+		Data: map[string]any{
+			"message": req.Message,
+		},
+	})
+	
+	// Get current metrics for client count
+	metrics := h.hub.GetMetrics()
+	
+	return c.JSON(200, map[string]interface{}{
+		"success": true,
+		"clients": metrics.CurrentConnections,
+	})
 }
 
 func main() {
@@ -59,52 +194,57 @@ func main() {
 	logger, _ := zap.NewDevelopment()
 	defer logger.Sync()
 
-	// Initialize WebSocket hub
+	// Create WebSocket hub
 	wsHub := hub.NewHub(logger)
+	go wsHub.Run()
 
 	// Create handlers
 	handlers := &HandlersManager{
-		WebSocket: &WebSocketHandler{
-			Hub:    wsHub,
-			Logger: logger,
+		Home:   &HomeHandler{},
+		Status: &StatusHandler{hub: wsHub},
+		WS: &WSHandler{
+			hub:    wsHub,
+			logger: logger,
+			upgrader: websocket.Upgrader{
+				CheckOrigin: func(r *http.Request) bool {
+					return true // Allow all origins for demo
+				},
+			},
 		},
+		API: &APIHandler{hub: wsHub},
 	}
 
-	// Create application with functional options
+	// Configure application
 	cfg := &app.Config{}
 	cfg.Server.Address = ":8082"
+	cfg.Logger.Level = "debug"
+
+	// Create application
 	application, err := app.NewApp(
 		app.WithConfig(cfg),
-		app.WithHandlers(handlers),
 		app.WithLogger(logger),
+		app.WithHandlers(handlers),
 	)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// Start WebSocket hub
-	go wsHub.Run()
+	// Register shutdown hook for WebSocket cleanup
+	application.OnShutdown(func(ctx context.Context) error {
+		logger.Info("Shutting down WebSocket hub...")
+		return wsHub.ShutdownWithTimeout(5 * time.Second)
+	})
 
-	// Setup graceful shutdown
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
+	logger.Info("Starting Gortex WebSocket Example", 
+		zap.String("address", cfg.Server.Address))
+	logger.Info("Routes:",
+		zap.String("home", "GET / (WebSocket client)"),
+		zap.String("websocket", "GET /ws (WebSocket endpoint)"),
+		zap.String("status", "GET /status (Hub metrics)"),
+		zap.String("broadcast", "POST /api/broadcast (Send to all)"),
+	)
 
-	// Start server
-	go func() {
-		logger.Info("WebSocket server started on :8082", zap.String("websocket", "/ws"))
-		if err := application.Run(); err != nil && err != http.ErrServerClosed {
-			logger.Fatal("Server error", zap.Error(err))
-		}
-	}()
-
-	// Wait for shutdown signal
-	<-ctx.Done()
-
-	// Graceful shutdown
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	if err := application.Shutdown(shutdownCtx); err != nil {
-		logger.Error("Shutdown error", zap.Error(err))
+	if err := application.Run(); err != nil && err != http.ErrServerClosed {
+		logger.Fatal("Server error", zap.Error(err))
 	}
 }

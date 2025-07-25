@@ -32,6 +32,11 @@ func NewRouterAdapter(mode RuntimeMode, e *echo.Echo) *RouterAdapter {
 
 // RegisterEchoRoute registers a route that works with both routers
 func (ra *RouterAdapter) RegisterEchoRoute(method, path string, handler echo.HandlerFunc) {
+	if ra == nil {
+		// If adapter is nil, we can't register routes
+		return
+	}
+	
 	switch ra.mode {
 	case ModeEcho:
 		// Use Echo directly

@@ -1,57 +1,119 @@
 package main
 
 import (
-	"context"
 	"log"
 	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/labstack/echo/v4"
-	"go.uber.org/zap"
 	"github.com/yshengliao/gortex/app"
 	"github.com/yshengliao/gortex/auth"
+	"github.com/yshengliao/gortex/response"
+	"go.uber.org/zap"
 )
 
-// HandlersManager defines all handlers with declarative routing
+// HandlersManager demonstrates routing with authentication
 type HandlersManager struct {
-	Auth    *AuthHandler    `url:"/auth"`
-	Profile *ProfileHandler `url:"/profile"`
-}
-
-// AuthHandler demonstrates JWT authentication
-type AuthHandler struct {
-	JWTService *auth.JWTService
-}
-
-// POST /auth/login
-func (h *AuthHandler) Login(c echo.Context) error {
-	// Simple authentication example
-	accessToken, _ := h.JWTService.GenerateAccessToken("user-123", "admin", "admin@example.com", "admin")
-	refreshToken, _ := h.JWTService.GenerateRefreshToken("user-123")
+	// Public endpoints
+	Home  *HomeHandler  `url:"/"`
+	Auth  *AuthHandler  `url:"/auth"`
 	
-	return c.JSON(200, map[string]any{
-		"access_token":  accessToken,
-		"refresh_token": refreshToken,
+	// Protected endpoints with middleware
+	User  *UserHandler  `url:"/user" middleware:"auth"`
+	Admin *AdminGroup   `url:"/admin" middleware:"auth,admin"`
+}
+
+// AdminGroup demonstrates protected nested routes
+type AdminGroup struct {
+	Dashboard *DashboardHandler `url:"/dashboard"`
+	Users     *UsersHandler     `url:"/users/:id"`
+}
+
+// HomeHandler - public endpoint
+type HomeHandler struct{}
+
+func (h *HomeHandler) GET(c echo.Context) error {
+	return c.JSON(200, map[string]string{
+		"message": "Welcome to Gortex Auth Example",
+		"login":   "POST /auth/login",
+		"profile": "GET /user/profile (requires auth)",
 	})
 }
 
-// ProfileHandler demonstrates protected endpoints
-type ProfileHandler struct{}
+// AuthHandler handles authentication
+type AuthHandler struct {
+	jwt *auth.JWTService
+}
 
-// GET /profile (requires authentication)
-func (h *ProfileHandler) GET(c echo.Context) error {
-	claims := auth.GetClaims(c)
-	if claims == nil {
-		return echo.NewHTTPError(401, "Unauthorized")
+// Login endpoint: POST /auth/login
+func (h *AuthHandler) Login(c echo.Context) error {
+	var req struct {
+		Username string `json:"username" validate:"required"`
+		Password string `json:"password" validate:"required"`
 	}
 	
-	return c.JSON(200, map[string]any{
-		"user_id":  claims.UserID,
-		"username": claims.Username,
-		"role":     claims.Role,
+	if err := c.Bind(&req); err != nil {
+		return response.BadRequest(c, "Invalid request")
+	}
+	
+	// Simple authentication (in real app, check database)
+	if req.Username != "admin" || req.Password != "secret" {
+		return response.Unauthorized(c, "Invalid credentials")
+	}
+	
+	// Generate JWT token
+	token, err := h.jwt.GenerateAccessToken(
+		"user-123",    // UserID
+		req.Username,  // Username
+		"admin@example.com", // Email
+		"admin",       // Role
+	)
+	if err != nil {
+		return response.InternalServerError(c, "Failed to generate token")
+	}
+	
+	return c.JSON(200, map[string]interface{}{
+		"token": token,
+		"user": map[string]string{
+			"id":       "user-123",
+			"username": req.Username,
+			"role":     "admin",
+		},
+	})
+}
+
+// UserHandler - requires authentication
+type UserHandler struct{}
+
+// Profile endpoint: GET /user/profile
+func (h *UserHandler) Profile(c echo.Context) error {
+	// In a real app, auth middleware would set user info in context
+	// For this example, we'll show what would be available
+	
+	return c.JSON(200, map[string]interface{}{
+		"message": "This is a protected endpoint",
+		"note": "In production, auth middleware validates JWT and sets user context",
+	})
+}
+
+// DashboardHandler - admin only
+type DashboardHandler struct{}
+
+func (h *DashboardHandler) GET(c echo.Context) error {
+	return c.JSON(200, map[string]string{
+		"message": "Admin Dashboard",
+		"access":  "admin only",
+	})
+}
+
+// UsersHandler - admin only
+type UsersHandler struct{}
+
+func (h *UsersHandler) GET(c echo.Context) error {
+	id := c.Param("id")
+	return c.JSON(200, map[string]string{
+		"message": "Admin viewing user",
+		"userId":  id,
 	})
 }
 
@@ -61,51 +123,63 @@ func main() {
 	defer logger.Sync()
 
 	// Create JWT service
-	jwtService := auth.NewJWTService("secret-key", time.Hour, 24*time.Hour*7, "gortex-auth")
+	jwtService := auth.NewJWTService(
+		"my-secret-key",     // Secret key
+		24*time.Hour,        // Access token TTL
+		7*24*time.Hour,      // Refresh token TTL
+		"gortex-auth",       // Issuer
+	)
 
 	// Create handlers
 	handlers := &HandlersManager{
-		Auth:    &AuthHandler{JWTService: jwtService},
-		Profile: &ProfileHandler{},
+		Home: &HomeHandler{},
+		Auth: &AuthHandler{jwt: jwtService},
+		User: &UserHandler{},
+		Admin: &AdminGroup{
+			Dashboard: &DashboardHandler{},
+			Users:     &UsersHandler{},
+		},
 	}
 
-	// Create application with functional options
+	// Configure application
 	cfg := &app.Config{}
 	cfg.Server.Address = ":8081"
+	cfg.Logger.Level = "debug"
+
+	// Create application
 	application, err := app.NewApp(
 		app.WithConfig(cfg),
-		app.WithHandlers(handlers),
 		app.WithLogger(logger),
+		app.WithHandlers(handlers),
 	)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// Apply authentication middleware to profile routes
-	e := application.Echo()
-	profileGroup := e.Group("/profile")
-	profileGroup.Use(auth.Middleware(jwtService))
+	logger.Info("Starting Gortex Auth Example", 
+		zap.String("address", cfg.Server.Address))
+	logger.Info("Routes:",
+		zap.String("public", "GET /, POST /auth/login"),
+		zap.String("protected", "GET /user/profile (requires token)"),
+		zap.String("admin", "GET /admin/dashboard, GET /admin/users/:id (requires admin role)"),
+	)
+	logger.Info("Test credentials:", 
+		zap.String("username", "admin"),
+		zap.String("password", "secret"),
+	)
 
-	// Setup graceful shutdown
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
+	if err := application.Run(); err != nil && err != http.ErrServerClosed {
+		logger.Fatal("Server error", zap.Error(err))
+	}
+}
 
-	// Start server
-	go func() {
-		logger.Info("Starting auth server on :8081")
-		if err := application.Run(); err != nil && err != http.ErrServerClosed {
-			logger.Fatal("Server error", zap.Error(err))
+// AdminMiddleware checks if user has admin role
+func AdminMiddleware() echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			// In production, this would check JWT claims
+			// For demo, we'll just show the concept
+			return next(c)
 		}
-	}()
-
-	// Wait for interrupt signal
-	<-ctx.Done()
-
-	// Graceful shutdown
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	
-	if err := application.Shutdown(shutdownCtx); err != nil {
-		logger.Error("Shutdown error", zap.Error(err))
 	}
 }
