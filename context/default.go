@@ -30,7 +30,6 @@ type DefaultContext struct {
 	store       Map
 	lock        sync.RWMutex
 	logger      Logger
-	echo        interface{} // For compatibility
 	stdContext  context.Context
 }
 
@@ -337,12 +336,12 @@ func (c *DefaultContext) File(file string) error {
 		return err
 	}
 	defer f.Close()
-	
+
 	fi, err := f.Stat()
 	if err != nil {
 		return err
 	}
-	
+
 	if fi.IsDir() {
 		file = filepath.Join(file, "index.html")
 		f, err = os.Open(file)
@@ -355,7 +354,7 @@ func (c *DefaultContext) File(file string) error {
 			return err
 		}
 	}
-	
+
 	http.ServeContent(c.response, c.request, fi.Name(), fi.ModTime(), f)
 	return nil
 }
@@ -430,11 +429,6 @@ func (c *DefaultContext) Logger() Logger {
 // SetLogger sets the logger
 func (c *DefaultContext) SetLogger(l Logger) {
 	c.logger = l
-}
-
-// Echo returns the Echo instance (for compatibility)
-func (c *DefaultContext) Echo() interface{} {
-	return c.echo
 }
 
 // Reset resets the context

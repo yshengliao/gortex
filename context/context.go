@@ -14,170 +14,166 @@ import (
 type Context interface {
 	// Request returns the underlying HTTP request
 	Request() *http.Request
-	
+
 	// SetRequest sets the HTTP request
 	SetRequest(r *http.Request)
-	
+
 	// Response returns the response writer
 	Response() ResponseWriter
-	
+
 	// IsTLS returns true if the request is using TLS
 	IsTLS() bool
-	
+
 	// IsWebSocket returns true if the request is a WebSocket upgrade
 	IsWebSocket() bool
-	
+
 	// Scheme returns the HTTP protocol scheme (http or https)
 	Scheme() string
-	
+
 	// RealIP returns the client's real IP address
 	RealIP() string
-	
+
 	// Path returns the request URL path
 	Path() string
-	
+
 	// SetPath sets the request URL path
 	SetPath(p string)
-	
+
 	// Param returns path parameter by name
 	Param(name string) string
-	
+
 	// ParamNames returns all path parameter names
 	ParamNames() []string
-	
+
 	// SetParamNames sets path parameter names
 	SetParamNames(names ...string)
-	
+
 	// ParamValues returns all path parameter values
 	ParamValues() []string
-	
+
 	// SetParamValues sets path parameter values
 	SetParamValues(values ...string)
-	
+
 	// QueryParam returns query parameter by name
 	QueryParam(name string) string
-	
+
 	// QueryParams returns all query parameters
 	QueryParams() url.Values
-	
+
 	// QueryString returns the URL query string
 	QueryString() string
-	
+
 	// FormValue returns form value by name
 	FormValue(name string) string
-	
+
 	// FormParams returns all form parameters
 	FormParams() (url.Values, error)
-	
+
 	// FormFile returns multipart form file by name
 	FormFile(name string) (*multipart.FileHeader, error)
-	
+
 	// MultipartForm returns multipart form
 	MultipartForm() (*multipart.Form, error)
-	
+
 	// Cookie returns cookie by name
 	Cookie(name string) (*http.Cookie, error)
-	
+
 	// SetCookie sets a cookie
 	SetCookie(cookie *http.Cookie)
-	
+
 	// Cookies returns all cookies
 	Cookies() []*http.Cookie
-	
+
 	// Get retrieves data from context
 	Get(key string) interface{}
-	
+
 	// Set saves data in context
 	Set(key string, val interface{})
-	
+
 	// Bind binds request body to interface
 	Bind(i interface{}) error
-	
+
 	// Validate validates the bound struct
 	Validate(i interface{}) error
-	
+
 	// JSON sends a JSON response with status code
 	JSON(code int, i interface{}) error
-	
+
 	// JSONBlob sends a JSON blob response with status code
 	JSONBlob(code int, b []byte) error
-	
+
 	// JSONPretty sends a pretty-printed JSON response
 	JSONPretty(code int, i interface{}, indent string) error
-	
+
 	// JSONByte sends a JSON byte response (for pre-marshaled data)
 	JSONByte(code int, b []byte) error
-	
+
 	// JSONP sends a JSONP response
 	JSONP(code int, callback string, i interface{}) error
-	
+
 	// JSONPBlob sends a JSONP blob response
 	JSONPBlob(code int, callback string, b []byte) error
-	
+
 	// XML sends an XML response with status code
 	XML(code int, i interface{}) error
-	
+
 	// XMLBlob sends an XML blob response
 	XMLBlob(code int, b []byte) error
-	
+
 	// XMLPretty sends a pretty-printed XML response
 	XMLPretty(code int, i interface{}, indent string) error
-	
+
 	// Blob sends a blob response with content type
 	Blob(code int, contentType string, b []byte) error
-	
+
 	// Stream sends a streaming response with content type
 	Stream(code int, contentType string, r io.Reader) error
-	
+
 	// File sends a file as response
 	File(file string) error
-	
+
 	// Inline sends a file as inline
 	Inline(file, name string) error
-	
+
 	// Attachment sends a file as attachment
 	Attachment(file, name string) error
-	
+
 	// NoContent sends a response with no body
 	NoContent(code int) error
-	
+
 	// String sends a string response
 	String(code int, s string) error
-	
+
 	// HTML sends an HTML response
 	HTML(code int, html string) error
-	
+
 	// HTMLBlob sends an HTML blob response
 	HTMLBlob(code int, b []byte) error
-	
+
 	// Redirect redirects the request
 	Redirect(code int, url string) error
-	
+
 	// Error invokes the registered error handler
 	Error(err error)
-	
+
 	// Handler returns the handler
 	Handler() HandlerFunc
-	
+
 	// SetHandler sets the handler
 	SetHandler(h HandlerFunc)
-	
+
 	// Logger returns the logger
 	Logger() Logger
-	
+
 	// SetLogger sets the logger
 	SetLogger(l Logger)
-	
-	// Echo returns the Echo instance (for compatibility)
-	// This will be removed in future versions
-	Echo() interface{}
-	
+
 	// Reset resets the context
 	Reset(r *http.Request, w http.ResponseWriter)
-	
+
 	// StdContext returns the standard context.Context
 	StdContext() context.Context
-	
+
 	// SetStdContext sets the standard context.Context
 	SetStdContext(ctx context.Context)
 }
@@ -323,7 +319,7 @@ const (
 	HeaderOrigin              = "Origin"
 	HeaderCacheControl        = "Cache-Control"
 	HeaderConnection          = "Connection"
-	
+
 	// Access control
 	HeaderAccessControlRequestMethod    = "Access-Control-Request-Method"
 	HeaderAccessControlRequestHeaders   = "Access-Control-Request-Headers"
@@ -333,7 +329,7 @@ const (
 	HeaderAccessControlAllowCredentials = "Access-Control-Allow-Credentials"
 	HeaderAccessControlExposeHeaders    = "Access-Control-Expose-Headers"
 	HeaderAccessControlMaxAge           = "Access-Control-Max-Age"
-	
+
 	// Security
 	HeaderStrictTransportSecurity         = "Strict-Transport-Security"
 	HeaderXContentTypeOptions             = "X-Content-Type-Options"

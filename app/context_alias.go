@@ -8,16 +8,10 @@ import (
 type (
 	// GortexContext is the new context interface
 	GortexContext = gortexctx.Context
-	
+
 	// GortexHandlerFunc is the new handler function type
 	GortexHandlerFunc = gortexctx.HandlerFunc
-	
+
 	// GortexMiddlewareFunc is the new middleware function type
 	GortexMiddlewareFunc = gortexctx.MiddlewareFunc
-)
-
-// Context conversion functions
-var (
-	EchoToGortex = gortexctx.EchoContextToGortex
-	GortexToEcho = gortexctx.GortexContextToEcho
 )
