@@ -137,11 +137,6 @@ func registerWebSocketHandler(e *echo.Echo, pattern string, handler any) error {
 	return nil
 }
 
-// registerHTTPHandler registers HTTP handlers for standard methods
-func registerHTTPHandler(e *echo.Echo, basePath string, handler any, handlerType reflect.Type) error {
-	return registerHTTPHandlerWithMiddleware(e, basePath, handler, handlerType, []echo.MiddlewareFunc{})
-}
-
 // registerHTTPHandlerWithMiddleware registers HTTP handlers with middleware
 func registerHTTPHandlerWithMiddleware(e *echo.Echo, basePath string, handler any, handlerType reflect.Type, middleware []echo.MiddlewareFunc) error {
 	methods := []string{"GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"}
@@ -173,11 +168,6 @@ func registerHTTPHandlerWithMiddleware(e *echo.Echo, basePath string, handler an
 	return nil
 }
 
-// registerMethod registers a standard HTTP method
-func registerMethod(e *echo.Echo, httpMethod, path string, handler any, method reflect.Method) {
-	registerMethodWithMiddleware(e, httpMethod, path, handler, method, []echo.MiddlewareFunc{})
-}
-
 // registerMethodWithMiddleware registers a standard HTTP method with middleware
 func registerMethodWithMiddleware(e *echo.Echo, httpMethod, path string, handler any, method reflect.Method, middleware []echo.MiddlewareFunc) {
 	handlerFunc := createHandlerFunc(handler, method)
@@ -198,11 +188,6 @@ func registerMethodWithMiddleware(e *echo.Echo, httpMethod, path string, handler
 	case "OPTIONS":
 		e.OPTIONS(path, handlerFunc, middleware...)
 	}
-}
-
-// registerCustomMethod registers a custom method as POST by default
-func registerCustomMethod(e *echo.Echo, path string, handler any, method reflect.Method) {
-	registerCustomMethodWithMiddleware(e, path, handler, method, []echo.MiddlewareFunc{})
 }
 
 // registerCustomMethodWithMiddleware registers a custom method with middleware

@@ -97,9 +97,7 @@ func TestNestedRouting(t *testing.T) {
 }
 
 // Test middleware inheritance
-type NestedMiddlewareHandler struct {
-	calls []string
-}
+type NestedMiddlewareHandler struct {}
 
 func (h *NestedMiddlewareHandler) GET(c echo.Context) error {
 	// Add to middleware chain tracking
