@@ -71,7 +71,7 @@ func RequestIDWithConfig(config RequestIDConfig) MiddlewareFunc {
 
 			req := c.Request()
 			res := c.Response()
-			
+
 			// Try to get request ID from header
 			rid := req.Header.Get(config.TargetHeader)
 			if rid == "" {
@@ -81,7 +81,7 @@ func RequestIDWithConfig(config RequestIDConfig) MiddlewareFunc {
 
 			// Set request ID in response header
 			res.Header().Set(config.TargetHeader, rid)
-			
+
 			// Store request ID in context for later use
 			c.Set("request_id", rid)
 

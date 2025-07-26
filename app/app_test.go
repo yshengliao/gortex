@@ -6,11 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"github.com/yshengliao/gortex/app"
+	"github.com/yshengliao/gortex/context"
 )
 
 type TestHandlers struct {
@@ -20,17 +20,17 @@ type TestHandlers struct {
 
 type HelloHandler struct{}
 
-func (h *HelloHandler) GET(c echo.Context) error {
+func (h *HelloHandler) GET(c context.Context) error {
 	return c.JSON(200, map[string]string{"message": "Hello, World!"})
 }
 
 type UserHandler struct{}
 
-func (h *UserHandler) GET(c echo.Context) error {
+func (h *UserHandler) GET(c context.Context) error {
 	return c.JSON(200, map[string]string{"endpoint": "list users"})
 }
 
-func (h *UserHandler) Create(c echo.Context) error {
+func (h *UserHandler) Create(c context.Context) error {
 	return c.JSON(201, map[string]string{"endpoint": "create user"})
 }
 
@@ -47,7 +47,7 @@ func TestNewApp(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.NotNil(t, application)
-	assert.NotNil(t, application.Echo())
+	assert.NotNil(t, application.Router())
 	assert.NotNil(t, application.Context())
 }
 
@@ -80,12 +80,12 @@ func TestDeclarativeRouting(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	e := application.Echo()
+	router := application.Router()
 
 	// Test GET /hello
 	req := httptest.NewRequest(http.MethodGet, "/hello", nil)
 	rec := httptest.NewRecorder()
-	e.ServeHTTP(rec, req)
+	router.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Contains(t, rec.Body.String(), "Hello, World!")
@@ -93,7 +93,7 @@ func TestDeclarativeRouting(t *testing.T) {
 	// Test GET /user
 	req = httptest.NewRequest(http.MethodGet, "/user", nil)
 	rec = httptest.NewRecorder()
-	e.ServeHTTP(rec, req)
+	router.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Contains(t, rec.Body.String(), "list users")
@@ -101,7 +101,7 @@ func TestDeclarativeRouting(t *testing.T) {
 	// Test POST /user/create
 	req = httptest.NewRequest(http.MethodPost, "/user/create", nil)
 	rec = httptest.NewRecorder()
-	e.ServeHTTP(rec, req)
+	router.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusCreated, rec.Code)
 	assert.Contains(t, rec.Body.String(), "create user")
@@ -147,8 +147,8 @@ func TestDependencyInjection(t *testing.T) {
 
 type ErrorHandler struct{}
 
-func (h *ErrorHandler) GET(c echo.Context) error {
-	return echo.NewHTTPError(http.StatusTeapot, "I'm a teapot")
+func (h *ErrorHandler) GET(c context.Context) error {
+	return context.NewHTTPError(http.StatusTeapot, "I'm a teapot")
 }
 
 func TestCustomErrorHandler(t *testing.T) {
@@ -168,7 +168,7 @@ func TestCustomErrorHandler(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/error", nil)
 	rec := httptest.NewRecorder()
-	application.Echo().ServeHTTP(rec, req)
+	application.Router().ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusTeapot, rec.Code)
 	assert.Contains(t, rec.Body.String(), "I'm a teapot")

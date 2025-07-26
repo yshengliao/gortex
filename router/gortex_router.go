@@ -2,6 +2,7 @@
 package router
 
 import (
+	"encoding/json"
 	"net/http"
 	"strings"
 	"sync"
@@ -20,13 +21,13 @@ type GortexRouter interface {
 	PATCH(path string, h middleware.HandlerFunc, m ...middleware.MiddlewareFunc)
 	HEAD(path string, h middleware.HandlerFunc, m ...middleware.MiddlewareFunc)
 	OPTIONS(path string, h middleware.HandlerFunc, m ...middleware.MiddlewareFunc)
-	
+
 	// Route grouping
 	Group(prefix string, m ...middleware.MiddlewareFunc) GortexRouter
-	
+
 	// Global middleware
 	Use(m ...middleware.MiddlewareFunc)
-	
+
 	// HTTP handler integration
 	ServeHTTP(w http.ResponseWriter, r *http.Request)
 }
@@ -117,39 +118,46 @@ func (r *gortexRouter) Use(m ...middleware.MiddlewareFunc) {
 func (r *gortexRouter) addRoute(method, path string, h middleware.HandlerFunc, m ...middleware.MiddlewareFunc) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	
+
 	fullPath := r.prefix + path
-	
+
 	if r.trees[method] == nil {
 		r.trees[method] = &routeNode{
 			children: make(map[string]*routeNode),
 		}
 	}
-	
+
 	// Combine all middleware: global + group + route-specific
 	allMiddlewares := make([]middleware.MiddlewareFunc, 0)
 	allMiddlewares = append(allMiddlewares, r.middlewares...)
 	allMiddlewares = append(allMiddlewares, m...)
-	
+
 	// Create final handler by applying middleware chain
 	finalHandler := h
 	for i := len(allMiddlewares) - 1; i >= 0; i-- {
 		finalHandler = allMiddlewares[i](finalHandler)
 	}
-	
+
 	r.addToTree(r.trees[method], fullPath, finalHandler, allMiddlewares)
 }
 
 // addToTree adds a route to the route tree
 func (r *gortexRouter) addToTree(root *routeNode, path string, handler middleware.HandlerFunc, middlewares []middleware.MiddlewareFunc) {
+	// Special case for root path
+	if path == "/" || path == "" {
+		root.handler = handler
+		root.middlewares = middlewares
+		return
+	}
+	
 	segments := strings.Split(strings.Trim(path, "/"), "/")
 	current := root
-	
+
 	for _, segment := range segments {
 		if segment == "" {
 			continue
 		}
-		
+
 		if strings.HasPrefix(segment, ":") {
 			// Parameter route
 			paramName := segment[1:]
@@ -181,7 +189,7 @@ func (r *gortexRouter) addToTree(root *routeNode, path string, handler middlewar
 			current = current.children[segment]
 		}
 	}
-	
+
 	current.handler = handler
 	current.middlewares = middlewares
 }
@@ -190,15 +198,39 @@ func (r *gortexRouter) addToTree(root *routeNode, path string, handler middlewar
 func (r *gortexRouter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	ctx := context.NewContext(req, w)
 	
+	// Set the request path
+	ctx.SetPath(req.URL.Path)
+
 	if handler, params := r.findRoute(req.Method, req.URL.Path); handler != nil {
 		// Set path parameters
-		for key, value := range params {
-			ctx.Set("param:"+key, value)
+		if len(params) > 0 {
+			names := make([]string, 0, len(params))
+			values := make([]string, 0, len(params))
+			for key, value := range params {
+				names = append(names, key)
+				values = append(values, value)
+			}
+			ctx.SetParamNames(names...)
+			ctx.SetParamValues(values...)
 		}
-		
+
 		if err := handler(ctx); err != nil {
-			// Handle error - this should be improved with proper error handling
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			// Handle error - check if it's an HTTPError
+			if he, ok := err.(*context.HTTPError); ok {
+				// Write the proper HTTP error response
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(he.Code)
+				response := map[string]interface{}{
+					"message": he.Message,
+				}
+				if encErr := json.NewEncoder(w).Encode(response); encErr != nil {
+					// Fall back to plain text if JSON encoding fails
+					http.Error(w, he.Error(), he.Code)
+				}
+			} else {
+				// Generic error handling
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
 		}
 	} else {
 		http.NotFound(w, req)
@@ -209,37 +241,38 @@ func (r *gortexRouter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 func (r *gortexRouter) findRoute(method, path string) (middleware.HandlerFunc, map[string]string) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	root := r.trees[method]
 	if root == nil {
 		return nil, nil
 	}
-	
+
 	segments := strings.Split(strings.Trim(path, "/"), "/")
 	params := make(map[string]string)
-	
+
 	handler, _ := r.searchTree(root, segments, 0, params)
 	return handler, params
 }
 
 // searchTree recursively searches the route tree
 func (r *gortexRouter) searchTree(node *routeNode, segments []string, index int, params map[string]string) (middleware.HandlerFunc, []middleware.MiddlewareFunc) {
-	if index >= len(segments) {
+	// Check if we've processed all segments or if this is root path
+	if index >= len(segments) || (len(segments) == 1 && segments[0] == "") {
 		if node.handler != nil {
 			return node.handler, node.middlewares
 		}
 		return nil, nil
 	}
-	
+
 	segment := segments[index]
-	
+
 	// Try static route first
 	if child, exists := node.children[segment]; exists {
 		if handler, middlewares := r.searchTree(child, segments, index+1, params); handler != nil {
 			return handler, middlewares
 		}
 	}
-	
+
 	// Try parameter route
 	if node.paramChild != nil {
 		params[node.paramChild.paramName] = segment
@@ -248,13 +281,17 @@ func (r *gortexRouter) searchTree(node *routeNode, segments []string, index int,
 		}
 		delete(params, node.paramChild.paramName)
 	}
-	
+
 	// Try wildcard route
 	if node.wildChild != nil {
+		// Capture all remaining segments as the wildcard value
+		remainingPath := strings.Join(segments[index:], "/")
+		params["*"] = remainingPath
 		if handler, middlewares := r.searchTree(node.wildChild, segments, len(segments), params); handler != nil {
 			return handler, middlewares
 		}
+		delete(params, "*")
 	}
-	
+
 	return nil, nil
 }

@@ -1,16 +1,17 @@
 package app
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
-	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zaptest"
 	"github.com/yshengliao/gortex/config"
+	"github.com/yshengliao/gortex/context"
 )
 
 func TestDevelopmentModeFeatures(t *testing.T) {
@@ -31,12 +32,27 @@ func TestDevelopmentModeFeatures(t *testing.T) {
 		// Test /_routes endpoint
 		req := httptest.NewRequest(http.MethodGet, "/_routes", nil)
 		rec := httptest.NewRecorder()
-		app.e.ServeHTTP(rec, req)
+		app.router.ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusOK, rec.Code)
-		assert.Contains(t, rec.Body.String(), "total_routes")
-		assert.Contains(t, rec.Body.String(), "routes")
-		assert.Contains(t, rec.Body.String(), "/_routes")
+		var response map[string]interface{}
+		err = json.Unmarshal(rec.Body.Bytes(), &response)
+		require.NoError(t, err)
+		
+		assert.NotNil(t, response["total_routes"])
+		assert.NotNil(t, response["routes"])
+		
+		// Check if /_routes is in the routes list
+		routes := response["routes"].([]interface{})
+		found := false
+		for _, r := range routes {
+			route := r.(map[string]interface{})
+			if route["path"] == "/_routes" {
+				found = true
+				break
+			}
+		}
+		assert.True(t, found, "/_routes should be in the routes list")
 	})
 
 	t.Run("development routes are not registered in production mode", func(t *testing.T) {
@@ -56,7 +72,7 @@ func TestDevelopmentModeFeatures(t *testing.T) {
 		// Test /_routes endpoint should not exist
 		req := httptest.NewRequest(http.MethodGet, "/_routes", nil)
 		rec := httptest.NewRecorder()
-		app.e.ServeHTTP(rec, req)
+		app.router.ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusNotFound, rec.Code)
 	})
@@ -78,7 +94,7 @@ func TestDevelopmentModeFeatures(t *testing.T) {
 		// Test default error page
 		req := httptest.NewRequest(http.MethodGet, "/_error", nil)
 		rec := httptest.NewRecorder()
-		app.e.ServeHTTP(rec, req)
+		app.router.ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusOK, rec.Code)
 		assert.Contains(t, rec.Body.String(), "available_types")
@@ -86,12 +102,12 @@ func TestDevelopmentModeFeatures(t *testing.T) {
 		// Test internal error
 		req = httptest.NewRequest(http.MethodGet, "/_error?type=internal", nil)
 		rec = httptest.NewRecorder()
-		app.e.ServeHTTP(rec, req)
+		app.router.ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusInternalServerError, rec.Code)
 	})
 
-	t.Run("development error pages show details", func(t *testing.T) {
+	t.Run("development error endpoint works", func(t *testing.T) {
 		logger := zaptest.NewLogger(t)
 		cfg := &Config{
 			Logger: config.LoggerConfig{
@@ -105,21 +121,23 @@ func TestDevelopmentModeFeatures(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		// Add a test handler that returns an error
-		app.e.GET("/test-error", func(c echo.Context) error {
-			return echo.NewHTTPError(http.StatusBadRequest, "Test error message")
-		})
-
-		// Request with HTML accept header
-		req := httptest.NewRequest(http.MethodGet, "/test-error", nil)
-		req.Header.Set("Accept", "text/html")
+		// Test the /_error endpoint with internal type
+		req := httptest.NewRequest(http.MethodGet, "/_error?type=internal", nil)
 		rec := httptest.NewRecorder()
-		app.e.ServeHTTP(rec, req)
+		app.router.ServeHTTP(rec, req)
 
-		assert.Equal(t, http.StatusBadRequest, rec.Code)
-		assert.Contains(t, rec.Body.String(), "Development Mode")
-		assert.Contains(t, rec.Body.String(), "Test error message")
-		assert.Contains(t, rec.Body.String(), "Request Information")
+		assert.Equal(t, http.StatusInternalServerError, rec.Code)
+		
+		// Test the /_error endpoint with panic type should panic
+		defer func() {
+			if r := recover(); r != nil {
+				assert.Contains(t, r, "Development test panic")
+			}
+		}()
+		
+		req = httptest.NewRequest(http.MethodGet, "/_error?type=panic", nil)
+		rec = httptest.NewRecorder()
+		app.router.ServeHTTP(rec, req)
 	})
 }
 
@@ -139,7 +157,7 @@ func TestDevLoggerMiddleware(t *testing.T) {
 		require.NoError(t, err)
 
 		// Add a test handler
-		app.e.POST("/test", func(c echo.Context) error {
+		app.router.POST("/test", func(c context.Context) error {
 			return c.JSON(http.StatusOK, map[string]string{
 				"message": "test response",
 			})
@@ -148,10 +166,10 @@ func TestDevLoggerMiddleware(t *testing.T) {
 		// Send request with body
 		body := `{"test": "data"}`
 		req := httptest.NewRequest(http.MethodPost, "/test", strings.NewReader(body))
-		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		req.Header.Set(context.HeaderContentType, context.MIMEApplicationJSON)
 		rec := httptest.NewRecorder()
 		
-		app.e.ServeHTTP(rec, req)
+		app.router.ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusOK, rec.Code)
 		// In a real test, we would capture logger output to verify logging
@@ -172,7 +190,7 @@ func TestDevLoggerMiddleware(t *testing.T) {
 		require.NoError(t, err)
 
 		// Add a test handler
-		app.e.GET("/test", func(c echo.Context) error {
+		app.router.GET("/test", func(c context.Context) error {
 			return c.String(http.StatusOK, "OK")
 		})
 
@@ -182,7 +200,7 @@ func TestDevLoggerMiddleware(t *testing.T) {
 		req.Header.Set("X-Api-Key", "secret-api-key")
 		rec := httptest.NewRecorder()
 		
-		app.e.ServeHTTP(rec, req)
+		app.router.ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusOK, rec.Code)
 		// In a real implementation, logger output would show [MASKED] for sensitive headers

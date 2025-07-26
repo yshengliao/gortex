@@ -2,19 +2,17 @@ package middleware
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"html/template"
-	"io"
 	"net/http"
 	"runtime"
 	"strings"
 
-	"github.com/labstack/echo/v4"
+	"github.com/yshengliao/gortex/context"
 )
 
-// DevErrorPageConfig defines the config for development error page middleware
-type DevErrorPageConfig struct {
+// GortexDevErrorPageConfig defines the config for development error page middleware
+type GortexDevErrorPageConfig struct {
 	// ShowStackTrace shows stack trace in error page
 	ShowStackTrace bool
 
@@ -25,220 +23,116 @@ type DevErrorPageConfig struct {
 	StackTraceLimit int
 }
 
-// DefaultDevErrorPageConfig returns default config
-var DefaultDevErrorPageConfig = DevErrorPageConfig{
+// DefaultGortexDevErrorPageConfig returns default config
+var DefaultGortexDevErrorPageConfig = GortexDevErrorPageConfig{
 	ShowStackTrace:     true,
 	ShowRequestDetails: true,
 	StackTraceLimit:    10,
 }
 
-// DevErrorPage returns a development error page middleware
-func DevErrorPage() echo.MiddlewareFunc {
-	return DevErrorPageWithConfig(DefaultDevErrorPageConfig)
+// ErrorInfo contains detailed error information
+type ErrorInfo struct {
+	Status         int                 `json:"status"`
+	StatusText     string              `json:"status_text"`
+	Message        string              `json:"message"`
+	Type           string              `json:"type"`
+	StackTrace     string              `json:"stack_trace"`
+	RequestDetails map[string]string   `json:"request_details"`
+	Headers        map[string][]string `json:"headers"`
 }
 
-// DevErrorPageWithConfig returns a development error page middleware with config
-func DevErrorPageWithConfig(config DevErrorPageConfig) echo.MiddlewareFunc {
+// GortexDevErrorPage returns a development error page middleware
+func GortexDevErrorPage() MiddlewareFunc {
+	return GortexDevErrorPageWithConfig(DefaultGortexDevErrorPageConfig)
+}
+
+// GortexDevErrorPageWithConfig returns a development error page middleware with config
+func GortexDevErrorPageWithConfig(config GortexDevErrorPageConfig) MiddlewareFunc {
 	// Set defaults
 	if config.StackTraceLimit == 0 {
-		config.StackTraceLimit = DefaultDevErrorPageConfig.StackTraceLimit
+		config.StackTraceLimit = DefaultGortexDevErrorPageConfig.StackTraceLimit
 	}
 
-	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
-			// Capture original writer
-			originalWriter := c.Response().Writer
-			
-			// Create response capture
-			buf := new(bytes.Buffer)
-			tee := io.MultiWriter(originalWriter, buf)
-			c.Response().Writer = &devErrorResponseWriter{
-				Writer:         tee,
-				ResponseWriter: originalWriter,
-				statusCode:     http.StatusOK,
-				buffer:         buf,
-			}
-
-			// Defer to catch panics
-			defer func() {
-				if r := recover(); r != nil {
-					err := fmt.Errorf("panic: %v", r)
-					
-					// Get stack trace
-					stackTrace := ""
-					if config.ShowStackTrace {
-						stackTrace = getStackTrace(config.StackTraceLimit)
-					}
-
-					// Clear buffer and render error page
-					buf.Reset()
-					c.Response().Writer = originalWriter
-					renderErrorPage(c, http.StatusInternalServerError, err, stackTrace, config)
-				}
-			}()
-
-			// Process request
+	return func(next HandlerFunc) HandlerFunc {
+		return func(c context.Context) error {
+			// Execute the next handler
 			err := next(c)
-			
-			// Get actual status code
-			rw := c.Response().Writer.(*devErrorResponseWriter)
-			status := rw.statusCode
-			
-			// Check if we should render error page
-			if status >= 400 && err == nil {
-				// Try to recreate error from response
-				var errorMsg string
-				if buf.Len() > 0 {
-					// Try to parse JSON error response
-					var jsonResp map[string]any
-					if json.Unmarshal(buf.Bytes(), &jsonResp) == nil {
-						if errObj, ok := jsonResp["error"].(map[string]any); ok {
-							if msg, ok := errObj["message"].(string); ok {
-								errorMsg = msg
-							}
-						}
-					}
-				}
-				if errorMsg == "" {
-					errorMsg = http.StatusText(status)
-				}
-				err = fmt.Errorf("%s", errorMsg)
-			}
-			
-			if err != nil || status >= 400 {
-				// Check if client accepts HTML
-				accept := c.Request().Header.Get("Accept")
-				if strings.Contains(accept, "text/html") {
-					// Get stack trace for 500 errors
-					stackTrace := ""
-					if status == http.StatusInternalServerError && config.ShowStackTrace {
-						stackTrace = getStackTrace(config.StackTraceLimit)
-					}
 
-					// Clear buffer and render error page
-					buf.Reset()
-					c.Response().Writer = originalWriter
-					c.Response().Committed = false
-					renderErrorPage(c, status, err, stackTrace, config)
-					return nil
-				}
+			// If no error, continue normally
+			if err == nil {
+				return nil
 			}
 
-			// Restore original writer
-			c.Response().Writer = originalWriter
-			
-			return err
+			// Extract error information
+			errorInfo := extractErrorInfo(err, c, config)
+
+			// Check if client accepts HTML
+			acceptHeader := c.Request().Header.Get("Accept")
+			if strings.Contains(acceptHeader, "text/html") {
+				return renderHTMLErrorPage(c, errorInfo)
+			}
+
+			// Return JSON error for API requests
+			return c.JSON(http.StatusInternalServerError, map[string]interface{}{
+				"error":   errorInfo.Message,
+				"details": errorInfo,
+			})
 		}
 	}
 }
 
-// devErrorResponseWriter wraps http.ResponseWriter to capture status code
-type devErrorResponseWriter struct {
-	io.Writer
-	http.ResponseWriter
-	statusCode int
-	buffer     *bytes.Buffer
-}
-
-func (w *devErrorResponseWriter) WriteHeader(code int) {
-	w.statusCode = code
-	w.ResponseWriter.WriteHeader(code)
-}
-
-func (w *devErrorResponseWriter) Write(b []byte) (int, error) {
-	if w.statusCode == 0 {
-		w.statusCode = http.StatusOK
+// extractErrorInfo extracts detailed error information
+func extractErrorInfo(err error, c context.Context, config GortexDevErrorPageConfig) *ErrorInfo {
+	errorInfo := &ErrorInfo{
+		Status:     http.StatusInternalServerError,
+		StatusText: http.StatusText(http.StatusInternalServerError),
+		Message:    err.Error(),
+		Type:       fmt.Sprintf("%T", err),
 	}
-	return w.Writer.Write(b)
+
+	// Extract stack trace if enabled
+	if config.ShowStackTrace {
+		errorInfo.StackTrace = getGortexStackTrace(config.StackTraceLimit)
+	}
+
+	// Extract request details if enabled
+	if config.ShowRequestDetails {
+		req := c.Request()
+		errorInfo.RequestDetails = map[string]string{
+			"method":      req.Method,
+			"url":         req.URL.String(),
+			"remote_addr": req.RemoteAddr,
+			"user_agent":  req.UserAgent(),
+			"referer":     req.Referer(),
+		}
+		errorInfo.Headers = req.Header
+	}
+
+	return errorInfo
 }
 
-// getStackTrace returns the current stack trace
-func getStackTrace(limit int) string {
+// getGortexStackTrace captures the current stack trace
+func getGortexStackTrace(limit int) string {
 	buf := make([]byte, 4096)
 	n := runtime.Stack(buf, false)
 	stack := string(buf[:n])
-	
+
 	// Parse and limit stack frames
 	lines := strings.Split(stack, "\n")
 	if len(lines) > limit*2 { // Each frame is typically 2 lines
 		lines = lines[:limit*2]
 		lines = append(lines, "... (truncated)")
 	}
-	
+
 	return strings.Join(lines, "\n")
 }
 
-// renderErrorPage renders a development error page
-func renderErrorPage(c echo.Context, status int, err error, stackTrace string, config DevErrorPageConfig) {
-	// Check if response was already written
-	if c.Response().Committed {
-		return
-	}
-	
-	// Check if client accepts HTML
-	accept := c.Request().Header.Get("Accept")
-	if !strings.Contains(accept, "text/html") {
-		// Return JSON error for non-HTML clients
-		c.JSON(status, map[string]any{
-			"error":   err.Error(),
-			"status":  status,
-			"path":    c.Request().URL.Path,
-			"method":  c.Request().Method,
-		})
-		return
-	}
-
-	// Create error page data
-	data := struct {
-		Status             int
-		StatusText         string
-		Error              string
-		Method             string
-		Path               string
-		QueryString        string
-		RequestID          string
-		StackTrace         string
-		ShowStackTrace     bool
-		ShowRequestDetails bool
-		Headers            map[string]string
-		RemoteIP           string
-		UserAgent          string
-	}{
-		Status:             status,
-		StatusText:         http.StatusText(status),
-		Error:              err.Error(),
-		Method:             c.Request().Method,
-		Path:               c.Request().URL.Path,
-		QueryString:        c.Request().URL.RawQuery,
-		RequestID:          c.Response().Header().Get(echo.HeaderXRequestID),
-		StackTrace:         stackTrace,
-		ShowStackTrace:     config.ShowStackTrace && stackTrace != "",
-		ShowRequestDetails: config.ShowRequestDetails,
-		RemoteIP:           c.RealIP(),
-		UserAgent:          c.Request().UserAgent(),
-	}
-
-	// Collect headers if showing request details
-	if config.ShowRequestDetails {
-		data.Headers = make(map[string]string)
-		for key, values := range c.Request().Header {
-			data.Headers[key] = strings.Join(values, ", ")
-		}
-	}
-
-	// Render HTML error page
-	c.Response().Header().Set(echo.HeaderContentType, echo.MIMETextHTMLCharsetUTF8)
-	c.Response().WriteHeader(status)
-	
-	tmpl := template.Must(template.New("error").Parse(errorPageTemplate))
-	tmpl.Execute(c.Response(), data)
-}
-
-// errorPageTemplate is the HTML template for error pages
-const errorPageTemplate = `<!DOCTYPE html>
+// renderHTMLErrorPage renders an HTML error page
+func renderHTMLErrorPage(c context.Context, errorInfo *ErrorInfo) error {
+	tmpl := `<!DOCTYPE html>
 <html>
 <head>
-    <title>Error {{.Status}}: {{.StatusText}}</title>
+    <title>Gortex Error - {{.Message}}</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -343,47 +237,13 @@ const errorPageTemplate = `<!DOCTYPE html>
                 <strong>Development Mode:</strong> This detailed error page is only shown in development mode.
             </div>
             
-            <div class="error-message">{{.Error}}</div>
+            <div class="error-message">{{.Message}}</div>
             
+            {{if .RequestDetails}}
             <div class="section">
                 <h2>Request Information</h2>
                 <table class="info-table">
-                    <tr>
-                        <td>Method</td>
-                        <td>{{.Method}}</td>
-                    </tr>
-                    <tr>
-                        <td>Path</td>
-                        <td>{{.Path}}</td>
-                    </tr>
-                    {{if .QueryString}}
-                    <tr>
-                        <td>Query String</td>
-                        <td>{{.QueryString}}</td>
-                    </tr>
-                    {{end}}
-                    {{if .RequestID}}
-                    <tr>
-                        <td>Request ID</td>
-                        <td>{{.RequestID}}</td>
-                    </tr>
-                    {{end}}
-                    <tr>
-                        <td>Remote IP</td>
-                        <td>{{.RemoteIP}}</td>
-                    </tr>
-                    <tr>
-                        <td>User Agent</td>
-                        <td>{{.UserAgent}}</td>
-                    </tr>
-                </table>
-            </div>
-            
-            {{if .ShowRequestDetails}}
-            <div class="section">
-                <h2>Request Headers</h2>
-                <table class="headers-table">
-                    {{range $key, $value := .Headers}}
+                    {{range $key, $value := .RequestDetails}}
                     <tr>
                         <td>{{$key}}</td>
                         <td>{{$value}}</td>
@@ -393,7 +253,23 @@ const errorPageTemplate = `<!DOCTYPE html>
             </div>
             {{end}}
             
-            {{if .ShowStackTrace}}
+            {{if .Headers}}
+            <div class="section">
+                <h2>Request Headers</h2>
+                <table class="headers-table">
+                    {{range $name, $values := .Headers}}
+                    {{range $values}}
+                    <tr>
+                        <td>{{$name}}</td>
+                        <td>{{.}}</td>
+                    </tr>
+                    {{end}}
+                    {{end}}
+                </table>
+            </div>
+            {{end}}
+            
+            {{if .StackTrace}}
             <div class="section">
                 <h2>Stack Trace</h2>
                 <div class="stack-trace">{{.StackTrace}}</div>
@@ -403,3 +279,82 @@ const errorPageTemplate = `<!DOCTYPE html>
     </div>
 </body>
 </html>`
+
+	t, err := template.New("error").Parse(tmpl)
+	if err != nil {
+		// Fallback to simple error response
+		return c.String(http.StatusInternalServerError, fmt.Sprintf("Error: %s", errorInfo.Message))
+	}
+
+	var buf bytes.Buffer
+	if err := t.Execute(&buf, errorInfo); err != nil {
+		// Fallback to simple error response
+		return c.String(http.StatusInternalServerError, fmt.Sprintf("Error: %s", errorInfo.Message))
+	}
+
+	c.Response().Header().Set("Content-Type", "text/html; charset=utf-8")
+	return c.String(http.StatusInternalServerError, buf.String())
+}
+
+// RecoverWithErrorPage is a recovery middleware that shows error pages
+func RecoverWithErrorPage() MiddlewareFunc {
+	return RecoverWithErrorPageConfig(DefaultGortexDevErrorPageConfig)
+}
+
+// RecoverWithErrorPageConfig is a recovery middleware with custom config
+func RecoverWithErrorPageConfig(config GortexDevErrorPageConfig) MiddlewareFunc {
+	return func(next HandlerFunc) HandlerFunc {
+		return func(c context.Context) (err error) {
+			defer func() {
+				if r := recover(); r != nil {
+					var recoveredErr error
+					switch v := r.(type) {
+					case error:
+						recoveredErr = v
+					case string:
+						recoveredErr = fmt.Errorf("%s", v)
+					default:
+						recoveredErr = fmt.Errorf("%v", v)
+					}
+
+					// Create error info for panic
+					errorInfo := &ErrorInfo{
+						Status:     http.StatusInternalServerError,
+						StatusText: http.StatusText(http.StatusInternalServerError),
+						Message:    recoveredErr.Error(),
+						Type:       "panic",
+					}
+
+					if config.ShowStackTrace {
+						errorInfo.StackTrace = getGortexStackTrace(config.StackTraceLimit)
+					}
+
+					if config.ShowRequestDetails {
+						req := c.Request()
+						errorInfo.RequestDetails = map[string]string{
+							"method":      req.Method,
+							"url":         req.URL.String(),
+							"remote_addr": req.RemoteAddr,
+							"user_agent":  req.UserAgent(),
+							"referer":     req.Referer(),
+						}
+						errorInfo.Headers = req.Header
+					}
+
+					// Check if client accepts HTML
+					acceptHeader := c.Request().Header.Get("Accept")
+					if strings.Contains(acceptHeader, "text/html") {
+						err = renderHTMLErrorPage(c, errorInfo)
+					} else {
+						err = c.JSON(http.StatusInternalServerError, map[string]interface{}{
+							"error":   errorInfo.Message,
+							"details": errorInfo,
+						})
+					}
+				}
+			}()
+
+			return next(c)
+		}
+	}
+}

@@ -6,7 +6,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/labstack/echo/v4"
+	gortexContext "github.com/yshengliao/gortex/context"
+	"github.com/yshengliao/gortex/middleware"
 )
 
 // Span represents a trace span
@@ -140,10 +141,10 @@ func SpanFromContext(ctx context.Context) *Span {
 	return nil
 }
 
-// TracingMiddleware creates an Echo middleware for distributed tracing
-func TracingMiddleware(tracer Tracer) echo.MiddlewareFunc {
-	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+// TracingMiddleware creates a Gortex middleware for distributed tracing
+func TracingMiddleware(tracer Tracer) middleware.MiddlewareFunc {
+	return func(next middleware.HandlerFunc) middleware.HandlerFunc {
+		return func(c gortexContext.Context) error {
 			// Extract trace context from headers
 			traceID := c.Request().Header.Get("X-Trace-ID")
 			if traceID == "" {
@@ -183,7 +184,7 @@ func TracingMiddleware(tracer Tracer) echo.MiddlewareFunc {
 			
 			// Add response tags
 			tracer.AddTags(span, map[string]string{
-				"http.status_code": fmt.Sprintf("%d", c.Response().Status),
+				"http.status_code": fmt.Sprintf("%d", c.Response().Status()),
 			})
 			
 			// Finish span

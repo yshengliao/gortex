@@ -10,7 +10,7 @@ import (
 
 	"github.com/go-playground/validator/v10"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/labstack/echo/v4"
+	gortexContext "github.com/yshengliao/gortex/context"
 )
 
 // ParameterBinder handles automatic parameter binding from HTTP requests
@@ -41,7 +41,7 @@ func NewParameterBinderWithContext(ctx *Context) *ParameterBinder {
 }
 
 // BindMethodParams binds HTTP request parameters to method parameters
-func (pb *ParameterBinder) BindMethodParams(c echo.Context, method reflect.Method) ([]reflect.Value, error) {
+func (pb *ParameterBinder) BindMethodParams(c gortexContext.Context, method reflect.Method) ([]reflect.Value, error) {
 	methodType := method.Type
 	numParams := methodType.NumIn()
 	params := make([]reflect.Value, 0, numParams)
@@ -50,8 +50,8 @@ func (pb *ParameterBinder) BindMethodParams(c echo.Context, method reflect.Metho
 	for i := 1; i < numParams; i++ {
 		paramType := methodType.In(i)
 		
-		// Handle echo.Context parameter
-		if paramType == reflect.TypeOf((*echo.Context)(nil)).Elem() {
+		// Handle gortex.Context parameter
+		if paramType == reflect.TypeOf((*gortexContext.Context)(nil)).Elem() {
 			params = append(params, reflect.ValueOf(c))
 			continue
 		}
@@ -98,7 +98,7 @@ func (pb *ParameterBinder) BindMethodParams(c echo.Context, method reflect.Metho
 }
 
 // bindParameter binds a single parameter from the request
-func (pb *ParameterBinder) bindParameter(c echo.Context, paramValue reflect.Value) error {
+func (pb *ParameterBinder) bindParameter(c gortexContext.Context, paramValue reflect.Value) error {
 	paramType := paramValue.Type()
 	isPtr := paramType.Kind() == reflect.Ptr
 	
@@ -120,7 +120,7 @@ func (pb *ParameterBinder) bindParameter(c echo.Context, paramValue reflect.Valu
 }
 
 // bindStruct binds a struct from the request
-func (pb *ParameterBinder) bindStruct(c echo.Context, structValue reflect.Value) error {
+func (pb *ParameterBinder) bindStruct(c gortexContext.Context, structValue reflect.Value) error {
 	structType := structValue.Type()
 	if structType.Kind() == reflect.Ptr {
 		structType = structType.Elem()
@@ -178,7 +178,7 @@ func (pb *ParameterBinder) bindStruct(c echo.Context, structValue reflect.Value)
 }
 
 // bindField binds a single struct field
-func (pb *ParameterBinder) bindField(c echo.Context, fieldValue reflect.Value, field reflect.StructField, name string) error {
+func (pb *ParameterBinder) bindField(c gortexContext.Context, fieldValue reflect.Value, field reflect.StructField, name string) error {
 	// Check binding source from tag
 	parts := strings.Split(field.Tag.Get(pb.tagName), ",")
 	source := "auto" // default to auto-detection
@@ -211,7 +211,7 @@ func (pb *ParameterBinder) bindField(c echo.Context, fieldValue reflect.Value, f
 			}
 		}
 	case "context":
-		// Try to get from echo context
+		// Try to get from gortex context
 		if val := c.Get(name); val != nil {
 			value = fmt.Sprintf("%v", val)
 			found = true
@@ -235,7 +235,7 @@ func (pb *ParameterBinder) bindField(c echo.Context, fieldValue reflect.Value, f
 }
 
 // bindPrimitive binds a primitive type from path or query parameters
-func (pb *ParameterBinder) bindPrimitive(c echo.Context, value reflect.Value) error {
+func (pb *ParameterBinder) bindPrimitive(c gortexContext.Context, value reflect.Value) error {
 	// For primitive types, we need to determine the parameter name
 	// This is a simplified approach - in real usage, you'd need method parameter names
 	
@@ -361,8 +361,8 @@ func (pb *ParameterBinder) getFromDI(paramType reflect.Type) (reflect.Value, err
 	return reflect.Value{}, fmt.Errorf("service %v not found in DI container", paramType)
 }
 
-// getJWTClaims extracts JWT claims from the echo context
-func (pb *ParameterBinder) getJWTClaims(c echo.Context) jwt.MapClaims {
+// getJWTClaims extracts JWT claims from the gortex context
+func (pb *ParameterBinder) getJWTClaims(c gortexContext.Context) jwt.MapClaims {
 	// Try to get JWT token from context (commonly set by JWT middleware)
 	if token := c.Get("user"); token != nil {
 		switch t := token.(type) {

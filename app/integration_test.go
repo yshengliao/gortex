@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	gortexContext "github.com/yshengliao/gortex/context"
 	"github.com/yshengliao/gortex/hub"
 	"go.uber.org/zap/zaptest"
 )
@@ -22,7 +22,7 @@ type TestHandlers struct {
 
 type TestHealthHandler struct{}
 
-func (h *TestHealthHandler) GET(c echo.Context) error {
+func (h *TestHealthHandler) GET(c gortexContext.Context) error {
 	return c.JSON(200, map[string]string{"status": "ok"})
 }
 
@@ -31,7 +31,7 @@ type TestWebSocketHandler struct {
 	Logger *testing.T
 }
 
-func (h *TestWebSocketHandler) HandleConnection(c echo.Context) error {
+func (h *TestWebSocketHandler) HandleConnection(c gortexContext.Context) error {
 	upgrader := websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
 			return true
@@ -63,7 +63,7 @@ func TestIntegrationGracefulShutdown(t *testing.T) {
 		
 		// Create config
 		cfg := &Config{}
-		cfg.Server.Address = ":0" // Random port
+		cfg.Server.Address = ":18080" // Fixed port for testing
 		
 		// Create handlers
 		handlers := &TestHandlers{
@@ -108,9 +108,9 @@ func TestIntegrationGracefulShutdown(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 		
 		// Get server address
-		addr := app.Echo().ListenerAddr()
-		require.NotNil(t, addr)
-		serverURL := "http://" + addr.String()
+		// For Gortex, we need to get the address from the server after it starts
+		// This is a temporary workaround - in production you'd use the configured address
+		serverURL := "http://localhost" + cfg.Server.Address
 		
 		// Test health endpoint
 		resp, err := http.Get(serverURL + "/health")

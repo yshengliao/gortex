@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/labstack/echo/v4"
+	"github.com/yshengliao/gortex/context"
 	"github.com/yshengliao/gortex/pkg/errors"
 	"github.com/yshengliao/gortex/response"
 )
@@ -13,7 +13,7 @@ import (
 type UserHandler struct{}
 
 // Example: Basic validation error
-func (h *UserHandler) CreateUser(c echo.Context) error {
+func (h *UserHandler) CreateUser(c context.Context) error {
 	var req struct {
 		Email    string `json:"email" validate:"required,email"`
 		Password string `json:"password" validate:"required,min=8"`
@@ -48,7 +48,7 @@ func (h *UserHandler) CreateUser(c echo.Context) error {
 }
 
 // Example: Authentication errors
-func (h *UserHandler) Login(c echo.Context) error {
+func (h *UserHandler) Login(c context.Context) error {
 	var req struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
@@ -90,7 +90,7 @@ func (h *UserHandler) Login(c echo.Context) error {
 }
 
 // Example: Resource not found
-func (h *UserHandler) GetUser(c echo.Context) error {
+func (h *UserHandler) GetUser(c context.Context) error {
 	userID := c.Param("id")
 	
 	user, err := h.findUserByID(userID)
@@ -102,7 +102,7 @@ func (h *UserHandler) GetUser(c echo.Context) error {
 }
 
 // Example: Business logic errors
-func (h *UserHandler) TransferCredits(c echo.Context) error {
+func (h *UserHandler) TransferCredits(c context.Context) error {
 	var req struct {
 		FromUserID string  `json:"from_user_id"`
 		ToUserID   string  `json:"to_user_id"`
@@ -151,7 +151,7 @@ func (h *UserHandler) TransferCredits(c echo.Context) error {
 }
 
 // Example: Rate limiting
-func (h *UserHandler) SendVerificationEmail(c echo.Context) error {
+func (h *UserHandler) SendVerificationEmail(c context.Context) error {
 	userIDValue := c.Get("user_id")
 	if userIDValue == nil {
 		return errors.UnauthorizedError(c, "User not authenticated")
@@ -172,7 +172,7 @@ func (h *UserHandler) SendVerificationEmail(c echo.Context) error {
 }
 
 // Example: System errors with proper error handling
-func (h *UserHandler) UpdateProfile(c echo.Context) error {
+func (h *UserHandler) UpdateProfile(c context.Context) error {
 	userID := c.Param("id")
 	
 	var updates map[string]interface{}
@@ -204,7 +204,7 @@ func (h *UserHandler) UpdateProfile(c echo.Context) error {
 }
 
 // Example: Conflict errors
-func (h *UserHandler) ChangeEmail(c echo.Context) error {
+func (h *UserHandler) ChangeEmail(c context.Context) error {
 	userID := c.Param("id")
 	
 	var req struct {
@@ -229,7 +229,7 @@ func (h *UserHandler) ChangeEmail(c echo.Context) error {
 }
 
 // Example: Custom error codes
-func (h *UserHandler) ActivateFeature(c echo.Context) error {
+func (h *UserHandler) ActivateFeature(c context.Context) error {
 	userID := c.Param("id")
 	feature := c.Param("feature")
 	
@@ -314,9 +314,9 @@ type User struct {
 }
 
 // Example: Error handling in middleware
-func ErrorHandlingMiddleware() echo.MiddlewareFunc {
-	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+func ErrorHandlingMiddleware() context.MiddlewareFunc {
+	return func(next context.HandlerFunc) context.HandlerFunc {
+		return func(c context.Context) error {
 			err := next(c)
 			if err != nil {
 				// Check if it's already an ErrorResponse
@@ -325,8 +325,8 @@ func ErrorHandlingMiddleware() echo.MiddlewareFunc {
 					return errResp.Send(c, http.StatusInternalServerError)
 				}
 				
-				// Check if it's an Echo HTTP error
-				if he, ok := err.(*echo.HTTPError); ok {
+				// Check if it's a Gortex HTTP error
+				if he, ok := err.(*context.HTTPError); ok {
 					code := errors.CodeInternalServerError
 					switch he.Code {
 					case http.StatusBadRequest:

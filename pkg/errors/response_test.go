@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/labstack/echo/v4"
+	"github.com/yshengliao/gortex/context"
 )
 
 func TestNewErrorResponse(t *testing.T) {
@@ -89,15 +89,14 @@ func TestErrorResponseChaining(t *testing.T) {
 }
 
 func TestErrorResponseSend(t *testing.T) {
-	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
+	ctx := context.NewContext(req, rec)
 	
 	err := New(CodeValidationFailed, "Test error").
 		WithRequestID("test-123")
 	
-	if sendErr := err.Send(c, http.StatusBadRequest); sendErr != nil {
+	if sendErr := err.Send(ctx, http.StatusBadRequest); sendErr != nil {
 		t.Errorf("Send() returned error: %v", sendErr)
 	}
 	
@@ -107,30 +106,28 @@ func TestErrorResponseSend(t *testing.T) {
 }
 
 func TestGetRequestID(t *testing.T) {
-	e := echo.New()
-	
 	tests := []struct {
 		name      string
-		setupFunc func(*echo.Context)
+		setupFunc func(req *http.Request, rec *httptest.ResponseRecorder)
 		expected  string
 	}{
 		{
 			name: "From Response Header",
-			setupFunc: func(c *echo.Context) {
-				(*c).Response().Header().Set(echo.HeaderXRequestID, "resp-123")
+			setupFunc: func(req *http.Request, rec *httptest.ResponseRecorder) {
+				rec.Header().Set(context.HeaderXRequestID, "resp-123")
 			},
 			expected: "resp-123",
 		},
 		{
 			name: "From Request Header",
-			setupFunc: func(c *echo.Context) {
-				(*c).Request().Header.Set(echo.HeaderXRequestID, "req-123")
+			setupFunc: func(req *http.Request, rec *httptest.ResponseRecorder) {
+				req.Header.Set(context.HeaderXRequestID, "req-123")
 			},
 			expected: "req-123",
 		},
 		{
 			name:      "No Request ID",
-			setupFunc: func(c *echo.Context) {},
+			setupFunc: func(req *http.Request, rec *httptest.ResponseRecorder) {},
 			expected:  "",
 		},
 	}
@@ -139,11 +136,12 @@ func TestGetRequestID(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/", nil)
 			rec := httptest.NewRecorder()
-			c := e.NewContext(req, rec)
 			
-			tt.setupFunc(&c)
+			tt.setupFunc(req, rec)
 			
-			if got := GetRequestID(c); got != tt.expected {
+			ctx := context.NewContext(req, rec)
+			
+			if got := GetRequestID(ctx); got != tt.expected {
 				t.Errorf("GetRequestID() = %v, want %v", got, tt.expected)
 			}
 		})

@@ -6,9 +6,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	gortexContext "github.com/yshengliao/gortex/context"
 	"github.com/yshengliao/gortex/observability"
 )
 
@@ -72,26 +72,29 @@ func TestSimpleTracer(t *testing.T) {
 }
 
 func TestTracingMiddleware(t *testing.T) {
-	e := echo.New()
 	tracer := observability.NewSimpleTracer()
 	
-	// Add tracing middleware
-	e.Use(observability.TracingMiddleware(tracer))
-	
-	// Add test handler that uses tracing
-	e.GET("/test", func(c echo.Context) error {
+	// Create a test handler
+	handler := func(c gortexContext.Context) error {
 		// Get span from context
 		span := observability.SpanFromContext(c.Request().Context())
 		assert.NotNil(t, span)
 		
 		return c.JSON(200, map[string]string{"trace_id": span.TraceID})
-	})
+	}
 	
-	// Make request
+	// Wrap with tracing middleware
+	wrappedHandler := observability.TracingMiddleware(tracer)(handler)
+	
+	// Create test context
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
 	rec := httptest.NewRecorder()
-	e.ServeHTTP(rec, req)
+	ctx := gortexContext.NewContext(req, rec)
 	
+	// Execute handler
+	err := wrappedHandler(ctx)
+	
+	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.NotEmpty(t, rec.Header().Get("X-Trace-ID"))
 }

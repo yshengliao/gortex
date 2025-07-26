@@ -8,9 +8,11 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yshengliao/gortex/context"
+	"github.com/yshengliao/gortex/router"
+	gortexMiddleware "github.com/yshengliao/gortex/middleware"
 	"go.uber.org/zap"
 )
 
@@ -33,25 +35,25 @@ type GameBetRequest struct {
 	Currency string  `json:"currency"`
 }
 
-// Traditional Echo handler for comparison
-func (h *AutoBindHandler) TraditionalGET(c echo.Context) error {
+// Traditional Gortex handler for comparison
+func (h *AutoBindHandler) TraditionalGET(c context.Context) error {
 	id := c.Param("id")
 	return c.JSON(200, map[string]string{"id": id, "method": "traditional"})
 }
 
 // New auto-binding handler - simple case
-func (h *AutoBindHandler) GET(c echo.Context, id int) error {
+func (h *AutoBindHandler) GET(c context.Context, id int) error {
 	return c.JSON(200, map[string]any{"id": id, "method": "auto-bind"})
 }
 
 // New auto-binding handler - struct binding
-func (h *AutoBindHandler) POST(c echo.Context, req *UserRequest) error {
+func (h *AutoBindHandler) POST(c context.Context, req *UserRequest) error {
 	h.Logger.Info("Auto-bound request", zap.Any("request", req))
 	return c.JSON(200, req)
 }
 
 // New auto-binding handler - complex binding
-func (h *AutoBindHandler) PlaceBet(c echo.Context, req *GameBetRequest) error {
+func (h *AutoBindHandler) PlaceBet(c context.Context, req *GameBetRequest) error {
 	h.Logger.Info("Placing bet", 
 		zap.String("game_id", req.GameID),
 		zap.Int("user_id", req.UserID),
@@ -73,12 +75,12 @@ type AutoGameHandler struct {
 	Logger *zap.Logger
 }
 
-func (h *AutoGameHandler) Users(c echo.Context, req *GameBetRequest) error {
+func (h *AutoGameHandler) Users(c context.Context, req *GameBetRequest) error {
 	return c.JSON(200, req)
 }
 
 func TestRouterWithAutoBinder(t *testing.T) {
-	e := echo.New()
+	r := router.NewGortexRouter()
 	logger, _ := zap.NewDevelopment()
 	ctx := NewContext()
 	Register(ctx, logger)
@@ -88,14 +90,14 @@ func TestRouterWithAutoBinder(t *testing.T) {
 	// Test traditional vs auto-binding
 	t.Run("primitive parameter binding", func(t *testing.T) {
 		// Register a single handler
-		err := registerHTTPHandlerWithMiddleware(e, "/test/:id", handler, 
-			reflect.TypeOf(handler), []echo.MiddlewareFunc{})
+		err := registerHTTPHandlerWithMiddleware(r, "/test/:id", handler, 
+			reflect.TypeOf(handler), []gortexMiddleware.MiddlewareFunc{})
 		require.NoError(t, err)
 
 		// Test the route
 		req := httptest.NewRequest(http.MethodGet, "/test/123", nil)
 		rec := httptest.NewRecorder()
-		e.ServeHTTP(rec, req)
+		r.ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusOK, rec.Code)
 		
@@ -121,16 +123,16 @@ func TestRouterWithAutoBinder(t *testing.T) {
 		rec := httptest.NewRecorder()
 		
 		// Manually set up context for testing
-		c := e.NewContext(req, rec)
-		c.SetPath("/test/:id")
-		c.SetParamNames("id")
-		c.SetParamValues("456")
+		ctx := context.NewContext(req, rec)
+		ctx.SetPath("/test/:id")
+		ctx.SetParamNames("id")
+		ctx.SetParamValues("456")
 
 		// Use createHandlerFunc to get proper binding
 		method, _ := reflect.TypeOf(handler).MethodByName("POST")
 		handlerFunc := createHandlerFunc(handler, method)
 		
-		err := handlerFunc(c)
+		err := handlerFunc(ctx)
 		require.NoError(t, err)
 
 		var result UserRequest
@@ -145,7 +147,7 @@ func TestRouterWithAutoBinder(t *testing.T) {
 }
 
 func TestRouterBinderIntegration(t *testing.T) {
-	e := echo.New()
+	r := router.NewGortexRouter()
 	logger, _ := zap.NewDevelopment()
 	ctx := NewContext()
 	Register(ctx, logger)
@@ -156,8 +158,9 @@ func TestRouterBinderIntegration(t *testing.T) {
 		Games: &AutoGameHandler{Logger: logger},
 	}
 
-	// Register routes
-	err := RegisterRoutes(e, handlers, ctx)
+	// Create a test app to register routes
+	testApp := &App{router: r, ctx: ctx}
+	err := RegisterRoutes(testApp, handlers)
 	require.NoError(t, err)
 
 	t.Run("nested route with auto binding", func(t *testing.T) {
@@ -173,7 +176,7 @@ func TestRouterBinderIntegration(t *testing.T) {
 			bytes.NewReader(bodyBytes))
 		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
-		e.ServeHTTP(rec, req)
+		r.ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusOK, rec.Code)
 		

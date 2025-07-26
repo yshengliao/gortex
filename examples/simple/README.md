@@ -18,7 +18,7 @@ No manual route registration needed! The framework automatically discovers route
 ### 2. Dynamic Parameters
 ```go
 // Route: /users/:id
-func (h *UserHandler) GET(c echo.Context) error {
+func (h *UserHandler) GET(c context.Context) error {
     id := c.Param("id")
     return c.JSON(200, map[string]interface{}{
         "id": id,

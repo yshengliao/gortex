@@ -16,8 +16,3 @@ type (
 	GortexMiddlewareFunc = gortexctx.MiddlewareFunc
 )
 
-// Context conversion functions
-var (
-	EchoToGortex = gortexctx.EchoContextToGortex
-	GortexToEcho = gortexctx.GortexContextToEcho
-)

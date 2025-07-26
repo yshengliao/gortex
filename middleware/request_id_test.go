@@ -75,7 +75,7 @@ func TestRequestIDWithExistingID(t *testing.T) {
 
 func TestRequestIDWithConfig(t *testing.T) {
 	customHeader := "X-Custom-Request-ID"
-	
+
 	config := RequestIDConfig{
 		TargetHeader: customHeader,
 		Generator: func() string {

@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/labstack/echo/v4"
+	"github.com/yshengliao/gortex/context"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -42,7 +42,7 @@ type ExtendedHandler struct {
 }
 
 // Method with validation
-func (h *ExtendedHandler) Login(c echo.Context, req *AuthRequest) error {
+func (h *ExtendedHandler) Login(c context.Context, req *AuthRequest) error {
 	return c.JSON(200, map[string]string{
 		"username": req.Username,
 		"message":  "Login successful",
@@ -50,12 +50,12 @@ func (h *ExtendedHandler) Login(c echo.Context, req *AuthRequest) error {
 }
 
 // Method with JWT claims binding
-func (h *ExtendedHandler) Profile(c echo.Context, req *ProfileRequest) error {
+func (h *ExtendedHandler) Profile(c context.Context, req *ProfileRequest) error {
 	return c.JSON(200, req)
 }
 
 // Method with DI service injection
-func (h *ExtendedHandler) ServiceMethod(c echo.Context, svc *UserService, req *ServiceRequest) error {
+func (h *ExtendedHandler) ServiceMethod(c context.Context, svc *UserService, req *ServiceRequest) error {
 	return c.JSON(200, map[string]string{
 		"service_name": svc.Name,
 		"request_name": req.Name,
@@ -63,7 +63,7 @@ func (h *ExtendedHandler) ServiceMethod(c echo.Context, svc *UserService, req *S
 }
 
 func TestParameterBinderValidation(t *testing.T) {
-	e := echo.New()
+	
 	binder := NewParameterBinder()
 	handler := &ExtendedHandler{}
 
@@ -77,11 +77,11 @@ func TestParameterBinderValidation(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewReader(bodyBytes))
 		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
+		ctx := context.NewContext(req, rec)
 
 		handlerType := reflect.TypeOf(handler)
 		method, _ := handlerType.MethodByName("Login")
-		params, err := binder.BindMethodParams(c, method)
+		params, err := binder.BindMethodParams(ctx, method)
 		require.NoError(t, err)
 		
 		authReq := params[1].Interface().(*AuthRequest)
@@ -99,18 +99,18 @@ func TestParameterBinderValidation(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewReader(bodyBytes))
 		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
+		ctx := context.NewContext(req, rec)
 
 		handlerType := reflect.TypeOf(handler)
 		method, _ := handlerType.MethodByName("Login")
-		_, err := binder.BindMethodParams(c, method)
+		_, err := binder.BindMethodParams(ctx, method)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "validation failed")
 	})
 }
 
 func TestParameterBinderJWTClaims(t *testing.T) {
-	e := echo.New()
+	
 	binder := NewParameterBinder()
 	handler := &ExtendedHandler{}
 
@@ -124,17 +124,17 @@ func TestParameterBinderJWTClaims(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/profile", nil)
 	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
+	ctx := context.NewContext(req, rec)
 	
 	// Set JWT token in context (as JWT middleware would do)
-	c.Set("user", token)
+	ctx.Set("user", token)
 	
 	// Set additional context value
-	c.Set("role", "admin")
+	ctx.Set("role", "admin")
 
 	handlerType := reflect.TypeOf(handler)
 	method, _ := handlerType.MethodByName("Profile")
-	params, err := binder.BindMethodParams(c, method)
+	params, err := binder.BindMethodParams(ctx, method)
 	require.NoError(t, err)
 
 	profile := params[1].Interface().(*ProfileRequest)
@@ -145,7 +145,7 @@ func TestParameterBinderJWTClaims(t *testing.T) {
 }
 
 func TestParameterBinderDI(t *testing.T) {
-	e := echo.New()
+	
 	
 	// Create DI context and register service
 	diContext := NewContext()
@@ -163,13 +163,13 @@ func TestParameterBinderDI(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/service", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
+	ctx := context.NewContext(req, rec)
 
 	handlerType := reflect.TypeOf(handler)
 	method, _ := handlerType.MethodByName("ServiceMethod")
-	params, err := binder.BindMethodParams(c, method)
+	params, err := binder.BindMethodParams(ctx, method)
 	require.NoError(t, err)
-	require.Len(t, params, 3) // echo.Context + *UserService + *ServiceRequest
+	require.Len(t, params, 3) // context.Context + *UserService + *ServiceRequest
 
 	// Check injected service
 	svc := params[1].Interface().(*UserService)
@@ -181,7 +181,7 @@ func TestParameterBinderDI(t *testing.T) {
 }
 
 func TestParameterBinderAllSources(t *testing.T) {
-	e := echo.New()
+	
 	
 	type CompleteRequest struct {
 		// Different binding sources
@@ -212,11 +212,11 @@ func TestParameterBinderAllSources(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer token123")
 	
 	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
-	c.SetParamNames("id")
-	c.SetParamValues("456")
-	c.Set("user", token)
-	c.Set("role", "moderator")
+	ctx := context.NewContext(req, rec)
+	ctx.SetParamNames("id")
+	ctx.SetParamValues("456")
+	ctx.Set("user", token)
+	ctx.Set("role", "moderator")
 
 	// Add JSON body for email field
 	jsonBody := map[string]string{
@@ -229,11 +229,11 @@ func TestParameterBinderAllSources(t *testing.T) {
 		bytes.NewReader(jsonBytes))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer token123")
-	c = e.NewContext(req, rec)
-	c.SetParamNames("id")
-	c.SetParamValues("456")
-	c.Set("user", token)
-	c.Set("role", "moderator")
+	ctx = context.NewContext(req, rec)
+	ctx.SetParamNames("id")
+	ctx.SetParamValues("456")
+	ctx.Set("user", token)
+	ctx.Set("role", "moderator")
 
 	binder := NewParameterBinder()
 	
@@ -241,7 +241,7 @@ func TestParameterBinderAllSources(t *testing.T) {
 	reqObj := &CompleteRequest{}
 	paramValue := reflect.ValueOf(reqObj)
 	
-	err := binder.bindParameter(c, paramValue)
+	err := binder.bindParameter(ctx, paramValue)
 	require.NoError(t, err)
 
 	// Verify all bindings
@@ -254,7 +254,7 @@ func TestParameterBinderAllSources(t *testing.T) {
 }
 
 func TestParameterBinderEdgeCasesExtended(t *testing.T) {
-	e := echo.New()
+	
 
 	t.Run("DI service not found", func(t *testing.T) {
 		diContext := NewContext()
@@ -262,7 +262,7 @@ func TestParameterBinderEdgeCasesExtended(t *testing.T) {
 		
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		rec := httptest.NewRecorder()
-		_ = e.NewContext(req, rec)
+		_ = context.NewContext(req, rec)
 
 		// Try to bind a service that's not registered
 		paramType := reflect.TypeOf((*UserService)(nil))
@@ -277,9 +277,9 @@ func TestParameterBinderEdgeCasesExtended(t *testing.T) {
 		
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
+		ctx := context.NewContext(req, rec)
 
-		claims := binder.getJWTClaims(c)
+		claims := binder.getJWTClaims(ctx)
 		assert.Nil(t, claims)
 	})
 
@@ -297,13 +297,13 @@ func TestParameterBinderEdgeCasesExtended(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(bodyBytes))
 		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
+		ctx := context.NewContext(req, rec)
 
 		authReq := &AuthRequest{}
 		paramValue := reflect.ValueOf(authReq)
 		
 		// Should not error even with invalid data when validator is nil
-		err := binder.bindParameter(c, paramValue)
+		err := binder.bindParameter(ctx, paramValue)
 		require.NoError(t, err)
 	})
 }

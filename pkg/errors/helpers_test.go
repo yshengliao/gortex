@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/labstack/echo/v4"
+	"github.com/yshengliao/gortex/context"
 )
 
 func TestGetHTTPStatus(t *testing.T) {
@@ -49,17 +49,16 @@ func TestGetHTTPStatus(t *testing.T) {
 }
 
 func TestValidationError(t *testing.T) {
-	e := echo.New()
 	req := httptest.NewRequest(http.MethodPost, "/", nil)
 	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
+	ctx := context.NewContext(req, rec)
 	
 	details := map[string]interface{}{
 		"field": "email",
 		"error": "invalid format",
 	}
 	
-	err := ValidationError(c, "Validation failed", details)
+	err := ValidationError(ctx, "Validation failed", details)
 	if err != nil {
 		t.Errorf("ValidationError() returned error: %v", err)
 	}
@@ -79,12 +78,11 @@ func TestValidationError(t *testing.T) {
 }
 
 func TestValidationFieldError(t *testing.T) {
-	e := echo.New()
 	req := httptest.NewRequest(http.MethodPost, "/", nil)
 	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
+	ctx := context.NewContext(req, rec)
 	
-	err := ValidationFieldError(c, "email", "Invalid email format")
+	err := ValidationFieldError(ctx, "email", "Invalid email format")
 	if err != nil {
 		t.Errorf("ValidationFieldError() returned error: %v", err)
 	}
@@ -100,13 +98,12 @@ func TestValidationFieldError(t *testing.T) {
 }
 
 func TestUnauthorizedError(t *testing.T) {
-	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
+	ctx := context.NewContext(req, rec)
 	
 	// Test with custom message
-	err := UnauthorizedError(c, "Custom unauthorized message")
+	err := UnauthorizedError(ctx, "Custom unauthorized message")
 	if err != nil {
 		t.Errorf("UnauthorizedError() returned error: %v", err)
 	}
@@ -116,16 +113,16 @@ func TestUnauthorizedError(t *testing.T) {
 	}
 	
 	// Test with default message
-	rec = httptest.NewRecorder()
-	c = e.NewContext(req, rec)
+	rec2 := httptest.NewRecorder()
+	ctx2 := context.NewContext(req, rec2)
 	
-	err = UnauthorizedError(c, "")
+	err = UnauthorizedError(ctx2, "")
 	if err != nil {
 		t.Errorf("UnauthorizedError() returned error: %v", err)
 	}
 	
 	var resp ErrorResponse
-	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+	if err := json.Unmarshal(rec2.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("Failed to unmarshal response: %v", err)
 	}
 	
@@ -135,12 +132,11 @@ func TestUnauthorizedError(t *testing.T) {
 }
 
 func TestNotFoundError(t *testing.T) {
-	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
+	ctx := context.NewContext(req, rec)
 	
-	err := NotFoundError(c, "User")
+	err := NotFoundError(ctx, "User")
 	if err != nil {
 		t.Errorf("NotFoundError() returned error: %v", err)
 	}
@@ -160,13 +156,12 @@ func TestNotFoundError(t *testing.T) {
 }
 
 func TestInternalServerError(t *testing.T) {
-	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
+	ctx := context.NewContext(req, rec)
 	
 	originalErr := errors.New("database connection failed")
-	err := InternalServerError(c, originalErr)
+	err := InternalServerError(ctx, originalErr)
 	if err != nil {
 		t.Errorf("InternalServerError() returned error: %v", err)
 	}
@@ -192,13 +187,12 @@ func TestInternalServerError(t *testing.T) {
 }
 
 func TestRateLimitError(t *testing.T) {
-	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
+	ctx := context.NewContext(req, rec)
 	
 	retryAfter := 60
-	err := RateLimitError(c, retryAfter)
+	err := RateLimitError(ctx, retryAfter)
 	if err != nil {
 		t.Errorf("RateLimitError() returned error: %v", err)
 	}
@@ -223,12 +217,11 @@ func TestRateLimitError(t *testing.T) {
 }
 
 func TestConflictError(t *testing.T) {
-	e := echo.New()
 	req := httptest.NewRequest(http.MethodPost, "/", nil)
 	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
+	ctx := context.NewContext(req, rec)
 	
-	err := ConflictError(c, "user", "email already exists")
+	err := ConflictError(ctx, "user", "email already exists")
 	if err != nil {
 		t.Errorf("ConflictError() returned error: %v", err)
 	}
@@ -252,12 +245,11 @@ func TestConflictError(t *testing.T) {
 }
 
 func TestTimeoutError(t *testing.T) {
-	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
+	ctx := context.NewContext(req, rec)
 	
-	err := TimeoutError(c, "database query")
+	err := TimeoutError(ctx, "database query")
 	if err != nil {
 		t.Errorf("TimeoutError() returned error: %v", err)
 	}
@@ -268,12 +260,11 @@ func TestTimeoutError(t *testing.T) {
 }
 
 func TestDatabaseError(t *testing.T) {
-	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
+	ctx := context.NewContext(req, rec)
 	
-	err := DatabaseError(c, "insert user")
+	err := DatabaseError(ctx, "insert user")
 	if err != nil {
 		t.Errorf("DatabaseError() returned error: %v", err)
 	}
@@ -293,16 +284,15 @@ func TestDatabaseError(t *testing.T) {
 }
 
 func TestSendError(t *testing.T) {
-	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
+	ctx := context.NewContext(req, rec)
 	
 	details := map[string]interface{}{
 		"custom": "detail",
 	}
 	
-	err := SendError(c, CodeBusinessLogicError, "Custom error message", details)
+	err := SendError(ctx, CodeBusinessLogicError, "Custom error message", details)
 	if err != nil {
 		t.Errorf("SendError() returned error: %v", err)
 	}
@@ -314,12 +304,11 @@ func TestSendError(t *testing.T) {
 }
 
 func TestSendErrorCode(t *testing.T) {
-	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
+	ctx := context.NewContext(req, rec)
 	
-	err := SendErrorCode(c, CodeResourceNotFound)
+	err := SendErrorCode(ctx, CodeResourceNotFound)
 	if err != nil {
 		t.Errorf("SendErrorCode() returned error: %v", err)
 	}
@@ -339,7 +328,6 @@ func TestSendErrorCode(t *testing.T) {
 }
 
 func BenchmarkValidationError(b *testing.B) {
-	e := echo.New()
 	req := httptest.NewRequest(http.MethodPost, "/", nil)
 	details := map[string]interface{}{
 		"field": "email",
@@ -349,19 +337,18 @@ func BenchmarkValidationError(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
-		_ = ValidationError(c, "Validation failed", details)
+		ctx := context.NewContext(req, rec)
+		_ = ValidationError(ctx, "Validation failed", details)
 	}
 }
 
 func BenchmarkSendError(b *testing.B) {
-	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
-		_ = SendErrorCode(c, CodeValidationFailed)
+		ctx := context.NewContext(req, rec)
+		_ = SendErrorCode(ctx, CodeValidationFailed)
 	}
 }

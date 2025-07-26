@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/labstack/echo/v4"
 	"go.uber.org/zap"
+	"github.com/yshengliao/gortex/context"
 	"github.com/yshengliao/gortex/pkg/errors"
 )
 
@@ -30,12 +30,12 @@ func DefaultErrorHandlerConfig() *ErrorHandlerConfig {
 }
 
 // ErrorHandler returns a middleware that handles errors in a consistent format
-func ErrorHandler() echo.MiddlewareFunc {
+func ErrorHandler() MiddlewareFunc {
 	return ErrorHandlerWithConfig(DefaultErrorHandlerConfig())
 }
 
 // ErrorHandlerWithConfig returns a middleware with custom configuration
-func ErrorHandlerWithConfig(config *ErrorHandlerConfig) echo.MiddlewareFunc {
+func ErrorHandlerWithConfig(config *ErrorHandlerConfig) MiddlewareFunc {
 	// Apply defaults
 	if config == nil {
 		config = DefaultErrorHandlerConfig()
@@ -44,8 +44,8 @@ func ErrorHandlerWithConfig(config *ErrorHandlerConfig) echo.MiddlewareFunc {
 		config.DefaultMessage = "An internal error occurred"
 	}
 
-	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+	return func(next HandlerFunc) HandlerFunc {
+		return func(c context.Context) error {
 			// Call the next handler
 			err := next(c)
 			if err == nil {
@@ -53,7 +53,7 @@ func ErrorHandlerWithConfig(config *ErrorHandlerConfig) echo.MiddlewareFunc {
 			}
 
 			// If response was already committed, we can't modify it
-			if c.Response().Committed {
+			if c.Response().Written() {
 				return err
 			}
 
@@ -72,7 +72,7 @@ func ErrorHandlerWithConfig(config *ErrorHandlerConfig) echo.MiddlewareFunc {
 						zap.Int("code", errResp.ErrorDetail.Code),
 						zap.String("message", errResp.ErrorDetail.Message),
 						zap.String("request_id", errResp.RequestID),
-						zap.String("path", c.Request().URL.Path),
+						zap.String("path", c.Path()),
 						zap.String("method", c.Request().Method),
 						zap.Any("details", errResp.ErrorDetail.Details),
 					)
@@ -83,9 +83,9 @@ func ErrorHandlerWithConfig(config *ErrorHandlerConfig) echo.MiddlewareFunc {
 				return c.JSON(httpStatus, errResp)
 			}
 
-			// Check if it's an Echo HTTPError
-			if he, ok := err.(*echo.HTTPError); ok {
-				// Map Echo HTTP errors to our error codes
+			// Check if it's a Gortex HTTPError
+			if he, ok := err.(*context.HTTPError); ok {
+				// Map HTTP errors to our error codes
 				code := mapHTTPErrorToCode(he.Code)
 				
 				// Extract message
@@ -109,7 +109,7 @@ func ErrorHandlerWithConfig(config *ErrorHandlerConfig) echo.MiddlewareFunc {
 						zap.Int("error_code", code.Int()),
 						zap.String("message", message),
 						zap.String("request_id", requestID),
-						zap.String("path", c.Request().URL.Path),
+						zap.String("path", c.Path()),
 						zap.String("method", c.Request().Method),
 						zap.Error(he.Internal),
 					)
@@ -139,7 +139,7 @@ func ErrorHandlerWithConfig(config *ErrorHandlerConfig) echo.MiddlewareFunc {
 				config.Logger.Error("Unhandled error",
 					zap.Error(err),
 					zap.String("request_id", requestID),
-					zap.String("path", c.Request().URL.Path),
+					zap.String("path", c.Path()),
 					zap.String("method", c.Request().Method),
 				)
 			}
@@ -187,12 +187,15 @@ func mapHTTPErrorToCode(httpStatus int) errors.ErrorCode {
 	case http.StatusGatewayTimeout:
 		return errors.CodeTimeout
 	default:
-		// Default to internal server error for unknown status codes
-		if httpStatus >= 500 {
-			return errors.CodeInternalServerError
-		} else if httpStatus >= 400 {
+		// For any other 4xx errors, treat as invalid input
+		if httpStatus >= 400 && httpStatus < 500 {
 			return errors.CodeInvalidInput
 		}
+		// For any other 5xx errors, treat as internal server error
+		if httpStatus >= 500 {
+			return errors.CodeInternalServerError
+		}
+		// For anything else, default to internal server error
 		return errors.CodeInternalServerError
 	}
 }

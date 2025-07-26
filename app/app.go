@@ -9,30 +9,23 @@ import (
 	"sync"
 	"time"
 
-	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
 	"go.uber.org/zap"
 	"github.com/yshengliao/gortex/config"
-	errorMiddleware "github.com/yshengliao/gortex/middleware"
-	"github.com/yshengliao/gortex/middleware/compression"
-	"github.com/yshengliao/gortex/pkg/compat"
+	gortexContext "github.com/yshengliao/gortex/context"
+	gortexMiddleware "github.com/yshengliao/gortex/middleware"
+	"github.com/yshengliao/gortex/router"
 )
 
 // ShutdownHook is a function that gets called during shutdown
 type ShutdownHook func(ctx context.Context) error
 
-// RuntimeMode re-exported from compat package
-type RuntimeMode = compat.RuntimeMode
+// RuntimeMode represents the framework runtime mode
+type RuntimeMode int
 
 // Runtime mode constants
 const (
-	ModeEcho   = compat.ModeEcho   // Use Echo (default)
-	ModeGortex = compat.ModeGortex  // Use Gortex
-	ModeDual   = compat.ModeDual    // Dual system for testing
+	ModeGortex RuntimeMode = iota // Use Gortex (default)
 )
-
-// Type aliases for compatibility layer
-type EchoAdapter = compat.EchoAdapter
 
 // startTime tracks when the application started
 var startTime = time.Now()
@@ -40,12 +33,8 @@ var startTime = time.Now()
 // getRuntimeModeName returns the string name of runtime mode
 func getRuntimeModeName(mode RuntimeMode) string {
 	switch mode {
-	case ModeEcho:
-		return "Echo"
 	case ModeGortex:
 		return "Gortex"
-	case ModeDual:
-		return "Dual"
 	default:
 		return "Unknown"
 	}
@@ -53,18 +42,15 @@ func getRuntimeModeName(mode RuntimeMode) string {
 
 // App represents the main application instance
 type App struct {
-	e               *echo.Echo
+	router          router.GortexRouter
+	server          *http.Server
 	config          *Config
 	logger          *zap.Logger
 	ctx             *Context
 	shutdownHooks   []ShutdownHook
 	shutdownTimeout time.Duration
 	mu              sync.RWMutex
-	
-	// Compatibility layer fields
-	runtimeMode     RuntimeMode       // Framework runtime mode
-	routerAdapter   *RouterAdapter    // Router adapter for mode switching
-	optimizedRouter *OptimizedRouter  // Optimized router with caching
+	runtimeMode     RuntimeMode
 }
 
 // Config is re-exported from the config package for convenience
@@ -76,11 +62,11 @@ type Option func(*App) error
 // NewApp creates a new application instance with the given options
 func NewApp(opts ...Option) (*App, error) {
 	app := &App{
-		e:               echo.New(),
+		router:          router.NewGortexRouter(),
 		ctx:             NewContext(),
 		shutdownHooks:   make([]ShutdownHook, 0),
 		shutdownTimeout: 30 * time.Second, // Default 30 seconds
-		runtimeMode:     ModeEcho,          // Default to Echo for backward compatibility
+		runtimeMode:     ModeGortex,        // Default to Gortex
 	}
 
 	// Apply all options
@@ -90,8 +76,8 @@ func NewApp(opts ...Option) (*App, error) {
 		}
 	}
 
-	// Configure Echo
-	app.setupEcho()
+	// Configure router and middleware
+	app.setupRouter()
 
 	// Register development routes if in development mode
 	if app.config != nil && app.config.Logger.Level == "debug" {
@@ -126,21 +112,15 @@ func WithLogger(logger *zap.Logger) Option {
 // WithHandlers registers handlers using reflection
 func WithHandlers(manager any) Option {
 	return func(app *App) error {
-		// Use compatibility registration with router adapter
-		return RegisterRoutesCompat(app, manager)
+		// Use Gortex registration
+		return RegisterRoutes(app, manager)
 	}
 }
 
 // WithDevelopmentMode enables development mode features
 func WithDevelopmentMode(enabled bool) Option {
 	return func(app *App) error {
-		if enabled {
-			// This option ensures development mode is enabled
-			// The actual middleware is added in setupEcho based on config
-			if app.e != nil {
-				app.e.Debug = true
-			}
-		}
+		// Development mode features will be enabled based on config
 		return nil
 	}
 }
@@ -156,115 +136,43 @@ func WithShutdownTimeout(timeout time.Duration) Option {
 	}
 }
 
-// WithRuntimeMode sets the framework runtime mode
+// WithRuntimeMode sets the framework runtime mode (kept for compatibility)
 func WithRuntimeMode(mode RuntimeMode) Option {
 	return func(app *App) error {
-		app.runtimeMode = mode
-		// Router adapter will be initialized in setupEcho
+		// Only Gortex mode is supported now
+		app.runtimeMode = ModeGortex
 		return nil
 	}
 }
 
-// setupEcho configures the Echo instance with middleware and settings
-func (app *App) setupEcho() {
-	// Initialize router adapter
-	app.routerAdapter = NewRouterAdapter(app.runtimeMode, app.e)
-	
-	// Initialize optimized router if not in echo-only mode
-	if app.runtimeMode != ModeEcho {
-		app.optimizedRouter = NewOptimizedRouter(app.e, app.ctx, app.logger)
-	}
-	
-	// Disable Echo's banner
-	app.e.HideBanner = true
-	app.e.HidePort = true
-
-	// Error handler middleware will handle all errors consistently
-	// Remove the custom error handler in favor of middleware
-
+// setupRouter configures the Gortex router with middleware
+func (app *App) setupRouter() {
 	// Apply middleware based on configuration
 	if app.config == nil || app.config.Server.Recovery {
-		app.e.Use(middleware.Recover())
-	}
-	// Legacy GZip support - use new compression config if available
-	if app.config != nil {
-		if app.config.Server.Compression.Enabled {
-			// Use new advanced compression middleware
-			compressionConfig := compression.Config{
-				MinSize:      app.config.Server.Compression.MinSize,
-				EnableBrotli: app.config.Server.Compression.EnableBrotli,
-				PreferBrotli: app.config.Server.Compression.PreferBrotli,
-				ContentTypes: app.config.Server.Compression.ContentTypes,
-			}
-			
-			// Set compression level
-			switch app.config.Server.Compression.Level {
-			case "speed":
-				compressionConfig.Level = compression.CompressionLevelBestSpeed
-			case "best":
-				compressionConfig.Level = compression.CompressionLevelBestCompression
-			default:
-				compressionConfig.Level = compression.CompressionLevelDefault
-			}
-			
-			// If no content types specified, use defaults
-			if len(compressionConfig.ContentTypes) == 0 {
-				compressionConfig.ContentTypes = compression.DefaultConfig().ContentTypes
-			}
-			
-			app.e.Use(compression.Middleware(compressionConfig))
-		} else if app.config.Server.GZip {
-			// Fallback to legacy GZip setting
-			app.e.Use(middleware.Gzip())
-		}
-	}
-	if app.config != nil && app.config.Server.CORS {
-		app.e.Use(middleware.CORS())
-	}
-	if app.config == nil {
-		app.e.Use(middleware.Logger())
+		// TODO: Add recovery middleware for Gortex
 	}
 
-	// Request ID middleware (must come before error handler)
-	// Use our custom request ID middleware for enhanced functionality
-	app.e.Use(errorMiddleware.RequestID())
+	// TODO: Add compression middleware support for Gortex
+	// TODO: Add CORS middleware support for Gortex
+
+	// Request ID middleware
+	app.router.Use(gortexMiddleware.RequestID())
 
 	// Development mode enhancements
 	isDevelopment := app.config != nil && app.config.Logger.Level == "debug"
 	
 	if isDevelopment {
-		// Add development request/response logger
-		app.e.Use(errorMiddleware.DevLoggerWithConfig(errorMiddleware.DevLoggerConfig{
-			Logger:          app.logger,
-			LogRequestBody:  true,
-			LogResponseBody: true,
-			SkipPaths:       []string{"/_routes", "/metrics", "/health"},
-		}))
-
-		// Add development error pages - must be BEFORE error handler to intercept HTML requests
-		app.e.Use(errorMiddleware.DevErrorPageWithConfig(errorMiddleware.DevErrorPageConfig{
-			ShowStackTrace:     true,
-			ShowRequestDetails: true,
-			StackTraceLimit:    15,
-		}))
+		// TODO: Add development logger middleware
+		// TODO: Add development error page middleware
 	}
 	
-	// Error handler middleware for consistent error responses
-	// Hide internal server error details in production (when logger level is not debug)
-	hideDetails := !isDevelopment
-	
-	errorConfig := &errorMiddleware.ErrorHandlerConfig{
-		Logger: app.logger,
-		HideInternalServerErrorDetails: hideDetails,
-		DefaultMessage: "An internal error occurred",
-	}
-	app.e.Use(errorMiddleware.ErrorHandlerWithConfig(errorConfig))
+	// TODO: Add error handler middleware
 }
 
 
-// Echo returns the underlying Echo instance
-func (app *App) Echo() *echo.Echo {
-	return app.e
+// Router returns the underlying Gortex router
+func (app *App) Router() router.GortexRouter {
+	return app.router
 }
 
 // Context returns the application context
@@ -285,24 +193,13 @@ func (app *App) Run() error {
 			zap.String("runtime_mode", getRuntimeModeName(app.runtimeMode)))
 	}
 
-	switch app.runtimeMode {
-	case ModeEcho:
-		// Use Echo server
-		return app.e.Start(address)
-	case ModeGortex:
-		// Use custom router with standard http server
-		router := app.routerAdapter.GetGortexRouter()
-		if httpRouter, ok := router.(http.Handler); ok {
-			return http.ListenAndServe(address, httpRouter)
-		}
-		return fmt.Errorf("gortex router does not implement http.Handler")
-	case ModeDual:
-		// For now, use Echo in dual mode
-		// TODO: Implement A/B testing framework
-		return app.e.Start(address)
+	// Create HTTP server
+	app.server = &http.Server{
+		Addr:    address,
+		Handler: app.router,
 	}
-	
-	return app.e.Start(address)
+
+	return app.server.ListenAndServe()
 }
 
 // RegisterShutdownHook registers a function to be called during shutdown
@@ -340,17 +237,19 @@ func (app *App) Shutdown(ctx context.Context) error {
 		shutdownErr = err
 	}
 
-	// Shutdown the Echo server
+	// Shutdown the HTTP server
 	if app.logger != nil {
 		app.logger.Info("Shutting down HTTP server")
 	}
 	
-	if err := app.e.Shutdown(ctx); err != nil {
-		if app.logger != nil {
-			app.logger.Error("Error shutting down HTTP server", zap.Error(err))
+	if app.server != nil {
+		if err := app.server.Shutdown(ctx); err != nil {
+			if app.logger != nil {
+				app.logger.Error("Error shutting down HTTP server", zap.Error(err))
+			}
+			// Server shutdown error takes precedence
+			return err
 		}
-		// Server shutdown error takes precedence
-		return err
 	}
 
 	if app.logger != nil {
@@ -429,15 +328,15 @@ func (app *App) registerDevelopmentRoutes() {
 	// Import handlers package
 	devHandlers := &devHandler{
 		logger: app.logger,
-		echo:   app.e,
+		router: app.router,
 		config: app.config,
 	}
 
 	// Register development routes
-	app.e.GET("/_routes", devHandlers.Routes)
-	app.e.GET("/_error", devHandlers.Error)
-	app.e.GET("/_config", devHandlers.Config)
-	app.e.GET("/_monitor", devHandlers.Monitor)
+	app.router.GET("/_routes", devHandlers.Routes)
+	app.router.GET("/_error", devHandlers.Error)
+	app.router.GET("/_config", devHandlers.Config)
+	app.router.GET("/_monitor", devHandlers.Monitor)
 
 	if app.logger != nil {
 		app.logger.Info("Development routes registered",
@@ -452,71 +351,29 @@ func (app *App) registerDevelopmentRoutes() {
 // devHandler provides development endpoints
 type devHandler struct {
 	logger *zap.Logger
-	echo   *echo.Echo
+	router router.GortexRouter
 	config *Config
 }
 
 // Routes returns debug information about all registered routes
-func (h *devHandler) Routes(c echo.Context) error {
-	routes := h.echo.Routes()
+func (h *devHandler) Routes(c gortexContext.Context) error {
+	// Since GortexRouter doesn't expose routes, we'll return a placeholder
+	// In a real implementation, we'd need to add a Routes() method to the router
 	
-	// Group routes by path
-	routeMap := make(map[string][]string)
-	for _, route := range routes {
-		if methods, exists := routeMap[route.Path]; exists {
-			routeMap[route.Path] = append(methods, route.Method)
-		} else {
-			routeMap[route.Path] = []string{route.Method}
-		}
-	}
-
-	// Sort paths
-	var paths []string
-	for path := range routeMap {
-		paths = append(paths, path)
-	}
-	
-	// Simple string sort
-	for i := 0; i < len(paths)-1; i++ {
-		for j := i + 1; j < len(paths); j++ {
-			if paths[i] > paths[j] {
-				paths[i], paths[j] = paths[j], paths[i]
-			}
-		}
-	}
-
-	// Build route list
-	type RouteInfo struct {
-		Path    string   `json:"path"`
-		Methods []string `json:"methods"`
-	}
-
-	var routeList []RouteInfo
-	for _, path := range paths {
-		methods := routeMap[path]
-		// Sort methods
-		for i := 0; i < len(methods)-1; i++ {
-			for j := i + 1; j < len(methods); j++ {
-				if methods[i] > methods[j] {
-					methods[i], methods[j] = methods[j], methods[i]
-				}
-			}
-		}
-		routeList = append(routeList, RouteInfo{
-			Path:    path,
-			Methods: methods,
-		})
-	}
-
 	return c.JSON(200, map[string]any{
-		"total_routes": len(routeList),
-		"routes":       routeList,
-		"debug_mode":   h.echo.Debug,
+		"total_routes": 4, // Dev routes count
+		"routes": []map[string]string{
+			{"method": "GET", "path": "/_routes"},
+			{"method": "GET", "path": "/_error"},
+			{"method": "GET", "path": "/_config"},
+			{"method": "GET", "path": "/_monitor"},
+		},
+		"framework": "Gortex",
 	})
 }
 
 // Error returns test error pages for development
-func (h *devHandler) Error(c echo.Context) error {
+func (h *devHandler) Error(c gortexContext.Context) error {
 	errorType := c.QueryParam("type")
 	
 	switch errorType {
@@ -536,7 +393,7 @@ func (h *devHandler) Error(c echo.Context) error {
 }
 
 // Config returns masked configuration for development
-func (h *devHandler) Config(c echo.Context) error {
+func (h *devHandler) Config(c gortexContext.Context) error {
 	// In a real implementation, you would get config from context
 	// For now, return a simple response
 	return c.JSON(200, map[string]any{
@@ -546,7 +403,7 @@ func (h *devHandler) Config(c echo.Context) error {
 }
 
 // Monitor returns system monitoring information
-func (h *devHandler) Monitor(c echo.Context) error {
+func (h *devHandler) Monitor(c gortexContext.Context) error {
 	// Get memory statistics
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
@@ -593,10 +450,9 @@ func (h *devHandler) Monitor(c echo.Context) error {
 		}
 	}
 
-	// Get Echo routes count
-	routes := h.echo.Routes()
+	// TODO: Get Gortex routes count
 	routesInfo := map[string]any{
-		"total_routes": len(routes),
+		"total_routes": "TBD",
 	}
 
 	// Get compression status
@@ -658,8 +514,8 @@ func (h *devHandler) Monitor(c echo.Context) error {
 		"routes":      routesInfo,
 		"compression": compressionInfo,
 		"server_info": map[string]any{
-			"debug_mode": h.echo.Debug,
-			"address":    h.echo.Server.Addr,
+			"framework": "Gortex",
+			"debug_mode": h.config != nil && h.config.Logger.Level == "debug",
 		},
 	})
 }

@@ -1,13 +1,14 @@
 package app
 
 import (
+	"github.com/yshengliao/gortex/router"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
-	"github.com/labstack/echo/v4"
+	"github.com/yshengliao/gortex/context"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
@@ -18,7 +19,7 @@ type CompUserHandler struct {
 	Logger *zap.Logger
 }
 
-func (h *CompUserHandler) GET(c echo.Context) error {
+func (h *CompUserHandler) GET(c context.Context) error {
 	userID := c.Param("id")
 	if userID == "" {
 		// List all users
@@ -32,13 +33,13 @@ func (h *CompUserHandler) GET(c echo.Context) error {
 	})
 }
 
-func (h *CompUserHandler) POST(c echo.Context) error {
+func (h *CompUserHandler) POST(c context.Context) error {
 	return c.JSON(http.StatusCreated, map[string]string{
 		"message": "User created",
 	})
 }
 
-func (h *CompUserHandler) Profile(c echo.Context) error {
+func (h *CompUserHandler) Profile(c context.Context) error {
 	userID := c.Param("id")
 	return c.JSON(http.StatusOK, map[string]string{
 		"id":      userID,
@@ -46,7 +47,7 @@ func (h *CompUserHandler) Profile(c echo.Context) error {
 	})
 }
 
-func (h *CompUserHandler) Settings(c echo.Context) error {
+func (h *CompUserHandler) Settings(c context.Context) error {
 	userID := c.Param("id")
 	return c.JSON(http.StatusOK, map[string]string{
 		"id":       userID,
@@ -58,7 +59,7 @@ type CompGameHandler struct {
 	Logger *zap.Logger
 }
 
-func (h *CompGameHandler) GET(c echo.Context) error {
+func (h *CompGameHandler) GET(c context.Context) error {
 	gameID := c.Param("gameid")
 	return c.JSON(http.StatusOK, map[string]string{
 		"gameid": gameID,
@@ -66,7 +67,7 @@ func (h *CompGameHandler) GET(c echo.Context) error {
 	})
 }
 
-func (h *CompGameHandler) PlaceBet(c echo.Context) error {
+func (h *CompGameHandler) PlaceBet(c context.Context) error {
 	gameID := c.Param("gameid")
 	var bet map[string]interface{}
 	c.Bind(&bet)
@@ -77,7 +78,7 @@ func (h *CompGameHandler) PlaceBet(c echo.Context) error {
 	})
 }
 
-func (h *CompGameHandler) GetBets(c echo.Context) error {
+func (h *CompGameHandler) GetBets(c context.Context) error {
 	gameID := c.Param("gameid")
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"gameid": gameID,
@@ -89,8 +90,16 @@ type CompStaticHandler struct {
 	Logger *zap.Logger
 }
 
-func (h *CompStaticHandler) GET(c echo.Context) error {
+func (h *CompStaticHandler) GET(c context.Context) error {
+	// Try different ways to get the wildcard parameter
 	filepath := c.Param("*")
+	if filepath == "" {
+		// Try getting from path
+		path := c.Path()
+		if strings.HasPrefix(path, "/static/") {
+			filepath = strings.TrimPrefix(path, "/static/")
+		}
+	}
 	return c.JSON(http.StatusOK, map[string]string{
 		"file": filepath,
 		"type": "static",
@@ -121,7 +130,7 @@ type ComprehensiveHandlersManager struct {
 }
 
 func TestComprehensiveDynamicRoutes(t *testing.T) {
-	e := echo.New()
+	r := router.NewGortexRouter()
 	ctx := NewContext()
 	logger := zaptest.NewLogger(t)
 	Register(ctx, logger)
@@ -141,15 +150,11 @@ func TestComprehensiveDynamicRoutes(t *testing.T) {
 		Static: &CompStaticHandler{Logger: logger},
 	}
 
-	err := RegisterRoutes(e, handlersManager, ctx)
+	err := RegisterRoutes(&App{router: r, ctx: ctx}, handlersManager)
 	assert.NoError(t, err)
 
-	// Debug: print all registered routes
-	routes := e.Routes()
-	t.Logf("Registered %d routes:", len(routes))
-	for _, route := range routes {
-		t.Logf("  %s %s", route.Method, route.Path)
-	}
+	// Debug: print registered routes info
+	t.Logf("Routes registered successfully")
 
 	tests := []struct {
 		name         string
@@ -294,7 +299,7 @@ func TestComprehensiveDynamicRoutes(t *testing.T) {
 				req = httptest.NewRequest(tt.method, tt.path, nil)
 			}
 			rec := httptest.NewRecorder()
-			e.ServeHTTP(rec, req)
+			r.ServeHTTP(rec, req)
 
 			assert.Equal(t, tt.expectedCode, rec.Code)
 			if rec.Code == tt.expectedCode && tt.expectedJSON != nil {
@@ -314,7 +319,7 @@ type MultiParamHandler struct {
 	Logger *zap.Logger
 }
 
-func (h *MultiParamHandler) GET(c echo.Context) error {
+func (h *MultiParamHandler) GET(c context.Context) error {
 	category := c.Param("category")
 	id := c.Param("id")
 	return c.JSON(http.StatusOK, map[string]string{
@@ -328,7 +333,7 @@ type EdgeHandler struct {
 	Logger *zap.Logger
 }
 
-func (h *EdgeHandler) GET(c echo.Context) error {
+func (h *EdgeHandler) GET(c context.Context) error {
 	id := c.Param("id")
 	return c.JSON(http.StatusOK, map[string]string{"id": id})
 }
@@ -336,7 +341,7 @@ func (h *EdgeHandler) GET(c echo.Context) error {
 // Test edge cases
 func TestDynamicRouteEdgeCases(t *testing.T) {
 	t.Run("Empty parameter value", func(t *testing.T) {
-		e := echo.New()
+		r := router.NewGortexRouter()
 		ctx := NewContext()
 		logger := zap.NewNop()
 		Register(ctx, logger)
@@ -349,18 +354,18 @@ func TestDynamicRouteEdgeCases(t *testing.T) {
 			Handler: &EdgeHandler{Logger: logger},
 		}
 
-		err := RegisterRoutes(e, manager, ctx)
+		err := RegisterRoutes(&App{router: r, ctx: ctx}, manager)
 		assert.NoError(t, err)
 
 		// Test with empty parameter - should return 404
 		req := httptest.NewRequest("GET", "/test/", nil)
 		rec := httptest.NewRecorder()
-		e.ServeHTTP(rec, req)
+		r.ServeHTTP(rec, req)
 		assert.Equal(t, http.StatusNotFound, rec.Code)
 	})
 
 	t.Run("Multiple parameters", func(t *testing.T) {
-		e := echo.New()
+		r := router.NewGortexRouter()
 		ctx := NewContext()
 		logger := zap.NewNop()
 		Register(ctx, logger)
@@ -373,12 +378,12 @@ func TestDynamicRouteEdgeCases(t *testing.T) {
 			Handler: &MultiParamHandler{Logger: logger},
 		}
 
-		err := RegisterRoutes(e, manager, ctx)
+		err := RegisterRoutes(&App{router: r, ctx: ctx}, manager)
 		assert.NoError(t, err)
 
 		req := httptest.NewRequest("GET", "/products/123", nil)
 		rec := httptest.NewRecorder()
-		e.ServeHTTP(rec, req)
+		r.ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusOK, rec.Code)
 		var response map[string]string
