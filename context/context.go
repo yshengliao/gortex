@@ -180,6 +180,29 @@ type Context interface {
 	
 	// SetStdContext sets the standard context.Context
 	SetStdContext(ctx context.Context)
+	
+	// Helper methods for better developer experience
+	
+	// ParamInt returns path parameter as int with default value
+	ParamInt(name string, defaultValue int) int
+	
+	// QueryInt returns query parameter as int with default value
+	QueryInt(name string, defaultValue int) int
+	
+	// QueryBool returns query parameter as bool with default value
+	QueryBool(name string, defaultValue bool) bool
+	
+	// OK sends a successful response with data (200 OK)
+	OK(data interface{}) error
+	
+	// Created sends a created response with data (201 Created)
+	Created(data interface{}) error
+	
+	// NoContent204 sends a no content response (204 No Content)
+	NoContent204() error
+	
+	// BadRequest sends a bad request response with message (400 Bad Request)
+	BadRequest(message string) error
 }
 
 // HandlerFunc defines a function to serve HTTP requests

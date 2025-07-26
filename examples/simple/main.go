@@ -1,12 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 
 	"github.com/yshengliao/gortex/app"
 	"github.com/yshengliao/gortex/context"
-	"github.com/yshengliao/gortex/response"
 	"go.uber.org/zap"
 )
 
@@ -52,7 +52,8 @@ type APIv2Group struct {
 type HomeHandler struct{}
 
 func (h *HomeHandler) GET(c context.Context) error {
-	return c.JSON(200, map[string]string{
+	// Using the new OK helper method
+	return c.OK(map[string]string{
 		"message": "Welcome to Gortex",
 		"version": "v0.3.0",
 	})
@@ -62,7 +63,8 @@ func (h *HomeHandler) GET(c context.Context) error {
 type HealthHandler struct{}
 
 func (h *HealthHandler) GET(c context.Context) error {
-	return c.JSON(200, map[string]string{
+	// Using the OK helper
+	return c.OK(map[string]string{
 		"status": "healthy",
 	})
 }
@@ -72,17 +74,28 @@ type UserHandler struct{}
 
 // GET /users/:id
 func (h *UserHandler) GET(c context.Context) error {
-	id := c.Param("id")
-	return c.JSON(200, map[string]interface{}{
-		"id":   id,
-		"name": "User " + id,
+	// Using the new helper method to get parameter as int
+	id := c.ParamInt("id", 0)
+	
+	// Check for query parameters using helper methods
+	page := c.QueryInt("page", 1)
+	active := c.QueryBool("active", true)
+	
+	// Using the new OK helper method
+	return c.OK(map[string]interface{}{
+		"id":     id,
+		"name":   fmt.Sprintf("User %d", id),
+		"page":   page,
+		"active": active,
 	})
 }
 
 // POST /users/:id
 func (h *UserHandler) POST(c context.Context) error {
-	id := c.Param("id")
-	return response.Success(c, 201, map[string]string{
+	id := c.ParamInt("id", 0)
+	
+	// Using the new Created helper method
+	return c.Created(map[string]interface{}{
 		"message": "User created",
 		"id":      id,
 	})
