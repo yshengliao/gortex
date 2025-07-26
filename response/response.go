@@ -46,41 +46,6 @@ func SuccessWithMeta(c context.Context, statusCode int, data any, meta map[strin
 	return c.JSON(statusCode, resp)
 }
 
-// Error sends an error response (deprecated - use pkg/errors instead)
-// Kept for backward compatibility
-func Error(c context.Context, statusCode int, message string) error {
-	return c.JSON(statusCode, StandardResponse{
-		Success: false,
-		Error:   message,
-		Code:    statusCode,
-	})
-}
-
-// BadRequest sends a 400 Bad Request response (deprecated - use errors.ValidationError)
-func BadRequest(c context.Context, message string) error {
-	return errors.ValidationError(c, message, nil)
-}
-
-// Unauthorized sends a 401 Unauthorized response (deprecated - use errors.UnauthorizedError)
-func Unauthorized(c context.Context, message string) error {
-	return errors.UnauthorizedError(c, message)
-}
-
-// Forbidden sends a 403 Forbidden response (deprecated - use errors.ForbiddenError)
-func Forbidden(c context.Context, message string) error {
-	return errors.ForbiddenError(c, message)
-}
-
-// NotFound sends a 404 Not Found response (deprecated - use errors.NotFoundError)
-func NotFound(c context.Context, message string) error {
-	return errors.NotFoundError(c, message)
-}
-
-// InternalServerError sends a 500 Internal Server Error response (deprecated - use errors.InternalServerError)
-func InternalServerError(c context.Context, message string) error {
-	err := errors.New(errors.CodeInternalServerError, message)
-	return err.Send(c, http.StatusInternalServerError)
-}
 
 // Created sends a 201 Created response
 func Created(c context.Context, data any) error {
