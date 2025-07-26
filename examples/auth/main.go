@@ -9,6 +9,7 @@ import (
 	"github.com/yshengliao/gortex/auth"
 	"github.com/yshengliao/gortex/context"
 	"github.com/yshengliao/gortex/middleware"
+	"github.com/yshengliao/gortex/pkg/errors"
 	"github.com/yshengliao/gortex/response"
 	"go.uber.org/zap"
 )
@@ -54,12 +55,12 @@ func (h *AuthHandler) Login(c context.Context) error {
 	}
 	
 	if err := c.Bind(&req); err != nil {
-		return response.BadRequest(c, "Invalid request")
+		return errors.ValidationError(c, "Invalid request", nil)
 	}
 	
 	// Simple authentication (in real app, check database)
 	if req.Username != "admin" || req.Password != "secret" {
-		return response.Unauthorized(c, "Invalid credentials")
+		return errors.UnauthorizedError(c, "Invalid credentials")
 	}
 	
 	// Generate JWT token
@@ -70,7 +71,8 @@ func (h *AuthHandler) Login(c context.Context) error {
 		"admin",       // Role
 	)
 	if err != nil {
-		return response.InternalServerError(c, "Failed to generate token")
+		err := errors.New(errors.CodeInternalServerError, "Failed to generate token")
+		return err.Send(c, http.StatusInternalServerError)
 	}
 	
 	return c.JSON(200, map[string]interface{}{
@@ -207,7 +209,7 @@ func AdminMiddleware() middleware.MiddlewareFunc {
 			// Check if user has admin role
 			claims := auth.GetClaims(c)
 			if claims == nil || claims.Role != "admin" {
-				return response.Forbidden(c, "Admin access required")
+				return errors.ForbiddenError(c, "Admin access required")
 			}
 			return next(c)
 		}
