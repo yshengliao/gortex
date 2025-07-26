@@ -6,16 +6,16 @@
 
 > **Zero boilerplate, pure Go web framework. Define routes with struct tags, not code.**
 
-## ✨ Why Gortex?
+## Why Gortex?
 
 ```go
-// ❌ Traditional: Manual route registration
+// Traditional: Manual route registration
 r.GET("/", homeHandler)
 r.GET("/users/:id", userHandler)
 r.GET("/api/v1/users", apiV1UserHandler)
 // ... dozens more routes
 
-// ✅ Gortex: Automatic discovery from struct tags
+// Gortex: Automatic discovery from struct tags
 type HandlersManager struct {
     Home  *HomeHandler  `url:"/"`
     Users *UserHandler  `url:"/users/:id"`
@@ -23,7 +23,7 @@ type HandlersManager struct {
 }
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
 ```bash
 go get github.com/yshengliao/gortex
@@ -85,7 +85,7 @@ func main() {
 }
 ```
 
-## 📚 Core Concepts
+## Core Concepts
 
 ### 1. Struct Tag Routing
 
@@ -124,7 +124,7 @@ type APIGroup struct {
 // /api/v2/...
 ```
 
-## 🔥 Key Features
+## Key Features
 
 ### Performance
 - **45% Faster Routing** - Optimized reflection caching
@@ -165,7 +165,7 @@ app.NewApp(
 )
 ```
 
-## 🛠️ Advanced Features
+## Advanced Features
 
 ### WebSocket Support
 ```go
@@ -212,7 +212,7 @@ func (h *UserHandler) GET(c context.Context) error {
 }
 ```
 
-## 📊 Benchmarks
+## Benchmarks
 
 | Operation | Performance | vs Echo | Memory |
 |-----------|------------|---------|--------|
@@ -221,7 +221,7 @@ func (h *UserHandler) GET(c context.Context) error {
 | Context Pool | 139 ns/op | N/A | 4 allocs |
 | Smart Params | 99.9 ns/op | N/A | 1 alloc |
 
-## 🎯 Best Practices
+## Best Practices
 
 ### 1. Structure Your Handlers
 ```go
@@ -250,14 +250,14 @@ func (h *UserHandler) GET(c context.Context) error {
 cfg.Logger.Level = "debug" // Enables /_routes, /_monitor, etc.
 ```
 
-## 📖 Examples
+## Examples
 
 Check out the [examples](./examples) directory:
 - [Simple](./examples/simple) - Basic routing and groups
 - [Auth](./examples/auth) - JWT authentication
 - [WebSocket](./examples/websocket) - Real-time communication
 
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md).
 
@@ -268,5 +268,5 @@ MIT License - see [LICENSE](LICENSE) file.
 ---
 
 <p align="center">
-Built with ❤️ by the Go community | Pure Go Framework
+Built with love by the Go community | Pure Go Framework
 </p>
