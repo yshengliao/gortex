@@ -19,21 +19,29 @@ import (
 // In development mode (default), this uses reflection for instant feedback
 // In production mode (go build -tags production), this uses generated static registration
 func RegisterRoutes(app *App, manager any) error {
-	return RegisterRoutesFromStruct(app.router, manager, app.ctx)
+	// Clear existing route infos if logging is enabled
+	if app.enableRoutesLog {
+		app.routeInfos = make([]RouteLogInfo, 0)
+	}
+	return RegisterRoutesFromStruct(app.router, manager, app.ctx, app)
 }
 
 // RegisterRoutesFromStruct registers routes from a struct using reflection
-func RegisterRoutesFromStruct(r router.GortexRouter, manager any, ctx *Context) error {
-	return registerRoutesRecursive(r, manager, ctx, "")
+func RegisterRoutesFromStruct(r router.GortexRouter, manager any, ctx *Context, app ...*App) error {
+	var appInstance *App
+	if len(app) > 0 {
+		appInstance = app[0]
+	}
+	return registerRoutesRecursive(r, manager, ctx, "", appInstance)
 }
 
 // registerRoutesRecursive recursively registers routes from structs
-func registerRoutesRecursive(r router.GortexRouter, manager any, ctx *Context, pathPrefix string) error {
-	return registerRoutesRecursiveWithMiddleware(r, manager, ctx, pathPrefix, []gortexMiddleware.MiddlewareFunc{})
+func registerRoutesRecursive(r router.GortexRouter, manager any, ctx *Context, pathPrefix string, app *App) error {
+	return registerRoutesRecursiveWithMiddleware(r, manager, ctx, pathPrefix, []gortexMiddleware.MiddlewareFunc{}, app)
 }
 
 // registerRoutesRecursiveWithMiddleware recursively registers routes with middleware inheritance
-func registerRoutesRecursiveWithMiddleware(r router.GortexRouter, manager any, ctx *Context, pathPrefix string, parentMiddleware []gortexMiddleware.MiddlewareFunc) error {
+func registerRoutesRecursiveWithMiddleware(r router.GortexRouter, manager any, ctx *Context, pathPrefix string, parentMiddleware []gortexMiddleware.MiddlewareFunc, app *App) error {
 	v := reflect.ValueOf(manager)
 	if v.Kind() != reflect.Ptr || v.Elem().Kind() != reflect.Struct {
 		return fmt.Errorf("handlers must be a pointer to struct")
@@ -98,7 +106,7 @@ func registerRoutesRecursiveWithMiddleware(r router.GortexRouter, manager any, c
 			}
 
 			// 1. Register any HTTP methods defined directly on this struct (e.g., GET, POST, CustomMethod).
-			if err := registerHTTPHandlerWithMiddleware(r, fullPath, handler, handlerType, currentMiddleware); err != nil {
+			if err := registerHTTPHandlerWithMiddleware(r, fullPath, handler, handlerType, currentMiddleware, app); err != nil {
 				return fmt.Errorf("failed to register HTTP handler %s: %w", field.Name, err)
 			}
 
@@ -110,7 +118,7 @@ func registerRoutesRecursiveWithMiddleware(r router.GortexRouter, manager any, c
 						zap.String("field", field.Name),
 						zap.String("prefix", fullPath))
 				}
-				if err := registerRoutesRecursiveWithMiddleware(r, handler, ctx, fullPath, currentMiddleware); err != nil {
+				if err := registerRoutesRecursiveWithMiddleware(r, handler, ctx, fullPath, currentMiddleware, app); err != nil {
 					return fmt.Errorf("failed to register nested routes for %s: %w", field.Name, err)
 				}
 			}
@@ -145,12 +153,12 @@ func registerWebSocketHandler(r router.GortexRouter, pattern string, handler any
 }
 
 // registerHTTPHandlerWithMiddleware registers HTTP handlers with middleware
-func registerHTTPHandlerWithMiddleware(r router.GortexRouter, basePath string, handler any, handlerType reflect.Type, middleware []gortexMiddleware.MiddlewareFunc) error {
+func registerHTTPHandlerWithMiddleware(r router.GortexRouter, basePath string, handler any, handlerType reflect.Type, middleware []gortexMiddleware.MiddlewareFunc, app *App) error {
 	methods := []string{"GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"}
 
 	for _, method := range methods {
 		if m, ok := handlerType.MethodByName(method); ok {
-			registerMethodWithMiddleware(r, method, basePath, handler, m, middleware)
+			registerMethodWithMiddleware(r, method, basePath, handler, m, middleware, app)
 		}
 	}
 
@@ -169,15 +177,34 @@ func registerHTTPHandlerWithMiddleware(r router.GortexRouter, basePath string, h
 		fullPath := strings.TrimSuffix(basePath, "/") + "/" + routePath
 
 		// Register the route with proper parameter handling
-		registerCustomMethodWithMiddleware(r, fullPath, handler, method, middleware)
+		registerCustomMethodWithMiddleware(r, fullPath, handler, method, middleware, app)
 	}
 
 	return nil
 }
 
 // registerMethodWithMiddleware registers a standard HTTP method with middleware
-func registerMethodWithMiddleware(r router.GortexRouter, httpMethod, path string, handler any, method reflect.Method, middleware []gortexMiddleware.MiddlewareFunc) {
+func registerMethodWithMiddleware(r router.GortexRouter, httpMethod, path string, handler any, method reflect.Method, middleware []gortexMiddleware.MiddlewareFunc, app *App) {
 	handlerFunc := createHandlerFunc(handler, method)
+	
+	// Collect route info if app is provided and logging is enabled
+	if app != nil && app.enableRoutesLog {
+		handlerName := reflect.TypeOf(handler).Elem().Name()
+		var middlewareNames []string
+		// TODO: Extract middleware names - for now just count them
+		if len(middleware) > 0 {
+			middlewareNames = []string{fmt.Sprintf("%d middleware", len(middleware))}
+		} else {
+			middlewareNames = []string{}
+		}
+		
+		app.routeInfos = append(app.routeInfos, RouteLogInfo{
+			Method:      httpMethod,
+			Path:        path,
+			Handler:     handlerName,
+			Middlewares: middlewareNames,
+		})
+	}
 
 	switch httpMethod {
 	case "GET":
@@ -198,8 +225,27 @@ func registerMethodWithMiddleware(r router.GortexRouter, httpMethod, path string
 }
 
 // registerCustomMethodWithMiddleware registers a custom method with middleware
-func registerCustomMethodWithMiddleware(r router.GortexRouter, path string, handler any, method reflect.Method, middleware []gortexMiddleware.MiddlewareFunc) {
+func registerCustomMethodWithMiddleware(r router.GortexRouter, path string, handler any, method reflect.Method, middleware []gortexMiddleware.MiddlewareFunc, app *App) {
 	handlerFunc := createHandlerFunc(handler, method)
+	
+	// Collect route info for custom methods
+	if app != nil && app.enableRoutesLog {
+		handlerName := reflect.TypeOf(handler).Elem().Name()
+		var middlewareNames []string
+		if len(middleware) > 0 {
+			middlewareNames = []string{fmt.Sprintf("%d middleware", len(middleware))}
+		} else {
+			middlewareNames = []string{}
+		}
+		
+		app.routeInfos = append(app.routeInfos, RouteLogInfo{
+			Method:      "POST", // Custom methods are registered as POST
+			Path:        path,
+			Handler:     handlerName + "." + method.Name,
+			Middlewares: middlewareNames,
+		})
+	}
+	
 	r.POST(path, handlerFunc, middleware...)
 }
 

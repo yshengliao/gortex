@@ -166,6 +166,7 @@ func main() {
 	application, err := app.NewApp(
 		app.WithConfig(cfg),
 		app.WithLogger(logger),
+		app.WithRoutesLogger(), // Enable automatic route logging
 		app.WithHandlers(handlers),
 	)
 	if err != nil {
@@ -175,16 +176,6 @@ func main() {
 	logger.Info("Starting Gortex server", 
 		zap.String("address", cfg.Server.Address))
 	logger.Info("Routes automatically discovered from struct tags!")
-	logger.Info("Example routes:",
-		zap.String("home", "GET /"),
-		zap.String("health", "GET /health"),
-		zap.String("user", "GET,POST /users/:id"),
-		zap.String("user-profile", "POST /users/:id/profile"),
-		zap.String("static", "GET /static/*"),
-		zap.String("api-v1-users", "GET /api/v1/users/:id"),
-		zap.String("api-v1-products", "GET /api/v1/products/:id"),
-		zap.String("api-v2-users", "GET /api/v2/users/:id"),
-	)
 
 	if err := application.Run(); err != nil && err != http.ErrServerClosed {
 		logger.Fatal("Server error", zap.Error(err))

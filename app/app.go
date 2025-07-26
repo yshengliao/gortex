@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -51,6 +52,16 @@ type App struct {
 	shutdownTimeout time.Duration
 	mu              sync.RWMutex
 	runtimeMode     RuntimeMode
+	routeInfos      []RouteLogInfo
+	enableRoutesLog bool
+}
+
+// RouteLogInfo stores information about a registered route for logging
+type RouteLogInfo struct {
+	Method      string
+	Path        string
+	Handler     string
+	Middlewares []string
 }
 
 // Config is re-exported from the config package for convenience
@@ -113,7 +124,17 @@ func WithLogger(logger *zap.Logger) Option {
 func WithHandlers(manager any) Option {
 	return func(app *App) error {
 		// Use Gortex registration
-		return RegisterRoutes(app, manager)
+		err := RegisterRoutes(app, manager)
+		if err != nil {
+			return err
+		}
+		
+		// Log routes if enabled
+		if app.enableRoutesLog && app.logger != nil {
+			app.logRoutes()
+		}
+		
+		return nil
 	}
 }
 
@@ -141,6 +162,14 @@ func WithRuntimeMode(mode RuntimeMode) Option {
 	return func(app *App) error {
 		// Only Gortex mode is supported now
 		app.runtimeMode = ModeGortex
+		return nil
+	}
+}
+
+// WithRoutesLogger enables automatic route logging
+func WithRoutesLogger() Option {
+	return func(app *App) error {
+		app.enableRoutesLog = true
 		return nil
 	}
 }
@@ -518,4 +547,129 @@ func (h *devHandler) Monitor(c gortexContext.Context) error {
 			"debug_mode": h.config != nil && h.config.Logger.Level == "debug",
 		},
 	})
+}
+
+// logRoutes logs all registered routes in a formatted table
+func (app *App) logRoutes() {
+	if len(app.routeInfos) == 0 {
+		app.logger.Info("No routes registered")
+		return
+	}
+
+	// Sort routes by path and method for better readability
+	sortedRoutes := make([]RouteLogInfo, len(app.routeInfos))
+	copy(sortedRoutes, app.routeInfos)
+	
+	// Simple sort by path then method
+	for i := 0; i < len(sortedRoutes); i++ {
+		for j := i + 1; j < len(sortedRoutes); j++ {
+			if sortedRoutes[i].Path > sortedRoutes[j].Path ||
+				(sortedRoutes[i].Path == sortedRoutes[j].Path && sortedRoutes[i].Method > sortedRoutes[j].Method) {
+				sortedRoutes[i], sortedRoutes[j] = sortedRoutes[j], sortedRoutes[i]
+			}
+		}
+	}
+
+	// Calculate column widths
+	methodWidth := 6   // "Method"
+	pathWidth := 4     // "Path"
+	handlerWidth := 7  // "Handler"
+	middlewareWidth := 11 // "Middlewares"
+
+	for _, route := range sortedRoutes {
+		if len(route.Method) > methodWidth {
+			methodWidth = len(route.Method)
+		}
+		if len(route.Path) > pathWidth {
+			pathWidth = len(route.Path)
+		}
+		if len(route.Handler) > handlerWidth {
+			handlerWidth = len(route.Handler)
+		}
+		middlewareStr := strings.Join(route.Middlewares, ", ")
+		if len(middlewareStr) > middlewareWidth {
+			middlewareWidth = len(middlewareStr)
+		}
+	}
+
+	// Add padding
+	methodWidth += 2
+	pathWidth += 2
+	handlerWidth += 2
+	middlewareWidth += 2
+
+	// Build the table
+	var output strings.Builder
+	
+	// Header
+	output.WriteString("\n")
+	output.WriteString("┌")
+	output.WriteString(strings.Repeat("─", methodWidth))
+	output.WriteString("┬")
+	output.WriteString(strings.Repeat("─", pathWidth))
+	output.WriteString("┬")
+	output.WriteString(strings.Repeat("─", handlerWidth))
+	output.WriteString("┬")
+	output.WriteString(strings.Repeat("─", middlewareWidth))
+	output.WriteString("┐\n")
+	
+	// Header row
+	output.WriteString("│")
+	output.WriteString(padRight(" Method", methodWidth))
+	output.WriteString("│")
+	output.WriteString(padRight(" Path", pathWidth))
+	output.WriteString("│")
+	output.WriteString(padRight(" Handler", handlerWidth))
+	output.WriteString("│")
+	output.WriteString(padRight(" Middlewares", middlewareWidth))
+	output.WriteString("│\n")
+	
+	// Separator
+	output.WriteString("├")
+	output.WriteString(strings.Repeat("─", methodWidth))
+	output.WriteString("┼")
+	output.WriteString(strings.Repeat("─", pathWidth))
+	output.WriteString("┼")
+	output.WriteString(strings.Repeat("─", handlerWidth))
+	output.WriteString("┼")
+	output.WriteString(strings.Repeat("─", middlewareWidth))
+	output.WriteString("┤\n")
+	
+	// Data rows
+	for _, route := range sortedRoutes {
+		output.WriteString("│")
+		output.WriteString(padRight(" "+route.Method, methodWidth))
+		output.WriteString("│")
+		output.WriteString(padRight(" "+route.Path, pathWidth))
+		output.WriteString("│")
+		output.WriteString(padRight(" "+route.Handler, handlerWidth))
+		output.WriteString("│")
+		middlewareStr := strings.Join(route.Middlewares, ", ")
+		if middlewareStr == "" {
+			middlewareStr = "none"
+		}
+		output.WriteString(padRight(" "+middlewareStr, middlewareWidth))
+		output.WriteString("│\n")
+	}
+	
+	// Footer
+	output.WriteString("└")
+	output.WriteString(strings.Repeat("─", methodWidth))
+	output.WriteString("┴")
+	output.WriteString(strings.Repeat("─", pathWidth))
+	output.WriteString("┴")
+	output.WriteString(strings.Repeat("─", handlerWidth))
+	output.WriteString("┴")
+	output.WriteString(strings.Repeat("─", middlewareWidth))
+	output.WriteString("┘\n")
+	
+	app.logger.Info("Registered routes", zap.String("table", output.String()))
+}
+
+// padRight pads a string to the right with spaces
+func padRight(s string, width int) string {
+	if len(s) >= width {
+		return s[:width]
+	}
+	return s + strings.Repeat(" ", width-len(s))
 }
