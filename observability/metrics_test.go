@@ -11,8 +11,8 @@ import (
 	"github.com/yshengliao/gortex/observability"
 )
 
-func TestSimpleCollector(t *testing.T) {
-	collector := observability.NewSimpleCollector()
+func TestImprovedCollector(t *testing.T) {
+	collector := observability.NewCollector()
 
 	t.Run("RecordHTTPRequest", func(t *testing.T) {
 		collector.RecordHTTPRequest("GET", "/api/users", 200, 100*time.Millisecond)
@@ -42,7 +42,7 @@ func TestSimpleCollector(t *testing.T) {
 }
 
 func TestMetricsMiddleware(t *testing.T) {
-	collector := observability.NewSimpleCollector()
+	collector := observability.NewCollector()
 
 	// Create a test handler
 	handler := func(c context.Context) error {

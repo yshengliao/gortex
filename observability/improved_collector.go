@@ -46,6 +46,31 @@ type SystemStats struct {
 	LastUpdated     time.Time `json:"last_updated"`
 }
 
+// HTTPRequestMetric represents an HTTP request metric
+type HTTPRequestMetric struct {
+	Method     string
+	Path       string
+	StatusCode int
+	Duration   time.Duration
+	Timestamp  time.Time
+}
+
+// WebSocketMessageMetric represents a WebSocket message metric
+type WebSocketMessageMetric struct {
+	Direction   string // "inbound" or "outbound"
+	MessageType string
+	Size        int64
+	Timestamp   time.Time
+}
+
+// BusinessMetric represents a custom business metric
+type BusinessMetric struct {
+	Name      string
+	Value     float64
+	Tags      map[string]string
+	Timestamp time.Time
+}
+
 // NewImprovedCollector creates a new lightweight metrics collector
 func NewImprovedCollector() *ImprovedCollector {
 	return &ImprovedCollector{

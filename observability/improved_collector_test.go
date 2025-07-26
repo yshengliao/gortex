@@ -204,20 +204,9 @@ func TestImprovedCollector_MemoryStability(t *testing.T) {
 	assert.LessOrEqual(t, len(finalHTTPStats.RequestsByMethod), 5) // Should be small
 }
 
-// Benchmark ImprovedCollector vs SimpleCollector
+// Benchmark ImprovedCollector
 func BenchmarkImprovedCollector_RecordHTTPRequest(b *testing.B) {
 	collector := NewImprovedCollector()
-	
-	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			collector.RecordHTTPRequest("GET", "/test", 200, time.Millisecond)
-		}
-	})
-}
-
-func BenchmarkSimpleCollector_RecordHTTPRequest(b *testing.B) {
-	collector := NewSimpleCollector()
 	
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
