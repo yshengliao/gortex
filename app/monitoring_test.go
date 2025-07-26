@@ -38,7 +38,7 @@ func TestMonitoringEndpoint(t *testing.T) {
 		app.WithConfig(cfg),
 		app.WithLogger(logger),
 		app.WithHandlers(&MockHandlers{Root: &MockHandler{}}),
-		app.WithDevelopmentMode(true),
+		app.WithDevelopmentMode(),
 	)
 	require.NoError(t, err)
 
@@ -140,7 +140,7 @@ func TestMonitoringMetricsValues(t *testing.T) {
 		app.WithConfig(cfg),
 		app.WithLogger(logger),
 		app.WithHandlers(&MockHandlers{Root: &MockHandler{}}),
-		app.WithDevelopmentMode(true),
+		app.WithDevelopmentMode(),
 	)
 	require.NoError(t, err)
 
@@ -200,7 +200,7 @@ func TestMonitoringCompressionStatus(t *testing.T) {
 			app.WithConfig(cfg),
 			app.WithLogger(logger),
 			app.WithHandlers(&MockHandlers{Root: &MockHandler{}}),
-			app.WithDevelopmentMode(true),
+			app.WithDevelopmentMode(),
 		)
 		require.NoError(t, err)
 
@@ -239,7 +239,7 @@ func TestMonitoringCompressionStatus(t *testing.T) {
 			app.WithConfig(cfg),
 			app.WithLogger(logger),
 			app.WithHandlers(&MockHandlers{Root: &MockHandler{}}),
-			app.WithDevelopmentMode(true),
+			app.WithDevelopmentMode(),
 		)
 		require.NoError(t, err)
 
@@ -274,7 +274,7 @@ func BenchmarkMonitoringEndpoint(b *testing.B) {
 		app.WithConfig(cfg),
 		app.WithLogger(logger),
 		app.WithHandlers(&MockHandlers{Root: &MockHandler{}}),
-		app.WithDevelopmentMode(true),
+		app.WithDevelopmentMode(),
 	)
 
 	

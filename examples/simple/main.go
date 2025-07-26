@@ -179,6 +179,7 @@ func main() {
 	application, err := app.NewApp(
 		app.WithConfig(cfg),
 		app.WithLogger(logger),
+		app.WithDevelopmentMode(), // Enable development mode with debug endpoints
 		app.WithRoutesLogger(), // Enable automatic route logging
 		app.WithHandlers(handlers),
 	)

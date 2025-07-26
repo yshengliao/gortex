@@ -10,7 +10,7 @@
 3. ✅ [CTX-HELPER] Context 輔助方法 (2025-07-26)
 
 ### Phase 2: 開發體驗（優先級：中）
-4. [DEV-MODE] 開發模式增強
+4. ✅ [DEV-MODE] 開發模式增強 (2025-07-26)
 5. [ERROR-PAGE] 友善錯誤頁面
 
 ### Phase 3: 進階特性（優先級：中）
@@ -122,7 +122,7 @@ type RouteInfo struct {
 ## 🎯 Task 3: Context 輔助方法 ✅
 
 **Status**: Completed (2025-07-26)
-**Commit**: (pending)
+**Commit**: 734cabd
 
 ### Commit 範例
 ```bash
@@ -169,7 +169,10 @@ Closes #CTX-HELPER"
 
 ---
 
-## 🎯 Task 4: 開發模式增強
+## 🎯 Task 4: 開發模式增強 ✅
+
+**Status**: Completed (2025-07-26)
+**Commit**: TBD
 
 ### Commit 範例
 ```bash

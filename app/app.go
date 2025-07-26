@@ -43,17 +43,18 @@ func getRuntimeModeName(mode RuntimeMode) string {
 
 // App represents the main application instance
 type App struct {
-	router          router.GortexRouter
-	server          *http.Server
-	config          *Config
-	logger          *zap.Logger
-	ctx             *Context
-	shutdownHooks   []ShutdownHook
-	shutdownTimeout time.Duration
-	mu              sync.RWMutex
-	runtimeMode     RuntimeMode
-	routeInfos      []RouteLogInfo
-	enableRoutesLog bool
+	router           router.GortexRouter
+	server           *http.Server
+	config           *Config
+	logger           *zap.Logger
+	ctx              *Context
+	shutdownHooks    []ShutdownHook
+	shutdownTimeout  time.Duration
+	mu               sync.RWMutex
+	runtimeMode      RuntimeMode
+	routeInfos       []RouteLogInfo
+	enableRoutesLog  bool
+	developmentMode  bool
 }
 
 // RouteLogInfo stores information about a registered route for logging
@@ -91,7 +92,7 @@ func NewApp(opts ...Option) (*App, error) {
 	app.setupRouter()
 
 	// Register development routes if in development mode
-	if app.config != nil && app.config.Logger.Level == "debug" {
+	if app.IsDevelopment() {
 		app.registerDevelopmentRoutes()
 	}
 
@@ -139,9 +140,13 @@ func WithHandlers(manager any) Option {
 }
 
 // WithDevelopmentMode enables development mode features
-func WithDevelopmentMode(enabled bool) Option {
+func WithDevelopmentMode() Option {
 	return func(app *App) error {
-		// Development mode features will be enabled based on config
+		app.developmentMode = true
+		// Automatically set debug logging level for development mode
+		if app.config != nil {
+			app.config.Logger.Level = "debug"
+		}
 		return nil
 	}
 }
@@ -188,9 +193,7 @@ func (app *App) setupRouter() {
 	app.router.Use(gortexMiddleware.RequestID())
 
 	// Development mode enhancements
-	isDevelopment := app.config != nil && app.config.Logger.Level == "debug"
-	
-	if isDevelopment {
+	if app.IsDevelopment() {
 		// TODO: Add development logger middleware
 		// TODO: Add development error page middleware
 	}
@@ -209,6 +212,11 @@ func (app *App) Context() *Context {
 	return app.ctx
 }
 
+// IsDevelopment returns true if the application is running in development mode
+func (app *App) IsDevelopment() bool {
+	return app.developmentMode || (app.config != nil && app.config.Logger.Level == "debug")
+}
+
 // Run starts the HTTP server
 func (app *App) Run() error {
 	address := ":8080"
@@ -217,9 +225,22 @@ func (app *App) Run() error {
 	}
 
 	if app.logger != nil {
+		// Development mode startup messages
+		if app.IsDevelopment() {
+			app.logger.Info("🔥 Development mode enabled!")
+			app.logger.Info("📝 Available debug endpoints:")
+			app.logger.Info("   • /_routes   - View all routes")
+			app.logger.Info("   • /_config   - View configuration")
+			app.logger.Info("   • /_monitor  - System metrics")
+			app.logger.Info("   • /_error    - Test error pages")
+			app.logger.Info("💡 Tip: Install air for hot reload: go install github.com/cosmtrek/air@latest")
+			app.logger.Info("🚀 Starting Gortex server")
+		}
+		
 		app.logger.Info("Starting server", 
 			zap.String("address", address),
-			zap.String("runtime_mode", getRuntimeModeName(app.runtimeMode)))
+			zap.String("runtime_mode", getRuntimeModeName(app.runtimeMode)),
+			zap.Bool("development_mode", app.IsDevelopment()))
 	}
 
 	// Create HTTP server
