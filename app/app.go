@@ -194,8 +194,9 @@ func (app *App) setupRouter() {
 
 	// Development mode enhancements
 	if app.IsDevelopment() {
+		// Add development error page middleware
+		app.router.Use(gortexMiddleware.RecoverWithErrorPage())
 		// TODO: Add development logger middleware
-		// TODO: Add development error page middleware
 	}
 	
 	// TODO: Add error handler middleware
