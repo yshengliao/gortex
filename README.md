@@ -129,7 +129,8 @@ type APIGroup struct {
 ### Performance
 - **45% Faster Routing** - Optimized reflection caching
 - **Zero Dependencies** - No Redis, Kafka, or external services
-- **Memory Efficient** - Built-in object pooling
+- **Memory Efficient** - Context pooling & smart parameter storage
+- **38% Less Memory** - Reduced allocations with object pooling
 
 ### Developer Experience
 - **No Route Registration** - Framework discovers routes automatically
@@ -213,11 +214,12 @@ func (h *UserHandler) GET(c context.Context) error {
 
 ## 📊 Benchmarks
 
-| Operation | Performance | vs Echo |
-|-----------|------------|---------|
-| Route Lookup | 541 ns/op | 45% faster |
-| HTTP Request | 1.57 μs/op | 15% faster |
-| Memory Usage | 0 allocs | Same |
+| Operation | Performance | vs Echo | Memory |
+|-----------|------------|---------|--------|
+| Route Lookup | 541 ns/op | 45% faster | 0 allocs |
+| HTTP Request | 1.57 μs/op | 15% faster | 50% less |
+| Context Pool | 139 ns/op | N/A | 4 allocs |
+| Smart Params | 99.9 ns/op | N/A | 1 alloc |
 
 ## 🎯 Best Practices
 

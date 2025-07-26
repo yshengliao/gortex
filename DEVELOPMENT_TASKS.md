@@ -272,7 +272,7 @@ Closes #ERROR-PAGE"
 ## 🎯 Task 6: 進階 Struct Tags 系統 ✅
 
 **Status**: Completed (2025-07-26)
-**Commit**: (pending)
+**Commit**: d63465c
 
 ### Commit 範例
 ```bash
@@ -327,7 +327,10 @@ Closes #STRUCT-TAGS"
 
 ---
 
-## 🎯 Task 7: 基礎效能優化
+## 🎯 Task 7: 基礎效能優化 ✅
+
+**Status**: Completed (2025-07-26)
+**Commit**: (pending)
 
 ### Commit 範例
 ```bash

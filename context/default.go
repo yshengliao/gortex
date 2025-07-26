@@ -24,8 +24,7 @@ type DefaultContext struct {
 	request     *http.Request
 	response    ResponseWriter
 	path        string
-	paramNames  []string
-	paramValues []string
+	params      *smartParams // Use smart params for better performance
 	handler     HandlerFunc
 	store       Map
 	lock        sync.RWMutex
@@ -39,6 +38,7 @@ func NewContext(r *http.Request, w http.ResponseWriter) Context {
 	return &DefaultContext{
 		request:    r,
 		response:   NewResponseWriter(w),
+		params:     newSmartParams(),
 		store:      make(Map),
 		stdContext: r.Context(),
 	}
@@ -118,32 +118,52 @@ func (c *DefaultContext) SetPath(p string) {
 
 // Param returns path parameter by name
 func (c *DefaultContext) Param(name string) string {
-	for i, n := range c.paramNames {
-		if i < len(c.paramValues) && n == name {
-			return c.paramValues[i]
-		}
+	if c.params == nil {
+		return ""
 	}
-	return ""
+	return c.params.get(name)
 }
 
 // ParamNames returns all path parameter names
 func (c *DefaultContext) ParamNames() []string {
-	return c.paramNames
+	if c.params == nil {
+		return nil
+	}
+	return c.params.names()
 }
 
 // SetParamNames sets path parameter names
 func (c *DefaultContext) SetParamNames(names ...string) {
-	c.paramNames = names
+	if c.params == nil {
+		c.params = newSmartParams()
+	}
+	// Reset and set new names
+	c.params.reset()
+	for _, name := range names {
+		c.params.set(name, "")
+	}
 }
 
 // ParamValues returns all path parameter values
 func (c *DefaultContext) ParamValues() []string {
-	return c.paramValues
+	if c.params == nil {
+		return nil
+	}
+	return c.params.values()
 }
 
 // SetParamValues sets path parameter values
 func (c *DefaultContext) SetParamValues(values ...string) {
-	c.paramValues = values
+	if c.params == nil {
+		c.params = newSmartParams()
+	}
+	// Set values for existing names
+	for i, value := range values {
+		name, _ := c.params.getByIndex(i)
+		if name != "" {
+			c.params.setByIndex(i, name, value)
+		}
+	}
 }
 
 // QueryParam returns query parameter by name
@@ -442,10 +462,21 @@ func (c *DefaultContext) Reset(r *http.Request, w http.ResponseWriter) {
 	c.request = r
 	c.response = NewResponseWriter(w)
 	c.path = ""
-	c.paramNames = nil
-	c.paramValues = nil
+	// Reset params instead of allocating new
+	if c.params == nil {
+		c.params = newSmartParams()
+	} else {
+		c.params.reset()
+	}
 	c.handler = nil
-	c.store = nil
+	// Keep the store allocated but clear it
+	if c.store == nil {
+		c.store = make(Map)
+	} else {
+		for k := range c.store {
+			delete(c.store, k)
+		}
+	}
 	c.stdContext = r.Context()
 }
 

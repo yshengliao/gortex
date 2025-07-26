@@ -27,9 +27,9 @@ func TestParamInt(t *testing.T) {
 			rec := httptest.NewRecorder()
 			c := NewContext(req, rec).(*DefaultContext)
 			
-			// Set up parameter
-			c.paramNames = []string{"id"}
-			c.paramValues = []string{tt.paramValue}
+			// Set up parameter using SetParams
+			params := map[string]string{"id": tt.paramValue}
+			SetParams(c, params)
 			
 			result := c.ParamInt("id", tt.defaultValue)
 			assert.Equal(t, tt.expected, result)
