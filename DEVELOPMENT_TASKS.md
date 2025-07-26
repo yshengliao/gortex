@@ -224,7 +224,7 @@ if cfg.IsDevelopment() {
 ## 🎯 Task 5: 友善錯誤頁面 ✅
 
 **Status**: Completed (2025-07-26)
-**Commit**: TBD
+**Commit**: bb50796
 
 ### Commit 範例
 ```bash
@@ -269,7 +269,10 @@ Closes #ERROR-PAGE"
 
 ---
 
-## 🎯 Task 6: 進階 Struct Tags 系統
+## 🎯 Task 6: 進階 Struct Tags 系統 ✅
+
+**Status**: Completed (2025-07-26)
+**Commit**: (pending)
 
 ### Commit 範例
 ```bash

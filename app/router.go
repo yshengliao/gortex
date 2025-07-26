@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"go.uber.org/zap"
@@ -52,6 +53,11 @@ func registerRoutesRecursiveWithMiddleware(r router.GortexRouter, manager any, c
 		return fmt.Errorf("failed to auto-initialize handlers: %w", err)
 	}
 
+	// Inject dependencies
+	if err := injectDependencies(v, ctx); err != nil {
+		return fmt.Errorf("failed to inject dependencies: %w", err)
+	}
+
 	t := v.Elem().Type()
 	logger, _ := Get[*zap.Logger](ctx)
 
@@ -84,6 +90,13 @@ func registerRoutesRecursiveWithMiddleware(r router.GortexRouter, manager any, c
 			if middlewareTag := field.Tag.Get("middleware"); middlewareTag != "" {
 				if mw := parseMiddleware(middlewareTag, ctx); mw != nil {
 					currentMiddleware = append(currentMiddleware, mw...)
+				}
+			}
+
+			// Check for ratelimit tag
+			if rateLimitTag := field.Tag.Get("ratelimit"); rateLimitTag != "" {
+				if rlMiddleware := parseRateLimit(rateLimitTag, ctx); rlMiddleware != nil {
+					currentMiddleware = append(currentMiddleware, rlMiddleware)
 				}
 			}
 
@@ -333,11 +346,91 @@ func parseMiddleware(tag string, ctx *Context) []gortexMiddleware.MiddlewareFunc
 			if authMW, err := Get[gortexMiddleware.MiddlewareFunc](ctx); err == nil {
 				middlewares = append(middlewares, authMW)
 			}
-			// TODO: Add more predefined middleware
+		case "requestid":
+			// Add request ID middleware
+			middlewares = append(middlewares, gortexMiddleware.RequestID())
+		case "recover":
+			// Add recovery middleware with error page in dev mode
+			if config, _ := Get[*Config](ctx); config != nil && config.Logger.Level == "debug" {
+				middlewares = append(middlewares, gortexMiddleware.RecoverWithErrorPage())
+			} else {
+				// Simple recovery for production
+				middlewares = append(middlewares, func(next gortexMiddleware.HandlerFunc) gortexMiddleware.HandlerFunc {
+					return func(c gortexContext.Context) error {
+						defer func() {
+							if r := recover(); r != nil {
+								c.Response().WriteHeader(http.StatusInternalServerError)
+							}
+						}()
+						return next(c)
+					}
+				})
+			}
+		case "rbac":
+			// Role-based access control would need to be configured
+			if logger, _ := Get[*zap.Logger](ctx); logger != nil {
+				logger.Warn("RBAC middleware requested but not configured", zap.String("middleware", name))
+			}
 		}
 	}
 
 	return middlewares
+}
+
+// parseRateLimit parses rate limit tag and returns rate limit middleware
+func parseRateLimit(tag string, ctx *Context) gortexMiddleware.MiddlewareFunc {
+	// Parse formats like "100/min", "10/sec", "1000/hour"
+	parts := strings.Split(tag, "/")
+	if len(parts) != 2 {
+		if logger, _ := Get[*zap.Logger](ctx); logger != nil {
+			logger.Warn("Invalid rate limit format", zap.String("tag", tag))
+		}
+		return nil
+	}
+
+	// Parse limit number
+	limit, err := strconv.Atoi(parts[0])
+	if err != nil {
+		if logger, _ := Get[*zap.Logger](ctx); logger != nil {
+			logger.Warn("Invalid rate limit number", zap.String("tag", tag), zap.Error(err))
+		}
+		return nil
+	}
+
+	// Parse time unit
+	var burst int
+	switch strings.ToLower(parts[1]) {
+	case "sec", "second":
+		burst = limit
+	case "min", "minute":
+		burst = limit / 60
+		if burst < 1 {
+			burst = 1
+		}
+	case "hour":
+		burst = limit / 3600
+		if burst < 1 {
+			burst = 1
+		}
+	default:
+		if logger, _ := Get[*zap.Logger](ctx); logger != nil {
+			logger.Warn("Unknown rate limit time unit", zap.String("unit", parts[1]))
+		}
+		return nil
+	}
+
+	// Create rate limit config
+	config := &gortexMiddleware.GortexRateLimitConfig{
+		Rate:  limit,
+		Burst: burst,
+		SkipFunc: func(c gortexContext.Context) bool {
+			// Skip rate limiting for local/internal requests
+			remoteAddr := c.Request().RemoteAddr
+			return strings.HasPrefix(remoteAddr, "127.0.0.1") || strings.HasPrefix(remoteAddr, "::1")
+		},
+	}
+
+	return gortexMiddleware.GortexRateLimitWithConfig(config)
 }
 
 // isHandlerGroup checks if a handler is a group (has nested fields with url tags)
@@ -426,6 +519,85 @@ func autoInitHandlers(v reflect.Value, checkURLTag bool) error {
 	}
 
 	return nil
+}
+
+// injectDependencies injects dependencies into handler fields with inject tag
+func injectDependencies(v reflect.Value, ctx *Context) error {
+	// Handle pointer
+	if v.Kind() == reflect.Ptr && !v.IsNil() {
+		v = v.Elem()
+	}
+
+	// Only process structs
+	if v.Kind() != reflect.Struct {
+		return nil
+	}
+
+	t := v.Type()
+	for i := 0; i < v.NumField(); i++ {
+		field := v.Field(i)
+		fieldType := t.Field(i)
+
+		// Skip unexported fields
+		if !field.CanSet() {
+			continue
+		}
+
+		// Check for inject tag
+		if injectTag := fieldType.Tag.Get("inject"); injectTag != "" {
+			// Try to inject from DI container
+			if ctx != nil {
+				ctx.mu.RLock()
+				if service, ok := ctx.services[field.Type()]; ok {
+					ctx.mu.RUnlock()
+					field.Set(reflect.ValueOf(service))
+				} else {
+					ctx.mu.RUnlock()
+					// If not in container and field is nil, try to create an instance
+					if field.Kind() == reflect.Ptr && field.IsNil() {
+						// Log warning but don't fail - allow partial injection
+						if logger, _ := Get[*zap.Logger](ctx); logger != nil {
+							logger.Warn("Service not found in DI container",
+								zap.String("field", fieldType.Name),
+								zap.String("type", field.Type().String()),
+								zap.String("looking_for", field.Type().String()),
+								zap.Any("available_types", getAvailableTypes(ctx)))
+						}
+					}
+				}
+			}
+		}
+
+		// Recursively process nested structs
+		if field.Kind() == reflect.Ptr && !field.IsNil() {
+			if field.Type().Elem().Kind() == reflect.Struct {
+				if err := injectDependencies(field, ctx); err != nil {
+					return fmt.Errorf("failed to inject dependencies in field %s: %w", fieldType.Name, err)
+				}
+			}
+		} else if field.Kind() == reflect.Struct {
+			if err := injectDependencies(field.Addr(), ctx); err != nil {
+				return fmt.Errorf("failed to inject dependencies in field %s: %w", fieldType.Name, err)
+			}
+		}
+	}
+
+	return nil
+}
+
+// getAvailableTypes returns available types in the DI container for debugging
+func getAvailableTypes(ctx *Context) []string {
+	if ctx == nil {
+		return nil
+	}
+	ctx.mu.RLock()
+	defer ctx.mu.RUnlock()
+	
+	types := make([]string, 0, len(ctx.services))
+	for t := range ctx.services {
+		types = append(types, t.String())
+	}
+	return types
 }
 
 // Helper functions are now in utils.go

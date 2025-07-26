@@ -25,6 +25,13 @@ type HandlersManager struct {
 	
 	// Nested groups for API versioning
 	API     *APIGroup       `url:"/api"`
+	
+	// Advanced struct tags demo (commented out - uncomment to use)
+	// Protected routes with middleware
+	// Admin   *AdminGroup     `url:"/admin" middleware:"auth"`
+	
+	// Rate-limited public API
+	// Public  *PublicAPI      `url:"/public" ratelimit:"100/min"`
 }
 
 // APIGroup demonstrates nested routing groups
@@ -195,3 +202,70 @@ func main() {
 		logger.Fatal("Server error", zap.Error(err))
 	}
 }
+
+// ============================================
+// Advanced Struct Tags Examples (Gortex v0.3.0+)
+// ============================================
+
+// Example 1: Dependency Injection with inject tag
+type DatabaseService struct {
+	// Your database connection
+}
+
+type UserServiceHandler struct {
+	DB *DatabaseService `inject:""` // Will be automatically injected from DI container
+}
+
+func (h *UserServiceHandler) GET(c context.Context) error {
+	// h.DB is automatically injected
+	return c.OK("User service with injected DB")
+}
+
+// Example 2: Middleware composition
+type ProtectedHandlers struct {
+	// Single middleware
+	Profile *ProfileHandler `url:"/profile" middleware:"auth"`
+	
+	// Multiple middleware (executed in order)
+	Admin *AdminHandler `url:"/admin" middleware:"auth,rbac,audit"`
+}
+
+type ProfileHandler struct{}
+type AdminHandler struct{}
+
+// Example 3: Rate limiting
+type PublicAPI struct {
+	Search *SearchHandler `url:"/search" ratelimit:"10/sec"`     // 10 requests per second
+	Upload *UploadHandler `url:"/upload" ratelimit:"100/min"`    // 100 requests per minute
+	Report *ReportHandler `url:"/report" ratelimit:"1000/hour"`  // 1000 requests per hour
+}
+
+type SearchHandler struct{}
+type UploadHandler struct{}
+type ReportHandler struct{}
+
+// Example 4: Combined tags
+type AdvancedAPI struct {
+	// Protected endpoint with rate limiting
+	Premium *PremiumHandler `url:"/premium" middleware:"auth" ratelimit:"50/min"`
+	
+	// Nested group with inherited middleware
+	V3 *APIv3Group `url:"/v3" middleware:"auth,requestid"`
+}
+
+type PremiumHandler struct{}
+type APIv3Group struct{}
+
+// To use these advanced features:
+// 1. Register services in DI container:
+//    ctx := app.NewContext()
+//    app.Register(ctx, &DatabaseService{})
+//
+// 2. Register middleware:
+//    middlewareRegistry := make(map[string]middleware.MiddlewareFunc)
+//    middlewareRegistry["auth"] = authMiddleware
+//    app.Register(ctx, middlewareRegistry)
+//
+// 3. Use the handlers:
+//    handlers := &AdvancedHandlers{}
+//    app.RegisterRoutesFromStruct(router, handlers, ctx)
