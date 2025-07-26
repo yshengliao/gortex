@@ -88,8 +88,9 @@
 
 **目標**：解決現有 Collector 的潛在效能瓶頸，確保在高併發場景下的穩定性。
 
-- [ ] **任務 3.1**: 為 `ImprovedCollector` 實作基於 LRU (Least Recently Used) 策略的基數限制 (cardinality limit)，防止記憶體無界增長。
+- [x] **任務 3.1**: 為 `ImprovedCollector` 實作基於 LRU (Least Recently Used) 策略的基數限制 (cardinality limit)，防止記憶體無界增長。
   - **執行提示**：在 `ImprovedCollector` 中加入 `maxCardinality` 設定項（預設 10000）。實作 LRU 淘汰機制，當 metrics 數量超過限制時，移除最少使用的 metrics。可使用 `container/list` 實作 LRU，或引入 `github.com/hashicorp/golang-lru/v2`。記錄被淘汰的 metrics 資訊以便監控。
+  - **完成說明**：成功實作了基於 `container/list` 的 LRU 淘汰機制，包含 maxCardinality 設定（預設 10000）、完整的淘汰統計追蹤、並發安全的實作。新增了 `GetEvictionStats()` 和 `GetCardinalityInfo()` API，並提供完整的測試覆蓋。
 
 - [ ] **任務 3.2**: 評估並優化 Collector 中的鎖定機制，考慮使用 `sync.Map` 或更細粒度的鎖來提升併發效能。
   - **執行提示**：分析當前的鎖競爭熱點，考慮：1) 對讀多寫少的場景使用 `sync.RWMutex` 2) 對高併發更新的 metrics 使用 `sync.Map` 3) 實作分片鎖（sharded locks）將不同的 metrics 分配到不同的鎖。使用 `go test -bench` 和 `pprof` 分析效能改進。

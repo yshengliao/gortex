@@ -1,13 +1,15 @@
 package metrics
 
 import (
+	"container/list"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
 )
 
 // ImprovedCollector is a lightweight metrics collector that maintains
-// current state without unbounded memory growth
+// current state without unbounded memory growth with LRU cardinality limits
 type ImprovedCollector struct {
 	// Atomic counters for high-frequency metrics
 	httpRequestCount     int64
@@ -20,6 +22,26 @@ type ImprovedCollector struct {
 	systemStats         SystemStats
 	businessMetrics     map[string]float64
 	lastUpdate          time.Time
+	
+	// LRU cardinality management
+	maxCardinality      int
+	lruList            *list.List
+	lruMap             map[string]*list.Element
+	evictionStats      EvictionStats
+}
+
+// EvictionStats tracks metrics eviction information
+type EvictionStats struct {
+	TotalEvictions     int64     `json:"total_evictions"`
+	LastEvictionTime   time.Time `json:"last_eviction_time"`
+	EvictedMetrics     []string  `json:"recently_evicted_metrics"`
+}
+
+// lruEntry represents an entry in the LRU cache
+type lruEntry struct {
+	key       string
+	value     float64
+	timestamp time.Time
 }
 
 // HTTPStats holds aggregated HTTP statistics
@@ -73,6 +95,15 @@ type BusinessMetric struct {
 
 // NewImprovedCollector creates a new lightweight metrics collector
 func NewImprovedCollector() *ImprovedCollector {
+	return NewImprovedCollectorWithCardinality(10000)
+}
+
+// NewImprovedCollectorWithCardinality creates a collector with custom cardinality limit
+func NewImprovedCollectorWithCardinality(maxCardinality int) *ImprovedCollector {
+	if maxCardinality <= 0 {
+		maxCardinality = 10000 // Default value
+	}
+	
 	return &ImprovedCollector{
 		businessMetrics: make(map[string]float64),
 		httpStats: HTTPStats{
@@ -82,7 +113,13 @@ func NewImprovedCollector() *ImprovedCollector {
 		websocketStats: WebSocketStats{
 			MessagesByType: make(map[string]int64),
 		},
-		lastUpdate: time.Now(),
+		lastUpdate:     time.Now(),
+		maxCardinality: maxCardinality,
+		lruList:       list.New(),
+		lruMap:        make(map[string]*list.Element),
+		evictionStats: EvictionStats{
+			EvictedMetrics: make([]string, 0),
+		},
 	}
 }
 
@@ -143,9 +180,23 @@ func (c *ImprovedCollector) RecordWebSocketMessage(direction string, messageType
 
 func (c *ImprovedCollector) RecordBusinessMetric(name string, value float64, tags map[string]string) {
 	c.mu.Lock()
-	// Simple key without complex tag handling to avoid memory growth
-	c.businessMetrics[name] = value
-	c.mu.Unlock()
+	defer c.mu.Unlock()
+	
+	// Generate metric key (simple key without complex tag handling to avoid memory growth)
+	metricKey := name
+	if len(tags) > 0 {
+		// Include first tag to maintain some granularity while limiting cardinality
+		for k, v := range tags {
+			metricKey = fmt.Sprintf("%s{%s=%s}", name, k, v)
+			break // Only use first tag to limit cardinality
+		}
+	}
+	
+	// Update LRU cache
+	c.updateLRUCache(metricKey, value)
+	
+	// Update business metrics map
+	c.businessMetrics[metricKey] = value
 }
 
 func (c *ImprovedCollector) RecordGoroutines(count int) {
@@ -162,16 +213,84 @@ func (c *ImprovedCollector) RecordMemoryUsage(bytes uint64) {
 	c.mu.Unlock()
 }
 
+// updateLRUCache updates the LRU cache for business metrics
+// This method must be called with the mutex already held
+func (c *ImprovedCollector) updateLRUCache(key string, value float64) {
+	now := time.Now()
+	
+	// Check if key already exists
+	if elem, exists := c.lruMap[key]; exists {
+		// Move to front (most recently used)
+		c.lruList.MoveToFront(elem)
+		// Update value
+		entry := elem.Value.(*lruEntry)
+		entry.value = value
+		entry.timestamp = now
+		return
+	}
+	
+	// Check if we need to evict
+	if len(c.lruMap) >= c.maxCardinality {
+		c.evictLeastRecentlyUsed()
+	}
+	
+	// Add new entry
+	entry := &lruEntry{
+		key:       key,
+		value:     value,
+		timestamp: now,
+	}
+	elem := c.lruList.PushFront(entry)
+	c.lruMap[key] = elem
+}
+
+// evictLeastRecentlyUsed removes the least recently used metric
+// This method must be called with the mutex already held
+func (c *ImprovedCollector) evictLeastRecentlyUsed() {
+	if c.lruList.Len() == 0 {
+		return
+	}
+	
+	// Get least recently used element (back of list)
+	elem := c.lruList.Back()
+	if elem == nil {
+		return
+	}
+	
+	entry := elem.Value.(*lruEntry)
+	evictedKey := entry.key
+	
+	// Remove from both list and map
+	c.lruList.Remove(elem)
+	delete(c.lruMap, evictedKey)
+	delete(c.businessMetrics, evictedKey)
+	
+	// Update eviction stats
+	c.evictionStats.TotalEvictions++
+	c.evictionStats.LastEvictionTime = time.Now()
+	
+	// Keep track of recently evicted metrics (max 10)
+	c.evictionStats.EvictedMetrics = append(c.evictionStats.EvictedMetrics, evictedKey)
+	if len(c.evictionStats.EvictedMetrics) > 10 {
+		c.evictionStats.EvictedMetrics = c.evictionStats.EvictedMetrics[1:]
+	}
+}
+
 // GetStats returns current statistics snapshot
 func (c *ImprovedCollector) GetStats() map[string]any {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	
 	return map[string]any{
-		"http":      c.httpStats,
-		"websocket": c.websocketStats,
-		"system":    c.systemStats,
-		"business":  c.businessMetrics,
+		"http":       c.httpStats,
+		"websocket":  c.websocketStats,
+		"system":     c.systemStats,
+		"business":   c.businessMetrics,
+		"cardinality": map[string]any{
+			"current":    len(c.businessMetrics),
+			"max":        c.maxCardinality,
+			"evictions":  c.evictionStats,
+		},
 		"timestamp": time.Now().Unix(),
 	}
 }
@@ -213,5 +332,32 @@ func (c *ImprovedCollector) Reset() {
 	c.systemStats = SystemStats{}
 	c.businessMetrics = make(map[string]float64)
 	c.lastUpdate = time.Now()
+	
+	// Reset LRU cache
+	c.lruList = list.New()
+	c.lruMap = make(map[string]*list.Element)
+	c.evictionStats = EvictionStats{
+		EvictedMetrics: make([]string, 0),
+	}
 	c.mu.Unlock()
+}
+
+// GetEvictionStats returns current eviction statistics
+func (c *ImprovedCollector) GetEvictionStats() EvictionStats {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.evictionStats
+}
+
+// GetCardinalityInfo returns current cardinality information
+func (c *ImprovedCollector) GetCardinalityInfo() map[string]any {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	
+	return map[string]any{
+		"current_metrics": len(c.businessMetrics),
+		"max_cardinality": c.maxCardinality,
+		"utilization":     float64(len(c.businessMetrics)) / float64(c.maxCardinality) * 100,
+		"evictions":       c.evictionStats,
+	}
 }
