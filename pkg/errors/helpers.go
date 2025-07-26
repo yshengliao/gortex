@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/labstack/echo/v4"
+	"github.com/yshengliao/gortex/context"
 )
 
 // Common HTTP status mappings for error codes
@@ -67,13 +67,13 @@ func GetHTTPStatus(code ErrorCode) int {
 }
 
 // ValidationError creates and sends a validation error response
-func ValidationError(c echo.Context, message string, details map[string]any) error {
+func ValidationError(c context.Context, message string, details map[string]any) error {
 	err := NewWithDetails(CodeValidationFailed, message, details)
 	return err.Send(c, http.StatusBadRequest)
 }
 
 // ValidationFieldError creates and sends a validation error for a specific field
-func ValidationFieldError(c echo.Context, field, message string) error {
+func ValidationFieldError(c context.Context, field, message string) error {
 	details := map[string]any{
 		"field": field,
 		"error": message,
@@ -83,7 +83,7 @@ func ValidationFieldError(c echo.Context, field, message string) error {
 }
 
 // UnauthorizedError creates and sends an unauthorized error response
-func UnauthorizedError(c echo.Context, message string) error {
+func UnauthorizedError(c context.Context, message string) error {
 	if message == "" {
 		message = CodeUnauthorized.Message()
 	}
@@ -92,7 +92,7 @@ func UnauthorizedError(c echo.Context, message string) error {
 }
 
 // ForbiddenError creates and sends a forbidden error response
-func ForbiddenError(c echo.Context, message string) error {
+func ForbiddenError(c context.Context, message string) error {
 	if message == "" {
 		message = CodeForbidden.Message()
 	}
@@ -101,7 +101,7 @@ func ForbiddenError(c echo.Context, message string) error {
 }
 
 // NotFoundError creates and sends a not found error response
-func NotFoundError(c echo.Context, resource string) error {
+func NotFoundError(c context.Context, resource string) error {
 	message := fmt.Sprintf("%s not found", resource)
 	err := New(CodeResourceNotFound, message).
 		WithDetail("resource", resource)
@@ -109,7 +109,7 @@ func NotFoundError(c echo.Context, resource string) error {
 }
 
 // InternalServerError creates and sends an internal server error response
-func InternalServerError(c echo.Context, err error) error {
+func InternalServerError(c context.Context, err error) error {
 	// In production, hide internal error details
 	message := "An internal error occurred"
 	details := map[string]any{
@@ -122,7 +122,7 @@ func InternalServerError(c echo.Context, err error) error {
 }
 
 // RateLimitError creates and sends a rate limit exceeded error response
-func RateLimitError(c echo.Context, retryAfter int) error {
+func RateLimitError(c context.Context, retryAfter int) error {
 	err := New(CodeRateLimitExceeded, "Rate limit exceeded").
 		WithDetail("retry_after", retryAfter)
 	
@@ -133,7 +133,7 @@ func RateLimitError(c echo.Context, retryAfter int) error {
 }
 
 // ConflictError creates and sends a conflict error response
-func ConflictError(c echo.Context, resource string, reason string) error {
+func ConflictError(c context.Context, resource string, reason string) error {
 	message := fmt.Sprintf("Conflict with %s", resource)
 	if reason != "" {
 		message = fmt.Sprintf("%s: %s", message, reason)
@@ -145,7 +145,7 @@ func ConflictError(c echo.Context, resource string, reason string) error {
 }
 
 // TimeoutError creates and sends a timeout error response
-func TimeoutError(c echo.Context, operation string) error {
+func TimeoutError(c context.Context, operation string) error {
 	message := fmt.Sprintf("Operation timed out: %s", operation)
 	err := New(CodeTimeout, message).
 		WithDetail("operation", operation)
@@ -153,7 +153,7 @@ func TimeoutError(c echo.Context, operation string) error {
 }
 
 // DatabaseError creates and sends a database error response
-func DatabaseError(c echo.Context, operation string) error {
+func DatabaseError(c context.Context, operation string) error {
 	message := fmt.Sprintf("Database operation failed: %s", operation)
 	err := New(CodeDatabaseError, message).
 		WithDetail("operation", operation)
@@ -161,7 +161,7 @@ func DatabaseError(c echo.Context, operation string) error {
 }
 
 // SendError is a generic function to send any error code with custom message
-func SendError(c echo.Context, code ErrorCode, message string, details map[string]any) error {
+func SendError(c context.Context, code ErrorCode, message string, details map[string]any) error {
 	if message == "" {
 		message = code.Message()
 	}
@@ -170,12 +170,12 @@ func SendError(c echo.Context, code ErrorCode, message string, details map[strin
 }
 
 // SendErrorCode sends an error using just the error code with default message
-func SendErrorCode(c echo.Context, code ErrorCode) error {
+func SendErrorCode(c context.Context, code ErrorCode) error {
 	err := NewFromCode(code)
 	return err.Send(c, GetHTTPStatus(code))
 }
 
 // BadRequest is a shorthand for validation errors
-func BadRequest(c echo.Context, message string) error {
+func BadRequest(c context.Context, message string) error {
 	return ValidationError(c, message, nil)
 }

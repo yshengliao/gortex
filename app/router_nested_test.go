@@ -1,12 +1,14 @@
 package app
 
 import (
+	gortexMiddleware "github.com/yshengliao/gortex/middleware"
+	"github.com/yshengliao/gortex/router"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/labstack/echo/v4"
+	"github.com/yshengliao/gortex/context"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -15,11 +17,11 @@ import (
 // Test structs for nested routing
 type NestedUserHandler struct{}
 
-func (h *NestedUserHandler) GET(c echo.Context) error {
+func (h *NestedUserHandler) GET(c context.Context) error {
 	return c.String(http.StatusOK, "nested user")
 }
 
-func (h *NestedUserHandler) Profile(c echo.Context) error {
+func (h *NestedUserHandler) Profile(c context.Context) error {
 	return c.String(http.StatusOK, "nested user profile")
 }
 
@@ -27,7 +29,7 @@ type V1Group struct {
 	Users *NestedUserHandler `url:"/users"`
 }
 
-func (g *V1Group) GET(c echo.Context) error {
+func (g *V1Group) GET(c context.Context) error {
 	return c.String(http.StatusOK, "v1 root")
 }
 
@@ -40,7 +42,7 @@ type NestedGroupHandlersManager struct {
 }
 
 func TestNestedRouting(t *testing.T) {
-	e := echo.New()
+	r := router.NewGortexRouter()
 	logger, _ := zap.NewDevelopment()
 	ctx := NewContext()
 	Register(ctx, logger)
@@ -53,7 +55,7 @@ func TestNestedRouting(t *testing.T) {
 		},
 	}
 
-	err := RegisterRoutes(e, manager, ctx)
+	err := RegisterRoutes(&App{router: r, ctx: ctx}, manager)
 	require.NoError(t, err)
 
 	testCases := []struct {
@@ -85,10 +87,10 @@ func TestNestedRouting(t *testing.T) {
 			if tc.path == "/api/v1/users/profile" {
 				method = http.MethodPost // Custom methods are registered as POST
 			}
-			
+
 			req := httptest.NewRequest(method, tc.path, nil)
 			rec := httptest.NewRecorder()
-			e.ServeHTTP(rec, req)
+			r.ServeHTTP(rec, req)
 
 			assert.Equal(t, http.StatusOK, rec.Code)
 			assert.Equal(t, tc.expectedBody, rec.Body.String())
@@ -97,9 +99,9 @@ func TestNestedRouting(t *testing.T) {
 }
 
 // Test middleware inheritance
-type NestedMiddlewareHandler struct {}
+type NestedMiddlewareHandler struct{}
 
-func (h *NestedMiddlewareHandler) GET(c echo.Context) error {
+func (h *NestedMiddlewareHandler) GET(c context.Context) error {
 	// Add to middleware chain tracking
 	if chain, ok := c.Get("middlewareChain").([]string); ok {
 		chain = append(chain, "handler")
@@ -123,22 +125,22 @@ type NestedMiddlewareHandlersManager struct {
 }
 
 func TestNestedMiddlewareInheritance(t *testing.T) {
-	e := echo.New()
+	r := router.NewGortexRouter()
 	logger, _ := zap.NewDevelopment()
 	ctx := NewContext()
 	Register(ctx, logger)
 
 	// Register test middleware
-	testRecoverMiddleware := func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+	testRecoverMiddleware := func(next gortexMiddleware.HandlerFunc) gortexMiddleware.HandlerFunc {
+		return func(c context.Context) error {
 			chain := []string{"recover"}
 			c.Set("middlewareChain", chain)
 			return next(c)
 		}
 	}
 
-	testLoggerMiddleware := func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+	testLoggerMiddleware := func(next gortexMiddleware.HandlerFunc) gortexMiddleware.HandlerFunc {
+		return func(c context.Context) error {
 			if chain, ok := c.Get("middlewareChain").([]string); ok {
 				chain = append(chain, "logger")
 				c.Set("middlewareChain", chain)
@@ -148,10 +150,10 @@ func TestNestedMiddlewareInheritance(t *testing.T) {
 	}
 
 	// Create a middleware registry to store named middleware
-	middlewareRegistry := make(map[string]echo.MiddlewareFunc)
+	middlewareRegistry := make(map[string]gortexMiddleware.MiddlewareFunc)
 	middlewareRegistry["recover"] = testRecoverMiddleware
 	middlewareRegistry["logger"] = testLoggerMiddleware
-	
+
 	// Register middleware registry in context
 	Register(ctx, middlewareRegistry)
 
@@ -163,20 +165,20 @@ func TestNestedMiddlewareInheritance(t *testing.T) {
 		},
 	}
 
-	err := RegisterRoutes(e, manager, ctx)
+	err := RegisterRoutes(&App{router: r, ctx: ctx}, manager)
 	require.NoError(t, err)
 
 	// Test that middleware is inherited correctly
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/users", nil)
 	rec := httptest.NewRecorder()
-	e.ServeHTTP(rec, req)
+	r.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusOK, rec.Code)
-	
+
 	var response map[string]any
 	err = json.Unmarshal(rec.Body.Bytes(), &response)
 	require.NoError(t, err)
-	
+
 	// Verify middleware chain order
 	chain, ok := response["middlewareChain"].([]any)
 	require.True(t, ok)

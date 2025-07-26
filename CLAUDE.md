@@ -10,9 +10,9 @@ Development guide for Gortex web framework - a high-performance Go framework wit
 
 ```go
 // Traditional
-e.GET("/", homeHandler)
-e.GET("/users/:id", userHandler)
-e.POST("/api/login", loginHandler)
+r.GET("/", homeHandler)
+r.GET("/users/:id", userHandler)
+r.POST("/api/login", loginHandler)
 
 // Gortex - automatic discovery
 type HandlersManager struct {
@@ -40,7 +40,7 @@ type HandlersManager struct {
 }
 
 type HomeHandler struct{}
-func (h *HomeHandler) GET(c echo.Context) error {
+func (h *HomeHandler) GET(c context.Context) error {
     return c.JSON(200, map[string]string{"message": "Hello Gortex!"})
 }
 ```
@@ -77,9 +77,9 @@ type HandlersManager struct {
 ```go
 type UserHandler struct{}
 
-func (h *UserHandler) GET(c echo.Context) error    { /* GET /users/:id */ }
-func (h *UserHandler) POST(c echo.Context) error   { /* POST /users/:id */ }
-func (h *UserHandler) Profile(c echo.Context) error { /* POST /users/:id/profile */ }
+func (h *UserHandler) GET(c context.Context) error    { /* GET /users/:id */ }
+func (h *UserHandler) POST(c context.Context) error   { /* POST /users/:id */ }
+func (h *UserHandler) Profile(c context.Context) error { /* POST /users/:id/profile */ }
 ```
 
 ### 3. Configuration Setup
@@ -139,7 +139,7 @@ curl localhost:8080/_routes  # View debug routes
 // Register business errors
 errors.Register(ErrUserNotFound, 404, "User not found")
 
-func (h *UserHandler) GET(c echo.Context) error {
+func (h *UserHandler) GET(c context.Context) error {
     user, err := h.service.GetUser(c.Param("id"))
     if err != nil {
         return err // Framework handles HTTP response
@@ -154,7 +154,7 @@ type WSHandler struct {
     hub *hub.Hub
 }
 
-func (h *WSHandler) GET(c echo.Context) error {
+func (h *WSHandler) HandleConnection(c context.Context) error {
     conn, _ := upgrader.Upgrade(c.Response(), c.Request(), nil)
     client := hub.NewClient(h.hub, conn, clientID, logger)
     h.hub.RegisterClient(client)
@@ -193,5 +193,5 @@ func (h *WSHandler) GET(c echo.Context) error {
 
 ---
 
-**Last Updated**: 2025/07/25 | **Framework**: Gortex v0.3.0-alpha | **Go**: 1.24+
+**Last Updated**: 2025/07/26 | **Framework**: Gortex v0.3.0-alpha | **Go**: 1.24+
 

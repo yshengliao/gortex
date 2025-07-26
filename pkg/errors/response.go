@@ -3,7 +3,7 @@ package errors
 import (
 	"time"
 
-	"github.com/labstack/echo/v4"
+	"github.com/yshengliao/gortex/context"
 )
 
 // ErrorResponse represents a standardized error response
@@ -27,18 +27,18 @@ func (e *ErrorResponse) Error() string {
 	return e.ErrorDetail.Message
 }
 
-// GetRequestID extracts request ID from Echo context
-func GetRequestID(c echo.Context) string {
+// GetRequestID extracts request ID from Gortex context
+func GetRequestID(c context.Context) string {
 	// First try to get from context value (set by our middleware)
 	if reqID, ok := c.Get("request_id").(string); ok && reqID != "" {
 		return reqID
 	}
 	// Try to get from response header (set by middleware)
-	if reqID := c.Response().Header().Get(echo.HeaderXRequestID); reqID != "" {
+	if reqID := c.Response().Header().Get("X-Request-ID"); reqID != "" {
 		return reqID
 	}
 	// Try to get from request header
-	if reqID := c.Request().Header.Get(echo.HeaderXRequestID); reqID != "" {
+	if reqID := c.Request().Header.Get("X-Request-ID"); reqID != "" {
 		return reqID
 	}
 	return ""
@@ -101,8 +101,8 @@ func (e *ErrorResponse) WithDetails(details map[string]any) *ErrorResponse {
 	return e
 }
 
-// Send sends the error response via Echo context
-func (e *ErrorResponse) Send(c echo.Context, httpStatus int) error {
+// Send sends the error response via Gortex context
+func (e *ErrorResponse) Send(c context.Context, httpStatus int) error {
 	// Auto-populate request ID if not set
 	if e.RequestID == "" {
 		e.RequestID = GetRequestID(c)

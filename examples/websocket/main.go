@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/labstack/echo/v4"
 	"github.com/yshengliao/gortex/app"
+	gortexContext "github.com/yshengliao/gortex/context"
 	"github.com/yshengliao/gortex/hub"
 	"go.uber.org/zap"
 )
@@ -29,7 +29,7 @@ type HandlersManager struct {
 // HomeHandler serves the WebSocket client page
 type HomeHandler struct{}
 
-func (h *HomeHandler) GET(c echo.Context) error {
+func (h *HomeHandler) GET(c gortexContext.Context) error {
 	html := `<!DOCTYPE html>
 <html>
 <head>
@@ -103,7 +103,7 @@ type StatusHandler struct {
 	hub *hub.Hub
 }
 
-func (h *StatusHandler) GET(c echo.Context) error {
+func (h *StatusHandler) GET(c gortexContext.Context) error {
 	metrics := h.hub.GetMetrics()
 	sentRate, receivedRate := h.hub.GetMessageRate()
 	return c.JSON(200, map[string]interface{}{
@@ -127,8 +127,8 @@ type WSHandler struct {
 	logger   *zap.Logger
 }
 
-// GET upgrades HTTP to WebSocket (marked with hijack:"ws")
-func (h *WSHandler) GET(c echo.Context) error {
+// HandleConnection upgrades HTTP to WebSocket (marked with hijack:"ws")
+func (h *WSHandler) HandleConnection(c gortexContext.Context) error {
 	// Upgrade HTTP connection to WebSocket
 	conn, err := h.upgrader.Upgrade(c.Response(), c.Request(), nil)
 	if err != nil {
@@ -163,7 +163,7 @@ type APIHandler struct {
 }
 
 // Broadcast sends message to all connected clients
-func (h *APIHandler) Broadcast(c echo.Context) error {
+func (h *APIHandler) Broadcast(c gortexContext.Context) error {
 	var req struct {
 		Message string `json:"message"`
 	}

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/labstack/echo/v4"
+	"github.com/yshengliao/gortex/context"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yshengliao/gortex/app"
@@ -21,7 +21,7 @@ type MockHandlers struct {
 
 type MockHandler struct{}
 
-func (h *MockHandler) GET(c echo.Context) error {
+func (h *MockHandler) GET(c context.Context) error {
 	return c.String(http.StatusOK, "OK")
 }
 
@@ -42,12 +42,12 @@ func TestMonitoringEndpoint(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	e := application.Echo()
+	
 
 	// Test monitoring endpoint
 	req := httptest.NewRequest(http.MethodGet, "/_monitor", nil)
 	rec := httptest.NewRecorder()
-	e.ServeHTTP(rec, req)
+	application.Router().ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusOK, rec.Code)
 
@@ -116,12 +116,12 @@ func TestMonitoringEndpointNotInProduction(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	e := application.Echo()
+	
 
 	// Test monitoring endpoint should not exist
 	req := httptest.NewRequest(http.MethodGet, "/_monitor", nil)
 	rec := httptest.NewRecorder()
-	e.ServeHTTP(rec, req)
+	application.Router().ServeHTTP(rec, req)
 
 	// Should return 404 in production mode
 	assert.Equal(t, http.StatusNotFound, rec.Code)
@@ -144,12 +144,12 @@ func TestMonitoringMetricsValues(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	e := application.Echo()
+	
 
 	// Make a request to generate some activity
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
-	e.ServeHTTP(rec, req)
+	application.Router().ServeHTTP(rec, req)
 
 	// Sleep briefly to ensure uptime is measurable
 	time.Sleep(10 * time.Millisecond)
@@ -157,7 +157,7 @@ func TestMonitoringMetricsValues(t *testing.T) {
 	// Test monitoring endpoint
 	req = httptest.NewRequest(http.MethodGet, "/_monitor", nil)
 	rec = httptest.NewRecorder()
-	e.ServeHTTP(rec, req)
+	application.Router().ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusOK, rec.Code)
 
@@ -204,11 +204,11 @@ func TestMonitoringCompressionStatus(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		e := application.Echo()
+		
 
 		req := httptest.NewRequest(http.MethodGet, "/_monitor", nil)
 		rec := httptest.NewRecorder()
-		e.ServeHTTP(rec, req)
+		application.Router().ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusOK, rec.Code)
 
@@ -243,11 +243,11 @@ func TestMonitoringCompressionStatus(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		e := application.Echo()
+		
 
 		req := httptest.NewRequest(http.MethodGet, "/_monitor", nil)
 		rec := httptest.NewRecorder()
-		e.ServeHTTP(rec, req)
+		application.Router().ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusOK, rec.Code)
 
@@ -277,7 +277,7 @@ func BenchmarkMonitoringEndpoint(b *testing.B) {
 		app.WithDevelopmentMode(true),
 	)
 
-	e := application.Echo()
+	
 
 	b.ResetTimer()
 	b.ReportAllocs()
@@ -285,6 +285,6 @@ func BenchmarkMonitoringEndpoint(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		req := httptest.NewRequest(http.MethodGet, "/_monitor", nil)
 		rec := httptest.NewRecorder()
-		e.ServeHTTP(rec, req)
+		application.Router().ServeHTTP(rec, req)
 	}
 }

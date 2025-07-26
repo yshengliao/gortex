@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/labstack/echo/v4"
 	"golang.org/x/time/rate"
+	"github.com/yshengliao/gortex/context"
 )
 
 // RateLimiter defines the interface for rate limiting
@@ -24,7 +24,7 @@ type RateLimiter interface {
 }
 
 // RateLimitConfig holds rate limiting configuration
-type RateLimitConfig struct {
+type GortexRateLimitConfig struct {
 	// Rate is the number of requests per second
 	Rate int
 
@@ -32,206 +32,141 @@ type RateLimitConfig struct {
 	Burst int
 
 	// KeyFunc extracts the key from the request
-	KeyFunc func(c echo.Context) string
+	KeyFunc func(c context.Context) string
 
 	// ErrorHandler handles rate limit errors
-	ErrorHandler func(c echo.Context) error
+	ErrorHandler func(c context.Context) error
 
 	// SkipFunc determines if rate limiting should be skipped
-	SkipFunc func(c echo.Context) bool
+	SkipFunc func(c context.Context) bool
 
 	// Store is the rate limiter implementation
 	Store RateLimiter
 }
 
-// DefaultRateLimitConfig returns a default rate limit configuration
-func DefaultRateLimitConfig() *RateLimitConfig {
-	return &RateLimitConfig{
+// DefaultGortexRateLimitConfig returns a default rate limit configuration
+func DefaultGortexRateLimitConfig() *GortexRateLimitConfig {
+	return &GortexRateLimitConfig{
 		Rate:  10,
 		Burst: 20,
-		KeyFunc: func(c echo.Context) string {
+		KeyFunc: func(c context.Context) string {
+			// Use client IP as default key
 			return c.RealIP()
 		},
-		ErrorHandler: func(c echo.Context) error {
-			return echo.NewHTTPError(http.StatusTooManyRequests, "rate limit exceeded")
+		ErrorHandler: func(c context.Context) error {
+			return c.JSON(http.StatusTooManyRequests, map[string]string{
+				"error": "rate limit exceeded",
+			})
 		},
-		SkipFunc: func(c echo.Context) bool {
-			return false
-		},
+		SkipFunc: nil,
+		Store:    NewMemoryRateLimiter(),
 	}
 }
 
-// limiterEntry holds a rate limiter and its last access time
-type limiterEntry struct {
-	limiter    *rate.Limiter
-	lastAccess time.Time
+// MemoryRateLimiter implements RateLimiter using in-memory storage
+type MemoryRateLimiter struct {
+	limiters map[string]*rate.Limiter
+	mu       sync.RWMutex
+	rate     rate.Limit
+	burst    int
 }
 
-// MemoryStore is an in-memory rate limiter store
-type MemoryStore struct {
-	rate            int
-	burst           int
-	limiters        map[string]*limiterEntry
-	mu              sync.RWMutex
-	cleanup         *time.Ticker
-	cleanupInterval time.Duration
-	ttl             time.Duration
-	stopped         chan struct{}
-	stopOnce        sync.Once
-}
-
-// MemoryStoreConfig holds configuration for MemoryStore
-type MemoryStoreConfig struct {
-	Rate            int
-	Burst           int
-	CleanupInterval time.Duration
-	TTL             time.Duration
-}
-
-// DefaultMemoryStoreConfig returns default configuration
-func DefaultMemoryStoreConfig() *MemoryStoreConfig {
-	return &MemoryStoreConfig{
-		Rate:            10,
-		Burst:           20,
-		CleanupInterval: 1 * time.Minute,
-		TTL:             10 * time.Minute,
+// NewMemoryRateLimiter creates a new memory-based rate limiter
+func NewMemoryRateLimiter() *MemoryRateLimiter {
+	return &MemoryRateLimiter{
+		limiters: make(map[string]*rate.Limiter),
+		rate:     rate.Limit(10), // 10 requests per second
+		burst:    20,             // burst of 20
 	}
 }
 
-// NewMemoryStore creates a new in-memory rate limiter store
-func NewMemoryStore(r int, b int) *MemoryStore {
-	config := &MemoryStoreConfig{
-		Rate:            r,
-		Burst:           b,
-		CleanupInterval: 1 * time.Minute,
-		TTL:             10 * time.Minute,
-	}
-	return NewMemoryStoreWithConfig(config)
+// SetRate sets the rate and burst for new limiters
+func (m *MemoryRateLimiter) SetRate(r rate.Limit, burst int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.rate = r
+	m.burst = burst
 }
 
-// NewMemoryStoreWithConfig creates a new in-memory rate limiter store with config
-func NewMemoryStoreWithConfig(config *MemoryStoreConfig) *MemoryStore {
-	store := &MemoryStore{
-		rate:            config.Rate,
-		burst:           config.Burst,
-		limiters:        make(map[string]*limiterEntry),
-		cleanup:         time.NewTicker(config.CleanupInterval),
-		cleanupInterval: config.CleanupInterval,
-		ttl:             config.TTL,
-		stopped:         make(chan struct{}),
+// getLimiter returns the rate limiter for a given key
+func (m *MemoryRateLimiter) getLimiter(key string) *rate.Limiter {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	
+	limiter, exists := m.limiters[key]
+	if !exists {
+		limiter = rate.NewLimiter(m.rate, m.burst)
+		m.limiters[key] = limiter
 	}
-
-	// Start cleanup routine
-	go store.cleanupRoutine()
-
-	return store
+	
+	return limiter
 }
 
 // Allow checks if a request is allowed
-func (s *MemoryStore) Allow(key string) bool {
-	return s.AllowN(key, 1)
+func (m *MemoryRateLimiter) Allow(key string) bool {
+	return m.getLimiter(key).Allow()
 }
 
 // AllowN checks if n requests are allowed
-func (s *MemoryStore) AllowN(key string, n int) bool {
-	now := time.Now()
-
-	s.mu.Lock()
-	entry, exists := s.limiters[key]
-	if !exists {
-		entry = &limiterEntry{
-			limiter:    rate.NewLimiter(rate.Limit(s.rate), s.burst),
-			lastAccess: now,
-		}
-		s.limiters[key] = entry
-	} else {
-		entry.lastAccess = now
-	}
-	s.mu.Unlock()
-
-	return entry.limiter.AllowN(now, n)
+func (m *MemoryRateLimiter) AllowN(key string, n int) bool {
+	return m.getLimiter(key).AllowN(time.Now(), n)
 }
 
 // Reset resets the rate limiter for a key
-func (s *MemoryStore) Reset(key string) {
-	s.mu.Lock()
-	delete(s.limiters, key)
-	s.mu.Unlock()
+func (m *MemoryRateLimiter) Reset(key string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.limiters, key)
 }
 
-// cleanupRoutine periodically cleans up unused limiters
-func (s *MemoryStore) cleanupRoutine() {
-	for {
-		select {
-		case <-s.cleanup.C:
-			s.performCleanup()
-		case <-s.stopped:
-			return
+// Cleanup removes old limiters (should be called periodically)
+func (m *MemoryRateLimiter) Cleanup() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	
+	// Simple cleanup: remove all limiters
+	// In production, you might want more sophisticated cleanup logic
+	m.limiters = make(map[string]*rate.Limiter)
+}
+
+// GortexRateLimit returns a rate limiting middleware for Gortex
+func GortexRateLimit() MiddlewareFunc {
+	return GortexRateLimitWithConfig(DefaultGortexRateLimitConfig())
+}
+
+// GortexRateLimitWithConfig returns a rate limiting middleware with custom config
+func GortexRateLimitWithConfig(config *GortexRateLimitConfig) MiddlewareFunc {
+	// Set defaults
+	if config.KeyFunc == nil {
+		config.KeyFunc = func(c context.Context) string {
+			return c.RealIP()
 		}
 	}
-}
-
-// performCleanup removes expired limiters
-func (s *MemoryStore) performCleanup() {
-	now := time.Now()
-	expiredKeys := make([]string, 0)
-
-	s.mu.RLock()
-	for key, entry := range s.limiters {
-		if now.Sub(entry.lastAccess) > s.ttl {
-			expiredKeys = append(expiredKeys, key)
+	
+	if config.ErrorHandler == nil {
+		config.ErrorHandler = func(c context.Context) error {
+			return c.JSON(http.StatusTooManyRequests, map[string]string{
+				"error": "rate limit exceeded",
+			})
 		}
 	}
-	s.mu.RUnlock()
-
-	// Remove expired entries
-	if len(expiredKeys) > 0 {
-		s.mu.Lock()
-		for _, key := range expiredKeys {
-			// Double-check the entry is still expired (it might have been accessed since we checked)
-			if entry, exists := s.limiters[key]; exists && now.Sub(entry.lastAccess) > s.ttl {
-				delete(s.limiters, key)
-			}
-		}
-		s.mu.Unlock()
-	}
-}
-
-// Size returns the current number of limiters in the store
-func (s *MemoryStore) Size() int {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return len(s.limiters)
-}
-
-// Stop stops the cleanup routine
-func (s *MemoryStore) Stop() {
-	s.stopOnce.Do(func() {
-		s.cleanup.Stop()
-		close(s.stopped)
-	})
-}
-
-// RateLimitMiddleware creates a rate limiting middleware
-func RateLimitMiddleware(config *RateLimitConfig) echo.MiddlewareFunc {
-	if config == nil {
-		config = DefaultRateLimitConfig()
-	}
-
+	
 	if config.Store == nil {
-		config.Store = NewMemoryStore(config.Rate, config.Burst)
+		store := NewMemoryRateLimiter()
+		store.SetRate(rate.Limit(config.Rate), config.Burst)
+		config.Store = store
 	}
 
-	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
-			// Check if should skip
+	return func(next HandlerFunc) HandlerFunc {
+		return func(c context.Context) error {
+			// Skip if skip function returns true
 			if config.SkipFunc != nil && config.SkipFunc(c) {
 				return next(c)
 			}
 
-			// Get key
+			// Get key for rate limiting
 			key := config.KeyFunc(c)
-
+			
 			// Check rate limit
 			if !config.Store.Allow(key) {
 				return config.ErrorHandler(c)
@@ -242,60 +177,41 @@ func RateLimitMiddleware(config *RateLimitConfig) echo.MiddlewareFunc {
 	}
 }
 
-// RateLimitByIP creates a rate limiter by IP address
-func RateLimitByIP(rate, burst int) echo.MiddlewareFunc {
-	config := &RateLimitConfig{
-		Rate:  rate,
-		Burst: burst,
-		KeyFunc: func(c echo.Context) string {
-			return c.RealIP()
-		},
-		ErrorHandler: func(c echo.Context) error {
-			return echo.NewHTTPError(http.StatusTooManyRequests, "rate limit exceeded")
-		},
+// GetRateLimitKey is a helper function to extract rate limit key from context
+func GetRateLimitKey(c context.Context) string {
+	if key := c.Get("rate_limit_key"); key != nil {
+		if keyStr, ok := key.(string); ok {
+			return keyStr
+		}
 	}
-
-	return RateLimitMiddleware(config)
+	return c.RealIP()
 }
 
-// RateLimitByUser creates a rate limiter by user ID
-func RateLimitByUser(rate, burst int, getUserID func(c echo.Context) string) echo.MiddlewareFunc {
-	config := &RateLimitConfig{
-		Rate:    rate,
-		Burst:   burst,
-		KeyFunc: getUserID,
-		ErrorHandler: func(c echo.Context) error {
-			return echo.NewHTTPError(http.StatusTooManyRequests, "rate limit exceeded")
-		},
-	}
+// Common key functions for rate limiting
 
-	return RateLimitMiddleware(config)
+// RateLimitByIP returns a key function that uses client IP
+func RateLimitByIP() func(context.Context) string {
+	return func(c context.Context) string {
+		return c.RealIP()
+	}
 }
 
-// RateLimitByPath creates a rate limiter by path
-func RateLimitByPath(rate, burst int) echo.MiddlewareFunc {
-	config := &RateLimitConfig{
-		Rate:  rate,
-		Burst: burst,
-		KeyFunc: func(c echo.Context) string {
-			return fmt.Sprintf("%s:%s", c.RealIP(), c.Path())
-		},
-		ErrorHandler: func(c echo.Context) error {
-			return echo.NewHTTPError(http.StatusTooManyRequests, "rate limit exceeded")
-		},
+// RateLimitByUser returns a key function that uses user ID from context
+func RateLimitByUser(userKey string) func(context.Context) string {
+	return func(c context.Context) string {
+		if userID := c.Get(userKey); userID != nil {
+			return fmt.Sprintf("user:%v", userID)
+		}
+		return c.RealIP() // fallback to IP
 	}
-
-	return RateLimitMiddleware(config)
 }
 
-// CustomRateLimitError creates a custom error handler for rate limiting
-func CustomRateLimitError(message string, retryAfter int) func(c echo.Context) error {
-	return func(c echo.Context) error {
-		c.Response().Header().Set("Retry-After", fmt.Sprintf("%d", retryAfter))
-		return echo.NewHTTPError(http.StatusTooManyRequests, map[string]any{
-			"error":       "rate_limit_exceeded",
-			"message":     message,
-			"retry_after": retryAfter,
-		})
+// RateLimitByHeader returns a key function that uses a specific header
+func RateLimitByHeader(headerName string) func(context.Context) string {
+	return func(c context.Context) string {
+		if value := c.Request().Header.Get(headerName); value != "" {
+			return fmt.Sprintf("header:%s:%s", headerName, value)
+		}
+		return c.RealIP() // fallback to IP
 	}
 }

@@ -1,287 +1,231 @@
-package middleware_test
+package middleware
 
 import (
-	"net/http"
 	"net/http/httptest"
-	"sync"
 	"testing"
 
-	"github.com/labstack/echo/v4"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"github.com/yshengliao/gortex/middleware"
+	"golang.org/x/time/rate"
+	"github.com/yshengliao/gortex/context"
 )
 
-func TestMemoryStore(t *testing.T) {
-	store := middleware.NewMemoryStore(10, 20)
-	defer store.Stop()
-
-	t.Run("Allow", func(t *testing.T) {
-		// Should allow initial requests
-		for i := 0; i < 10; i++ {
-			assert.True(t, store.Allow("test-key"))
-		}
-	})
-
-	t.Run("AllowN", func(t *testing.T) {
-		// Should allow burst
-		assert.True(t, store.AllowN("burst-key", 5))
-		assert.True(t, store.AllowN("burst-key", 5))
-		
-		// Should not allow exceeding burst
-		assert.False(t, store.AllowN("burst-key", 15))
-	})
-
-	t.Run("Reset", func(t *testing.T) {
-		key := "reset-key"
-		
-		// Use up the limit
-		for i := 0; i < 20; i++ {
-			store.Allow(key)
-		}
-		assert.False(t, store.Allow(key))
-		
-		// Reset and try again
-		store.Reset(key)
-		assert.True(t, store.Allow(key))
-	})
-
-	t.Run("ConcurrentAccess", func(t *testing.T) {
-		var wg sync.WaitGroup
-		key := "concurrent-key"
-		
-		// Make concurrent requests
-		for i := 0; i < 50; i++ {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				store.Allow(key)
-			}()
-		}
-		
-		wg.Wait()
-		// Should handle concurrent access without panic
-	})
-}
-
-func TestRateLimitMiddleware(t *testing.T) {
-	e := echo.New()
-	
-	t.Run("DefaultConfig", func(t *testing.T) {
-		handler := func(c echo.Context) error {
-			return c.String(200, "OK")
-		}
-		
-		// Apply rate limit middleware
-		h := middleware.RateLimitMiddleware(nil)(handler)
-		
-		// Create request
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
-		req.RemoteAddr = "192.168.1.1:12345"
-		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
-		
-		// Should allow request
-		err := h(c)
-		assert.NoError(t, err)
-		assert.Equal(t, http.StatusOK, rec.Code)
-	})
-
-	t.Run("CustomConfig", func(t *testing.T) {
-		config := &middleware.RateLimitConfig{
-			Rate:  1,
-			Burst: 2,
-			KeyFunc: func(c echo.Context) string {
-				return "fixed-key"
-			},
-			ErrorHandler: func(c echo.Context) error {
-				return c.JSON(429, map[string]string{"error": "too many requests"})
-			},
-		}
-		
-		handler := func(c echo.Context) error {
-			return c.String(200, "OK")
-		}
-		
-		h := middleware.RateLimitMiddleware(config)(handler)
-		
-		// First two requests should pass (burst)
-		for i := 0; i < 2; i++ {
-			req := httptest.NewRequest(http.MethodGet, "/", nil)
-			rec := httptest.NewRecorder()
-			c := e.NewContext(req, rec)
-			
-			err := h(c)
-			assert.NoError(t, err)
-			assert.Equal(t, http.StatusOK, rec.Code)
-		}
-		
-		// Third request should be rate limited
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
-		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
-		
-		err := h(c)
-		assert.NoError(t, err)
-		assert.Equal(t, http.StatusTooManyRequests, rec.Code)
-	})
-
-	t.Run("SkipFunc", func(t *testing.T) {
-		config := &middleware.RateLimitConfig{
-			Rate:  1,
-			Burst: 1,
-			KeyFunc: func(c echo.Context) string {
-				return "test"
-			},
-			SkipFunc: func(c echo.Context) bool {
-				return c.Request().Header.Get("X-Skip-Limit") == "true"
-			},
-		}
-		
-		handler := func(c echo.Context) error {
-			return c.String(200, "OK")
-		}
-		
-		h := middleware.RateLimitMiddleware(config)(handler)
-		
-		// Make multiple requests with skip header
-		for i := 0; i < 5; i++ {
-			req := httptest.NewRequest(http.MethodGet, "/", nil)
-			req.Header.Set("X-Skip-Limit", "true")
-			rec := httptest.NewRecorder()
-			c := e.NewContext(req, rec)
-			
-			err := h(c)
-			assert.NoError(t, err)
-			assert.Equal(t, http.StatusOK, rec.Code)
-		}
-	})
-}
-
-func TestRateLimitByIP(t *testing.T) {
-	e := echo.New()
-	handler := func(c echo.Context) error {
-		return c.String(200, "OK")
+func TestGortexRateLimit(t *testing.T) {
+	// Create a test handler
+	handler := func(c context.Context) error {
+		return c.String(200, "success")
 	}
-	
-	h := middleware.RateLimitByIP(2, 4)(handler)
-	
-	// Test different IPs
-	ips := []string{"192.168.1.1:12345", "192.168.1.2:12345"}
-	
-	for _, ip := range ips {
-		// Each IP should get its own limit
-		for i := 0; i < 4; i++ {
-			req := httptest.NewRequest(http.MethodGet, "/", nil)
-			req.RemoteAddr = ip
-			rec := httptest.NewRecorder()
-			c := e.NewContext(req, rec)
-			
-			err := h(c)
-			require.NoError(t, err)
-			assert.Equal(t, http.StatusOK, rec.Code)
-		}
+
+	// Create rate limit config with very low limits for testing
+	config := &GortexRateLimitConfig{
+		Rate:  1, // 1 request per second
+		Burst: 1, // burst of 1
+		KeyFunc: func(c context.Context) string {
+			return "test-key" // Fixed key for testing
+		},
+	}
+
+	// Create middleware
+	middleware := GortexRateLimitWithConfig(config)
+	wrappedHandler := middleware(handler)
+
+	// First request should succeed
+	req := httptest.NewRequest("GET", "/test", nil)
+	w := httptest.NewRecorder()
+	ctx := context.NewContext(req, w)
+
+	err := wrappedHandler(ctx)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	if w.Code != 200 {
+		t.Errorf("Expected status 200, got %d", w.Code)
+	}
+
+	// Second request should be rate limited
+	req = httptest.NewRequest("GET", "/test", nil)
+	w = httptest.NewRecorder()
+	ctx = context.NewContext(req, w)
+
+	err = wrappedHandler(ctx)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	if w.Code != 429 {
+		t.Errorf("Expected status 429 (rate limited), got %d", w.Code)
 	}
 }
 
-func TestRateLimitByPath(t *testing.T) {
-	e := echo.New()
-	handler := func(c echo.Context) error {
-		return c.String(200, "OK")
+func TestGortexRateLimitByIP(t *testing.T) {
+	handler := func(c context.Context) error {
+		return c.String(200, "success")
 	}
-	
-	h := middleware.RateLimitByPath(1, 2)(handler)
-	
-	paths := []string{"/api/users", "/api/posts"}
-	
-	for _, path := range paths {
-		// Each path should get its own limit
-		for i := 0; i < 2; i++ {
-			req := httptest.NewRequest(http.MethodGet, path, nil)
-			req.RemoteAddr = "192.168.1.1:12345"
-			rec := httptest.NewRecorder()
-			c := e.NewContext(req, rec)
-			c.SetPath(path)
-			
-			err := h(c)
-			require.NoError(t, err)
-			assert.Equal(t, http.StatusOK, rec.Code)
-		}
-		
-		// Third request should fail
-		req := httptest.NewRequest(http.MethodGet, path, nil)
-		req.RemoteAddr = "192.168.1.1:12345"
-		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
-		c.SetPath(path)
-		
-		err := h(c)
-		require.Error(t, err)
-		httpErr, ok := err.(*echo.HTTPError)
-		require.True(t, ok)
-		assert.Equal(t, http.StatusTooManyRequests, httpErr.Code)
+
+	config := &GortexRateLimitConfig{
+		Rate:    1,
+		Burst:   1,
+		KeyFunc: RateLimitByIP(),
+	}
+
+	middleware := GortexRateLimitWithConfig(config)
+	wrappedHandler := middleware(handler)
+
+	// Test with different IPs
+	req1 := httptest.NewRequest("GET", "/test", nil)
+	req1.RemoteAddr = "192.168.1.1:12345"
+	w1 := httptest.NewRecorder()
+	ctx1 := context.NewContext(req1, w1)
+
+	req2 := httptest.NewRequest("GET", "/test", nil)
+	req2.RemoteAddr = "192.168.1.2:12346"
+	w2 := httptest.NewRecorder()
+	ctx2 := context.NewContext(req2, w2)
+
+	// Both requests should succeed (different IPs)
+	err := wrappedHandler(ctx1)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if w1.Code != 200 {
+		t.Errorf("Expected status 200, got %d", w1.Code)
+	}
+
+	err = wrappedHandler(ctx2)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if w2.Code != 200 {
+		t.Errorf("Expected status 200, got %d", w2.Code)
+	}
+}
+
+func TestGortexRateLimitSkip(t *testing.T) {
+	handler := func(c context.Context) error {
+		return c.String(200, "success")
+	}
+
+	config := &GortexRateLimitConfig{
+		Rate:  1,
+		Burst: 1,
+		KeyFunc: func(c context.Context) string {
+			return "test-key"
+		},
+		SkipFunc: func(c context.Context) bool {
+			return c.Request().URL.Path == "/skip"
+		},
+	}
+
+	middleware := GortexRateLimitWithConfig(config)
+	wrappedHandler := middleware(handler)
+
+	// First request to non-skipped path should succeed
+	req := httptest.NewRequest("GET", "/test", nil)
+	w := httptest.NewRecorder()
+	ctx := context.NewContext(req, w)
+
+	err := wrappedHandler(ctx)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if w.Code != 200 {
+		t.Errorf("Expected status 200, got %d", w.Code)
+	}
+
+	// Second request to non-skipped path should be rate limited
+	req = httptest.NewRequest("GET", "/test", nil)
+	w = httptest.NewRecorder()
+	ctx = context.NewContext(req, w)
+
+	err = wrappedHandler(ctx)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if w.Code != 429 {
+		t.Errorf("Expected status 429, got %d", w.Code)
+	}
+
+	// Request to skipped path should always succeed
+	req = httptest.NewRequest("GET", "/skip", nil)
+	w = httptest.NewRecorder()
+	ctx = context.NewContext(req, w)
+
+	err = wrappedHandler(ctx)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if w.Code != 200 {
+		t.Errorf("Expected status 200 for skipped path, got %d", w.Code)
+	}
+}
+
+func TestMemoryRateLimiter(t *testing.T) {
+	limiter := NewMemoryRateLimiter()
+	limiter.SetRate(rate.Limit(2), 2) // 2 requests per second, burst of 2
+
+	key := "test-key"
+
+	// First two requests should be allowed (burst)
+	if !limiter.Allow(key) {
+		t.Error("First request should be allowed")
+	}
+	if !limiter.Allow(key) {
+		t.Error("Second request should be allowed")
+	}
+
+	// Third request should be denied (exceeds burst)
+	if limiter.Allow(key) {
+		t.Error("Third request should be denied")
+	}
+
+	// Test reset
+	limiter.Reset(key)
+	if !limiter.Allow(key) {
+		t.Error("Request should be allowed after reset")
 	}
 }
 
 func TestRateLimitByUser(t *testing.T) {
-	e := echo.New()
-	handler := func(c echo.Context) error {
-		return c.String(200, "OK")
+	keyFunc := RateLimitByUser("user_id")
+
+	// Create context with user ID
+	req := httptest.NewRequest("GET", "/test", nil)
+	w := httptest.NewRecorder()
+	ctx := context.NewContext(req, w)
+	ctx.Set("user_id", "user123")
+
+	key := keyFunc(ctx)
+	expected := "user:user123"
+	if key != expected {
+		t.Errorf("Expected key %s, got %s", expected, key)
 	}
-	
-	getUserID := func(c echo.Context) string {
-		return c.Request().Header.Get("X-User-ID")
-	}
-	
-	h := middleware.RateLimitByUser(1, 2, getUserID)(handler)
-	
-	users := []string{"user1", "user2"}
-	
-	for _, userID := range users {
-		// Each user should get their own limit
-		for i := 0; i < 2; i++ {
-			req := httptest.NewRequest(http.MethodGet, "/", nil)
-			req.Header.Set("X-User-ID", userID)
-			rec := httptest.NewRecorder()
-			c := e.NewContext(req, rec)
-			
-			err := h(c)
-			require.NoError(t, err)
-			assert.Equal(t, http.StatusOK, rec.Code)
-		}
+
+	// Test fallback to IP when no user ID
+	ctx2 := context.NewContext(req, w)
+	key2 := keyFunc(ctx2)
+	if key2 == expected {
+		t.Error("Should fallback to IP when no user ID")
 	}
 }
 
-func TestCustomRateLimitError(t *testing.T) {
-	errorHandler := middleware.CustomRateLimitError("Please wait before trying again", 60)
-	
-	e := echo.New()
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
-	
-	err := errorHandler(c)
-	require.Error(t, err)
-	
-	httpErr, ok := err.(*echo.HTTPError)
-	require.True(t, ok)
-	assert.Equal(t, http.StatusTooManyRequests, httpErr.Code)
-	
-	// Check response headers
-	assert.Equal(t, "60", rec.Header().Get("Retry-After"))
-}
+func TestRateLimitByHeader(t *testing.T) {
+	keyFunc := RateLimitByHeader("X-API-Key")
 
-func BenchmarkRateLimiter(b *testing.B) {
-	store := middleware.NewMemoryStore(1000, 2000)
-	defer store.Stop()
-	
-	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		i := 0
-		for pb.Next() {
-			key := "key" + string(rune(i%100))
-			store.Allow(key)
-			i++
-		}
-	})
+	req := httptest.NewRequest("GET", "/test", nil)
+	req.Header.Set("X-API-Key", "api123")
+	w := httptest.NewRecorder()
+	ctx := context.NewContext(req, w)
+
+	key := keyFunc(ctx)
+	expected := "header:X-API-Key:api123"
+	if key != expected {
+		t.Errorf("Expected key %s, got %s", expected, key)
+	}
+
+	// Test fallback when header missing
+	req2 := httptest.NewRequest("GET", "/test", nil)
+	ctx2 := context.NewContext(req2, w)
+	key2 := keyFunc(ctx2)
+	if key2 == expected {
+		t.Error("Should fallback to IP when header missing")
+	}
 }

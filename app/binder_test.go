@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yshengliao/gortex/context"
 )
 
 // Test structures for parameter binding
@@ -44,19 +44,19 @@ type TestBindingHandler struct {
 	binder *ParameterBinder
 }
 
-func (h *TestBindingHandler) SimpleMethod(c echo.Context, params *SimpleParams) error {
+func (h *TestBindingHandler) SimpleMethod(c context.Context, params *SimpleParams) error {
 	return c.JSON(200, params)
 }
 
-func (h *TestBindingHandler) ComplexMethod(c echo.Context, params *ComplexParams) error {
+func (h *TestBindingHandler) ComplexMethod(c context.Context, params *ComplexParams) error {
 	return c.JSON(200, params)
 }
 
-func (h *TestBindingHandler) PrimitiveMethod(c echo.Context, id int) error {
+func (h *TestBindingHandler) PrimitiveMethod(c context.Context, id int) error {
 	return c.JSON(200, map[string]int{"id": id})
 }
 
-func (h *TestBindingHandler) MultipleParams(c echo.Context, id int, params *SimpleParams) error {
+func (h *TestBindingHandler) MultipleParams(c context.Context, id int, params *SimpleParams) error {
 	return c.JSON(200, map[string]any{
 		"id":     id,
 		"params": params,
@@ -64,22 +64,21 @@ func (h *TestBindingHandler) MultipleParams(c echo.Context, id int, params *Simp
 }
 
 func TestParameterBinderSimple(t *testing.T) {
-	e := echo.New()
 	binder := NewParameterBinder()
 	handler := &TestBindingHandler{binder: binder}
 
 	// Test simple parameter binding
 	req := httptest.NewRequest(http.MethodGet, "/users/123?name=test", nil)
 	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
-	c.SetParamNames("id")
-	c.SetParamValues("123")
+	ctx := context.NewContext(req, rec)
+	ctx.SetParamNames("id")
+	ctx.SetParamValues("123")
 
 	handlerType := reflect.TypeOf(handler)
 	method, _ := handlerType.MethodByName("SimpleMethod")
-	params, err := binder.BindMethodParams(c, method)
+	params, err := binder.BindMethodParams(ctx, method)
 	require.NoError(t, err)
-	require.Len(t, params, 2) // echo.Context + *SimpleParams
+	require.Len(t, params, 2) // context.Context + *SimpleParams
 
 	// Check bound values
 	simpleParams := params[1].Interface().(*SimpleParams)
@@ -88,7 +87,7 @@ func TestParameterBinderSimple(t *testing.T) {
 }
 
 func TestParameterBinderComplex(t *testing.T) {
-	e := echo.New()
+	
 	binder := NewParameterBinder()
 	handler := &TestBindingHandler{binder: binder}
 
@@ -107,15 +106,15 @@ func TestParameterBinderComplex(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer token123")
 	
 	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
-	c.SetParamNames("user_id", "game_id")
-	c.SetParamValues("456", "ABC")
+	ctx := context.NewContext(req, rec)
+	ctx.SetParamNames("user_id", "game_id")
+	ctx.SetParamValues("456", "ABC")
 
 	handlerType := reflect.TypeOf(handler)
 	method, _ := handlerType.MethodByName("ComplexMethod")
-	params, err := binder.BindMethodParams(c, method)
+	params, err := binder.BindMethodParams(ctx, method)
 	require.NoError(t, err)
-	require.Len(t, params, 2) // echo.Context + *ComplexParams
+	require.Len(t, params, 2) // context.Context + *ComplexParams
 
 	// Check bound values
 	complexParams := params[1].Interface().(*ComplexParams)
@@ -131,22 +130,22 @@ func TestParameterBinderComplex(t *testing.T) {
 }
 
 func TestParameterBinderPrimitive(t *testing.T) {
-	e := echo.New()
+	
 	binder := NewParameterBinder()
 	handler := &TestBindingHandler{binder: binder}
 
 	// Test primitive parameter binding
 	req := httptest.NewRequest(http.MethodGet, "/items/789", nil)
 	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
-	c.SetParamNames("id")
-	c.SetParamValues("789")
+	ctx := context.NewContext(req, rec)
+	ctx.SetParamNames("id")
+	ctx.SetParamValues("789")
 
 	handlerType := reflect.TypeOf(handler)
 	method, _ := handlerType.MethodByName("PrimitiveMethod")
-	params, err := binder.BindMethodParams(c, method)
+	params, err := binder.BindMethodParams(ctx, method)
 	require.NoError(t, err)
-	require.Len(t, params, 2) // echo.Context + int
+	require.Len(t, params, 2) // context.Context + int
 
 	// Check bound value
 	id := params[1].Interface().(int)
@@ -154,7 +153,7 @@ func TestParameterBinderPrimitive(t *testing.T) {
 }
 
 func TestParameterBinderAutoDetection(t *testing.T) {
-	e := echo.New()
+	
 	binder := NewParameterBinder()
 
 	// Create request with mixed parameters
@@ -167,15 +166,15 @@ func TestParameterBinderAutoDetection(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	
 	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
-	c.SetParamNames("id")
-	c.SetParamValues("999")
+	ctx := context.NewContext(req, rec)
+	ctx.SetParamNames("id")
+	ctx.SetParamValues("999")
 
 	// Create a method-like structure for testing
 	params := &AutoBindParams{}
 	paramValue := reflect.ValueOf(params)
 	
-	err := binder.bindParameter(c, paramValue)
+	err := binder.bindParameter(ctx, paramValue)
 	require.NoError(t, err)
 
 	// Check auto-detected bindings
@@ -186,18 +185,18 @@ func TestParameterBinderAutoDetection(t *testing.T) {
 }
 
 func TestParameterBinderEdgeCases(t *testing.T) {
-	e := echo.New()
+	
 	binder := NewParameterBinder()
 
 	t.Run("empty request", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
+		ctx := context.NewContext(req, rec)
 
 		params := &SimpleParams{}
 		paramValue := reflect.ValueOf(params)
 		
-		err := binder.bindParameter(c, paramValue)
+		err := binder.bindParameter(ctx, paramValue)
 		require.NoError(t, err)
 		
 		// Should have zero values
@@ -209,26 +208,26 @@ func TestParameterBinderEdgeCases(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader([]byte("invalid json")))
 		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
+		ctx := context.NewContext(req, rec)
 
 		params := &SimpleParams{}
 		paramValue := reflect.ValueOf(params)
 		
-		err := binder.bindParameter(c, paramValue)
+		err := binder.bindParameter(ctx, paramValue)
 		require.NoError(t, err) // Should not fail, just skip JSON binding
 	})
 
 	t.Run("type conversion errors", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/users/abc?page_size=xyz", nil)
 		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
-		c.SetParamNames("user_id")
-		c.SetParamValues("abc")
+		ctx := context.NewContext(req, rec)
+		ctx.SetParamNames("user_id")
+		ctx.SetParamValues("abc")
 
 		params := &ComplexParams{}
 		paramValue := reflect.ValueOf(params)
 		
-		err := binder.bindParameter(c, paramValue)
+		err := binder.bindParameter(ctx, paramValue)
 		require.NoError(t, err)
 		
 		// Invalid conversions should result in zero values
@@ -238,7 +237,7 @@ func TestParameterBinderEdgeCases(t *testing.T) {
 }
 
 func TestParameterBinderTimeFormats(t *testing.T) {
-	e := echo.New()
+	
 	binder := NewParameterBinder()
 
 	type TimeParams struct {
@@ -273,12 +272,12 @@ func TestParameterBinderTimeFormats(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/"+tc.query, nil)
 			rec := httptest.NewRecorder()
-			c := e.NewContext(req, rec)
+			ctx := context.NewContext(req, rec)
 
 			params := &TimeParams{}
 			paramValue := reflect.ValueOf(params)
 			
-			err := binder.bindParameter(c, paramValue)
+			err := binder.bindParameter(ctx, paramValue)
 			require.NoError(t, err)
 			
 			// At least one time field should be set
@@ -289,7 +288,7 @@ func TestParameterBinderTimeFormats(t *testing.T) {
 }
 
 func TestParameterBinderFieldTypes(t *testing.T) {
-	e := echo.New()
+	
 	binder := NewParameterBinder()
 
 	type AllTypes struct {
@@ -316,12 +315,12 @@ func TestParameterBinderFieldTypes(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/"+query, nil)
 	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
+	ctx := context.NewContext(req, rec)
 
 	params := &AllTypes{}
 	paramValue := reflect.ValueOf(params)
 	
-	err := binder.bindParameter(c, paramValue)
+	err := binder.bindParameter(ctx, paramValue)
 	require.NoError(t, err)
 
 	assert.Equal(t, "test", params.String)

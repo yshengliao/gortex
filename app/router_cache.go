@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/labstack/echo/v4"
+	"github.com/yshengliao/gortex/context"
 )
 
 // HandlerCache caches reflection results for handlers
@@ -61,7 +61,7 @@ func (c *HandlerCache) buildMethodCache(t reflect.Type) map[string]HandlerMethod
 	// Check standard HTTP methods
 	for _, httpMethod := range httpMethods {
 		if method, exists := t.MethodByName(httpMethod); exists {
-			if isValidEchoHandler(method) {
+			if isValidGortexHandler(method) {
 				methods[httpMethod] = HandlerMethod{
 					Name:       httpMethod,
 					HTTPMethod: httpMethod,
@@ -84,7 +84,7 @@ func (c *HandlerCache) buildMethodCache(t reflect.Type) map[string]HandlerMethod
 		}
 		
 		// Check if it's a valid handler
-		if isValidEchoHandler(method) {
+		if isValidGortexHandler(method) {
 			httpMethod := "GET" // Default
 			
 			// Determine HTTP method from name
@@ -122,7 +122,7 @@ func (c *HandlerCache) buildMethodCache(t reflect.Type) map[string]HandlerMethod
 type RouteInfo struct {
 	Method  string
 	Path    string
-	Handler echo.HandlerFunc
+	Handler context.HandlerFunc
 }
 
 // RouteCache caches compiled routes

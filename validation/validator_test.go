@@ -1,14 +1,15 @@
 package validation_test
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
-	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yshengliao/gortex/context"
 	"github.com/yshengliao/gortex/validation"
 )
 
@@ -52,7 +53,7 @@ func TestValidation(t *testing.T) {
 
 		err := v.Validate(user)
 		require.Error(t, err)
-		
+
 		ve, ok := err.(*validation.ValidationError)
 		require.True(t, ok)
 		assert.Len(t, ve.Errors, 3)
@@ -127,15 +128,12 @@ func TestCustomValidators(t *testing.T) {
 }
 
 func TestBindAndValidate(t *testing.T) {
-	e := echo.New()
-	e.Validator = validation.NewValidator()
-
 	type LoginRequest struct {
 		Username string `json:"username" validate:"required,min=3,max=50"`
 		Password string `json:"password" validate:"required,min=6"`
 	}
 
-	handler := func(c echo.Context) error {
+	handler := func(c context.Context) error {
 		var req LoginRequest
 		if err := validation.BindAndValidate(c, &req); err != nil {
 			return err
@@ -143,14 +141,21 @@ func TestBindAndValidate(t *testing.T) {
 		return c.JSON(200, req)
 	}
 
-	e.POST("/login", handler)
-
 	t.Run("ValidRequest", func(t *testing.T) {
 		body := `{"username":"testuser","password":"password123"}`
 		req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(body))
-		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		req.Header.Set(context.HeaderContentType, context.MIMEApplicationJSON)
 		rec := httptest.NewRecorder()
-		e.ServeHTTP(rec, req)
+		c := context.NewContext(req, rec)
+		err := handler(c)
+		if err != nil {
+			if httpErr, ok := err.(*context.HTTPError); ok {
+				rec.WriteHeader(httpErr.Code)
+				if msg, ok := httpErr.Message.(string); ok {
+					rec.Write([]byte(msg))
+				}
+			}
+		}
 
 		assert.Equal(t, http.StatusOK, rec.Code)
 		assert.Contains(t, rec.Body.String(), "testuser")
@@ -159,9 +164,18 @@ func TestBindAndValidate(t *testing.T) {
 	t.Run("InvalidJSON", func(t *testing.T) {
 		body := `{"username":"testuser","password":}`
 		req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(body))
-		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		req.Header.Set(context.HeaderContentType, context.MIMEApplicationJSON)
 		rec := httptest.NewRecorder()
-		e.ServeHTTP(rec, req)
+		c := context.NewContext(req, rec)
+		err := handler(c)
+		if err != nil {
+			if httpErr, ok := err.(*context.HTTPError); ok {
+				rec.WriteHeader(httpErr.Code)
+				if msg, ok := httpErr.Message.(string); ok {
+					rec.Write([]byte(msg))
+				}
+			}
+		}
 
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
 		assert.Contains(t, rec.Body.String(), "Invalid request format")
@@ -170,9 +184,22 @@ func TestBindAndValidate(t *testing.T) {
 	t.Run("ValidationErrors", func(t *testing.T) {
 		body := `{"username":"ab","password":"123"}`
 		req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(body))
-		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		req.Header.Set(context.HeaderContentType, context.MIMEApplicationJSON)
 		rec := httptest.NewRecorder()
-		e.ServeHTTP(rec, req)
+		c := context.NewContext(req, rec)
+		err := handler(c)
+		if err != nil {
+			if httpErr, ok := err.(*context.HTTPError); ok {
+				rec.WriteHeader(httpErr.Code)
+				if msg, ok := httpErr.Message.(string); ok {
+					rec.Write([]byte(msg))
+				} else if errors, ok := httpErr.Message.(map[string]string); ok {
+					// Handle validation errors
+					body, _ := json.Marshal(errors)
+					rec.Write(body)
+				}
+			}
+		}
 
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
 		assert.Contains(t, rec.Body.String(), "username")
@@ -188,7 +215,7 @@ func TestValidationError(t *testing.T) {
 				"field2": "error2",
 			},
 		}
-		
+
 		errStr := ve.Error()
 		assert.Contains(t, errStr, "field1: error1")
 		assert.Contains(t, errStr, "field2: error2")
@@ -198,7 +225,7 @@ func TestValidationError(t *testing.T) {
 		ve := &validation.ValidationError{
 			Errors: map[string]string{},
 		}
-		
+
 		assert.Equal(t, "validation failed", ve.Error())
 	})
 }

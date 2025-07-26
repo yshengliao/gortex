@@ -1,21 +1,23 @@
 package app
 
 import (
+	gortexMiddleware "github.com/yshengliao/gortex/middleware"
+	"github.com/yshengliao/gortex/router"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"sync"
 	"testing"
 
-	"github.com/labstack/echo/v4"
+	"github.com/yshengliao/gortex/context"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 )
 
 // Test middleware that adds a header
-func testMiddleware(name, value string) echo.MiddlewareFunc {
-	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+func testMiddleware(name, value string) gortexMiddleware.MiddlewareFunc {
+	return func(next gortexMiddleware.HandlerFunc) gortexMiddleware.HandlerFunc {
+		return func(c context.Context) error {
 			c.Response().Header().Set(name, value)
 			return next(c)
 		}
@@ -26,9 +28,9 @@ func testMiddleware(name, value string) echo.MiddlewareFunc {
 var middlewareOrder []string
 var middlewareMu sync.Mutex
 
-func orderMiddleware(name string) echo.MiddlewareFunc {
-	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+func orderMiddleware(name string) gortexMiddleware.MiddlewareFunc {
+	return func(next gortexMiddleware.HandlerFunc) gortexMiddleware.HandlerFunc {
+		return func(c context.Context) error {
 			middlewareMu.Lock()
 			middlewareOrder = append(middlewareOrder, name)
 			middlewareMu.Unlock()
@@ -42,7 +44,7 @@ type AuthenticatedHandler struct {
 	Logger *zap.Logger
 }
 
-func (h *AuthenticatedHandler) GET(c echo.Context) error {
+func (h *AuthenticatedHandler) GET(c context.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{"status": "authenticated"})
 }
 
@@ -60,12 +62,12 @@ type PublicHandler struct {
 	Logger *zap.Logger
 }
 
-func (h *PublicHandler) GET(c echo.Context) error {
+func (h *PublicHandler) GET(c context.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{"status": "public"})
 }
 
 func TestMiddlewareInheritance(t *testing.T) {
-	e := echo.New()
+	r := router.NewGortexRouter()
 	ctx := NewContext()
 	logger := zap.NewNop()
 	Register(ctx, logger)
@@ -78,7 +80,7 @@ func TestMiddlewareInheritance(t *testing.T) {
 		},
 	}
 
-	err := RegisterRoutes(e, handlersManager, ctx)
+	err := RegisterRoutes(&App{router: r, ctx: ctx}, handlersManager)
 	assert.NoError(t, err)
 
 	// For now, just test that routes are registered
@@ -103,7 +105,7 @@ func TestMiddlewareInheritance(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest("GET", tt.path, nil)
 			rec := httptest.NewRecorder()
-			e.ServeHTTP(rec, req)
+			r.ServeHTTP(rec, req)
 
 			assert.Equal(t, tt.expectedCode, rec.Code)
 		})
@@ -115,7 +117,7 @@ type OrderTestHandler struct {
 	Logger *zap.Logger
 }
 
-func (h *OrderTestHandler) GET(c echo.Context) error {
+func (h *OrderTestHandler) GET(c context.Context) error {
 	middlewareMu.Lock()
 	middlewareOrder = append(middlewareOrder, "handler")
 	middlewareMu.Unlock()
@@ -133,13 +135,13 @@ type MultiLevelHandler struct {
 	Logger *zap.Logger
 }
 
-func (h *MultiLevelHandler) GET(c echo.Context) error {
+func (h *MultiLevelHandler) GET(c context.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{"level": "multi"})
 }
 
 // Test that middleware can be applied at different levels
 func TestMultiLevelMiddleware(t *testing.T) {
-	e := echo.New()
+	r := router.NewGortexRouter()
 	ctx := NewContext()
 	logger := zap.NewNop()
 	Register(ctx, logger)
@@ -165,13 +167,13 @@ func TestMultiLevelMiddleware(t *testing.T) {
 		},
 	}
 
-	err := RegisterRoutes(e, manager, ctx)
+	err := RegisterRoutes(&App{router: r, ctx: ctx}, manager)
 	assert.NoError(t, err)
 
 	// Test that the route is registered with all middleware
 	req := httptest.NewRequest("GET", "/api/v1/resource", nil)
 	rec := httptest.NewRecorder()
-	e.ServeHTTP(rec, req)
+	r.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusOK, rec.Code)
 	var response map[string]string

@@ -5,9 +5,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/labstack/echo/v4"
 	"github.com/yshengliao/gortex/app"
 	"github.com/yshengliao/gortex/auth"
+	"github.com/yshengliao/gortex/context"
+	"github.com/yshengliao/gortex/middleware"
 	"github.com/yshengliao/gortex/response"
 	"go.uber.org/zap"
 )
@@ -32,7 +33,7 @@ type AdminGroup struct {
 // HomeHandler - public endpoint
 type HomeHandler struct{}
 
-func (h *HomeHandler) GET(c echo.Context) error {
+func (h *HomeHandler) GET(c context.Context) error {
 	return c.JSON(200, map[string]string{
 		"message": "Welcome to Gortex Auth Example",
 		"login":   "POST /auth/login",
@@ -46,7 +47,7 @@ type AuthHandler struct {
 }
 
 // Login endpoint: POST /auth/login
-func (h *AuthHandler) Login(c echo.Context) error {
+func (h *AuthHandler) Login(c context.Context) error {
 	var req struct {
 		Username string `json:"username" validate:"required"`
 		Password string `json:"password" validate:"required"`
@@ -86,20 +87,31 @@ func (h *AuthHandler) Login(c echo.Context) error {
 type UserHandler struct{}
 
 // Profile endpoint: GET /user/profile
-func (h *UserHandler) Profile(c echo.Context) error {
-	// In a real app, auth middleware would set user info in context
-	// For this example, we'll show what would be available
+func (h *UserHandler) Profile(c context.Context) error {
+	// Get user claims from JWT (set by auth middleware)
+	claims := auth.GetClaims(c)
+	if claims != nil {
+		return c.JSON(200, map[string]interface{}{
+			"message": "This is your profile",
+			"user": map[string]string{
+				"id":       claims.UserID,
+				"username": claims.Username,
+				"email":    claims.Email,
+				"role":     claims.Role,
+			},
+		})
+	}
 	
 	return c.JSON(200, map[string]interface{}{
 		"message": "This is a protected endpoint",
-		"note": "In production, auth middleware validates JWT and sets user context",
+		"note": "JWT claims would be available here in production",
 	})
 }
 
 // DashboardHandler - admin only
 type DashboardHandler struct{}
 
-func (h *DashboardHandler) GET(c echo.Context) error {
+func (h *DashboardHandler) GET(c context.Context) error {
 	return c.JSON(200, map[string]string{
 		"message": "Admin Dashboard",
 		"access":  "admin only",
@@ -109,7 +121,7 @@ func (h *DashboardHandler) GET(c echo.Context) error {
 // UsersHandler - admin only
 type UsersHandler struct{}
 
-func (h *UsersHandler) GET(c echo.Context) error {
+func (h *UsersHandler) GET(c context.Context) error {
 	id := c.Param("id")
 	return c.JSON(200, map[string]string{
 		"message": "Admin viewing user",
@@ -146,14 +158,29 @@ func main() {
 	cfg.Server.Address = ":8081"
 	cfg.Logger.Level = "debug"
 
-	// Create application
+	// Create application first
 	application, err := app.NewApp(
 		app.WithConfig(cfg),
 		app.WithLogger(logger),
-		app.WithHandlers(handlers),
 	)
 	if err != nil {
 		log.Fatal(err)
+	}
+	
+	// Get application context and register middleware
+	ctx := application.Context()
+	
+	// Create middleware registry
+	middlewareRegistry := make(map[string]middleware.MiddlewareFunc)
+	middlewareRegistry["auth"] = auth.Middleware(jwtService)
+	middlewareRegistry["admin"] = AdminMiddleware()
+	
+	// Register middleware registry in context
+	app.Register(ctx, middlewareRegistry)
+	
+	// Now register handlers with middleware support
+	if err := app.RegisterRoutes(application, handlers); err != nil {
+		log.Fatal("Failed to register routes:", err)
 	}
 
 	logger.Info("Starting Gortex Auth Example", 
@@ -174,11 +201,14 @@ func main() {
 }
 
 // AdminMiddleware checks if user has admin role
-func AdminMiddleware() echo.MiddlewareFunc {
-	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
-			// In production, this would check JWT claims
-			// For demo, we'll just show the concept
+func AdminMiddleware() middleware.MiddlewareFunc {
+	return func(next middleware.HandlerFunc) middleware.HandlerFunc {
+		return func(c context.Context) error {
+			// Check if user has admin role
+			claims := auth.GetClaims(c)
+			if claims == nil || claims.Role != "admin" {
+				return response.Forbidden(c, "Admin access required")
+			}
 			return next(c)
 		}
 	}

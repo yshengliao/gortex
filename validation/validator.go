@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/go-playground/validator/v10"
-	"github.com/labstack/echo/v4"
+	"github.com/yshengliao/gortex/context"
 )
 
 // Validator wraps go-playground/validator
@@ -141,16 +141,18 @@ func (ve *ValidationError) Error() string {
 }
 
 // BindAndValidate binds and validates request data
-func BindAndValidate(c echo.Context, i any) error {
+func BindAndValidate(c context.Context, i any) error {
 	if err := c.Bind(i); err != nil {
-		return echo.NewHTTPError(400, "Invalid request format")
+		return context.NewHTTPError(400, "Invalid request format")
 	}
 	
-	if err := c.Validate(i); err != nil {
+	// Create a validator instance
+	v := NewValidator()
+	if err := v.Validate(i); err != nil {
 		if ve, ok := err.(*ValidationError); ok {
-			return echo.NewHTTPError(400, ve.Errors)
+			return context.NewHTTPError(400, ve.Errors)
 		}
-		return echo.NewHTTPError(400, err.Error())
+		return context.NewHTTPError(400, err.Error())
 	}
 	
 	return nil

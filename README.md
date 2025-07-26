@@ -1,18 +1,18 @@
-# Gortex - Go Web Framework with Struct Tag Routing
+# Gortex - High-Performance Go Web Framework
 
 [![Go Version](https://img.shields.io/badge/go-1.24+-blue.svg)](https://go.dev/)
 ![Status](https://img.shields.io/badge/status-v0.3.0--alpha-orange.svg)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 
-> **Zero boilerplate web framework for Go. Define routes with struct tags, not code.**
+> **Zero boilerplate, pure Go web framework. Define routes with struct tags, not code.**
 
 ## ✨ Why Gortex?
 
 ```go
 // ❌ Traditional: Manual route registration
-e.GET("/", homeHandler)
-e.GET("/users/:id", userHandler)
-e.GET("/api/v1/users", apiV1UserHandler)
+r.GET("/", homeHandler)
+r.GET("/users/:id", userHandler)
+r.GET("/api/v1/users", apiV1UserHandler)
 // ... dozens more routes
 
 // ✅ Gortex: Automatic discovery from struct tags
@@ -33,8 +33,8 @@ go get github.com/yshengliao/gortex
 package main
 
 import (
-    "github.com/labstack/echo/v4"
     "github.com/yshengliao/gortex/app"
+    "github.com/yshengliao/gortex/context"
 )
 
 // Define routes with struct tags
@@ -46,12 +46,12 @@ type HandlersManager struct {
 }
 
 type HomeHandler struct{}
-func (h *HomeHandler) GET(c echo.Context) error {
-    return c.JSON(200, map[string]string{"message": "Welcome!"})
+func (h *HomeHandler) GET(c context.Context) error {
+    return c.JSON(200, map[string]string{"message": "Welcome to Gortex!"})
 }
 
 type UserHandler struct{}
-func (h *UserHandler) GET(c echo.Context) error {
+func (h *UserHandler) GET(c context.Context) error {
     return c.JSON(200, map[string]string{"id": c.Param("id")})
 }
 
@@ -60,12 +60,12 @@ type AdminGroup struct {
 }
 
 type DashboardHandler struct{}
-func (h *DashboardHandler) GET(c echo.Context) error {
+func (h *DashboardHandler) GET(c context.Context) error {
     return c.JSON(200, map[string]string{"data": "admin only"})
 }
 
 type WSHandler struct{}
-func (h *WSHandler) GET(c echo.Context) error {
+func (h *WSHandler) HandleConnection(c context.Context) error {
     // WebSocket upgrade logic
     return nil
 }
@@ -105,10 +105,10 @@ type HandlersManager struct {
 ```go
 type UserHandler struct{}
 
-func (h *UserHandler) GET(c echo.Context) error    { /* GET /users/:id */ }
-func (h *UserHandler) POST(c echo.Context) error   { /* POST /users/:id */ }
-func (h *UserHandler) DELETE(c echo.Context) error { /* DELETE /users/:id */ }
-func (h *UserHandler) Profile(c echo.Context) error { /* POST /users/:id/profile */ }
+func (h *UserHandler) GET(c context.Context) error    { /* GET /users/:id */ }
+func (h *UserHandler) POST(c context.Context) error   { /* POST /users/:id */ }
+func (h *UserHandler) DELETE(c context.Context) error { /* DELETE /users/:id */ }
+func (h *UserHandler) Profile(c context.Context) error { /* POST /users/:id/profile */ }
 ```
 
 ### 3. Nested Route Groups
@@ -172,7 +172,7 @@ type WSHandler struct {
     hub *hub.Hub
 }
 
-func (h *WSHandler) GET(c echo.Context) error {
+func (h *WSHandler) HandleConnection(c context.Context) error {
     // Auto-upgrades to WebSocket with hijack:"ws" tag
     conn, _ := upgrader.Upgrade(c.Response(), c.Request(), nil)
     client := hub.NewClient(h.hub, conn, id, logger)
@@ -202,7 +202,7 @@ errors.Register(ErrUserNotFound, 404, "User not found")
 errors.Register(ErrUnauthorized, 401, "Unauthorized")
 
 // Automatic error responses
-func (h *UserHandler) GET(c echo.Context) error {
+func (h *UserHandler) GET(c context.Context) error {
     user, err := h.service.GetUser(c.Param("id"))
     if err != nil {
         return err // Framework handles HTTP response
@@ -237,7 +237,7 @@ type UserHandler struct {
     service *UserService // Business logic here
 }
 
-func (h *UserHandler) GET(c echo.Context) error {
+func (h *UserHandler) GET(c context.Context) error {
     user, err := h.service.GetUser(c.Request().Context(), c.Param("id"))
     // Handle response...
 }
@@ -266,5 +266,5 @@ MIT License - see [LICENSE](LICENSE) file.
 ---
 
 <p align="center">
-Built with ❤️ by the Go community | Powered by <a href="https://echo.labstack.com">Echo</a>
+Built with ❤️ by the Go community | Pure Go Framework
 </p>

@@ -8,20 +8,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yshengliao/gortex/context"
+	"github.com/yshengliao/gortex/pkg/errors"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest"
-	"github.com/yshengliao/gortex/pkg/errors"
 )
 
 func TestErrorHandler(t *testing.T) {
 	tests := []struct {
 		name           string
-		handler        echo.HandlerFunc
+		handler        HandlerFunc
 		requestID      string
 		expectedStatus int
 		expectedCode   int
@@ -29,7 +28,7 @@ func TestErrorHandler(t *testing.T) {
 	}{
 		{
 			name: "Success - no error",
-			handler: func(c echo.Context) error {
+			handler: func(c context.Context) error {
 				return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 			},
 			expectedStatus: http.StatusOK,
@@ -39,7 +38,7 @@ func TestErrorHandler(t *testing.T) {
 		},
 		{
 			name: "ErrorResponse - validation error",
-			handler: func(c echo.Context) error {
+			handler: func(c context.Context) error {
 				return errors.NewWithDetails(errors.CodeValidationFailed, "Validation failed", map[string]interface{}{
 					"field": "email",
 					"error": "invalid format",
@@ -51,11 +50,11 @@ func TestErrorHandler(t *testing.T) {
 			validateBody: func(t *testing.T, body map[string]interface{}) {
 				assert.False(t, body["success"].(bool))
 				assert.Equal(t, "test-request-123", body["request_id"])
-				
+
 				errorDetail := body["error"].(map[string]interface{})
 				assert.Equal(t, float64(errors.CodeValidationFailed.Int()), errorDetail["code"])
 				assert.Equal(t, "Validation failed", errorDetail["message"])
-				
+
 				details := errorDetail["details"].(map[string]interface{})
 				assert.Equal(t, "email", details["field"])
 				assert.Equal(t, "invalid format", details["error"])
@@ -63,14 +62,14 @@ func TestErrorHandler(t *testing.T) {
 		},
 		{
 			name: "ErrorResponse - unauthorized",
-			handler: func(c echo.Context) error {
+			handler: func(c context.Context) error {
 				return errors.New(errors.CodeTokenExpired, "Token has expired")
 			},
 			expectedStatus: http.StatusUnauthorized,
 			expectedCode:   errors.CodeTokenExpired.Int(),
 			validateBody: func(t *testing.T, body map[string]interface{}) {
 				assert.False(t, body["success"].(bool))
-				
+
 				errorDetail := body["error"].(map[string]interface{})
 				assert.Equal(t, float64(errors.CodeTokenExpired.Int()), errorDetail["code"])
 				assert.Equal(t, "Token has expired", errorDetail["message"])
@@ -78,14 +77,14 @@ func TestErrorHandler(t *testing.T) {
 		},
 		{
 			name: "Echo HTTPError - 404",
-			handler: func(c echo.Context) error {
-				return echo.NewHTTPError(http.StatusNotFound, "Resource not found")
+			handler: func(c context.Context) error {
+				return context.NewHTTPError(http.StatusNotFound, "Resource not found")
 			},
 			expectedStatus: http.StatusNotFound,
 			expectedCode:   errors.CodeResourceNotFound.Int(),
 			validateBody: func(t *testing.T, body map[string]interface{}) {
 				assert.False(t, body["success"].(bool))
-				
+
 				errorDetail := body["error"].(map[string]interface{})
 				assert.Equal(t, float64(errors.CodeResourceNotFound.Int()), errorDetail["code"])
 				assert.Equal(t, "Resource not found", errorDetail["message"])
@@ -93,18 +92,20 @@ func TestErrorHandler(t *testing.T) {
 		},
 		{
 			name: "Echo HTTPError - 500 with internal error",
-			handler: func(c echo.Context) error {
-				return echo.NewHTTPError(http.StatusInternalServerError, "Something went wrong").SetInternal(fmt.Errorf("database connection failed"))
+			handler: func(c context.Context) error {
+				err := context.NewHTTPError(http.StatusInternalServerError, "Something went wrong")
+				err.Internal = fmt.Errorf("database connection failed")
+				return err
 			},
 			expectedStatus: http.StatusInternalServerError,
 			expectedCode:   errors.CodeInternalServerError.Int(),
 			validateBody: func(t *testing.T, body map[string]interface{}) {
 				assert.False(t, body["success"].(bool))
-				
+
 				errorDetail := body["error"].(map[string]interface{})
 				assert.Equal(t, float64(errors.CodeInternalServerError.Int()), errorDetail["code"])
 				assert.Equal(t, "Something went wrong", errorDetail["message"])
-				
+
 				// Internal error should be in details
 				details := errorDetail["details"].(map[string]interface{})
 				assert.Contains(t, details["internal"], "database connection failed")
@@ -112,33 +113,33 @@ func TestErrorHandler(t *testing.T) {
 		},
 		{
 			name: "Standard Go error - hidden in production",
-			handler: func(c echo.Context) error {
+			handler: func(c context.Context) error {
 				return fmt.Errorf("database connection timeout")
 			},
 			expectedStatus: http.StatusInternalServerError,
 			expectedCode:   errors.CodeInternalServerError.Int(),
 			validateBody: func(t *testing.T, body map[string]interface{}) {
 				assert.False(t, body["success"].(bool))
-				
+
 				errorDetail := body["error"].(map[string]interface{})
 				assert.Equal(t, float64(errors.CodeInternalServerError.Int()), errorDetail["code"])
 				// In production mode, actual error is hidden
 				assert.Equal(t, "An internal error occurred", errorDetail["message"])
-				
+
 				// No details should be exposed
 				assert.Nil(t, errorDetail["details"])
 			},
 		},
 		{
 			name: "Echo HTTPError - rate limit",
-			handler: func(c echo.Context) error {
-				return echo.NewHTTPError(http.StatusTooManyRequests, "Rate limit exceeded")
+			handler: func(c context.Context) error {
+				return context.NewHTTPError(http.StatusTooManyRequests, "Rate limit exceeded")
 			},
 			expectedStatus: http.StatusTooManyRequests,
 			expectedCode:   errors.CodeRateLimitExceeded.Int(),
 			validateBody: func(t *testing.T, body map[string]interface{}) {
 				assert.False(t, body["success"].(bool))
-				
+
 				errorDetail := body["error"].(map[string]interface{})
 				assert.Equal(t, float64(errors.CodeRateLimitExceeded.Int()), errorDetail["code"])
 				assert.Equal(t, "Rate limit exceeded", errorDetail["message"])
@@ -149,16 +150,15 @@ func TestErrorHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Setup
-			e := echo.New()
 			req := httptest.NewRequest(http.MethodGet, "/test", nil)
 			if tt.requestID != "" {
-				req.Header.Set(echo.HeaderXRequestID, tt.requestID)
+				req.Header.Set(context.HeaderXRequestID, tt.requestID)
 			}
 			rec := httptest.NewRecorder()
-			c := e.NewContext(req, rec)
+			c := context.NewContext(req, rec)
 
 			// Add request ID middleware
-			middleware.RequestID()(func(c echo.Context) error {
+			RequestID()(func(c context.Context) error {
 				// Apply error handler middleware
 				return ErrorHandler()(tt.handler)(c)
 			})(c)
@@ -200,12 +200,11 @@ func TestErrorHandlerWithConfig(t *testing.T) {
 			DefaultMessage:                 "Internal error",
 		}
 
-		e := echo.New()
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
 		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
+		c := context.NewContext(req, rec)
 
-		handler := func(c echo.Context) error {
+		handler := func(c context.Context) error {
 			return fmt.Errorf("sensitive database error: connection timeout at 192.168.1.1")
 		}
 
@@ -220,7 +219,7 @@ func TestErrorHandlerWithConfig(t *testing.T) {
 		// In development mode, actual error is shown
 		errorDetail := body["error"].(map[string]interface{})
 		assert.Equal(t, "sensitive database error: connection timeout at 192.168.1.1", errorDetail["message"])
-		
+
 		// Error details should be included
 		details := errorDetail["details"].(map[string]interface{})
 		assert.Equal(t, "sensitive database error: connection timeout at 192.168.1.1", details["error"])
@@ -234,12 +233,11 @@ func TestErrorHandlerWithConfig(t *testing.T) {
 			DefaultMessage:                 "Something went wrong",
 		}
 
-		e := echo.New()
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
 		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
+		c := context.NewContext(req, rec)
 
-		handler := func(c echo.Context) error {
+		handler := func(c context.Context) error {
 			return fmt.Errorf("sensitive database error: connection timeout at 192.168.1.1")
 		}
 
@@ -254,18 +252,17 @@ func TestErrorHandlerWithConfig(t *testing.T) {
 		// In production mode, actual error is hidden
 		errorDetail := body["error"].(map[string]interface{})
 		assert.Equal(t, "Something went wrong", errorDetail["message"])
-		
+
 		// No details should be exposed
 		assert.Nil(t, errorDetail["details"])
 	})
 
 	t.Run("Nil config uses defaults", func(t *testing.T) {
-		e := echo.New()
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
 		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
+		c := context.NewContext(req, rec)
 
-		handler := func(c echo.Context) error {
+		handler := func(c context.Context) error {
 			return fmt.Errorf("test error")
 		}
 
@@ -274,11 +271,11 @@ func TestErrorHandlerWithConfig(t *testing.T) {
 
 		// Should use default config
 		assert.Equal(t, http.StatusInternalServerError, rec.Code)
-		
+
 		var body map[string]interface{}
 		err := json.Unmarshal(rec.Body.Bytes(), &body)
 		require.NoError(t, err)
-		
+
 		errorDetail := body["error"].(map[string]interface{})
 		assert.Equal(t, "An internal error occurred", errorDetail["message"])
 	})
@@ -286,16 +283,15 @@ func TestErrorHandlerWithConfig(t *testing.T) {
 
 func TestErrorHandlerCommittedResponse(t *testing.T) {
 	// Test that middleware doesn't modify already committed responses
-	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
 	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
+	c := context.NewContext(req, rec)
 
-	handler := func(c echo.Context) error {
+	handler := func(c context.Context) error {
 		// Write response
 		c.JSON(http.StatusOK, map[string]string{"status": "ok"})
-		// Force commit
-		c.Response().Committed = true
+		// Note: In Gortex, check if response is already written instead
+		rec.Flushed = true
 		// Return error after response is committed
 		return fmt.Errorf("error after commit")
 	}
@@ -306,7 +302,7 @@ func TestErrorHandlerCommittedResponse(t *testing.T) {
 	// The error should be returned as-is
 	assert.Error(t, err)
 	assert.Equal(t, "error after commit", err.Error())
-	
+
 	// Response should not be modified
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Contains(t, rec.Body.String(), `"status":"ok"`)
@@ -336,7 +332,7 @@ func TestMapHTTPErrorToCode(t *testing.T) {
 		{http.StatusGatewayTimeout, errors.CodeTimeout},
 		// Unknown codes
 		{599, errors.CodeInternalServerError}, // Unknown 5xx
-		{499, errors.CodeInvalidInput},         // Unknown 4xx
+		{499, errors.CodeInvalidInput},        // Unknown 4xx
 		{399, errors.CodeInternalServerError}, // Unknown 3xx
 	}
 
@@ -363,23 +359,23 @@ func TestErrorHandlerLogging(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		handler echo.HandlerFunc
+		handler HandlerFunc
 	}{
 		{
 			name: "Log ErrorResponse",
-			handler: func(c echo.Context) error {
+			handler: func(c context.Context) error {
 				return errors.New(errors.CodeValidationFailed, "Test validation error")
 			},
 		},
 		{
 			name: "Log HTTPError",
-			handler: func(c echo.Context) error {
-				return echo.NewHTTPError(http.StatusNotFound, "Not found")
+			handler: func(c context.Context) error {
+				return context.NewHTTPError(http.StatusNotFound, "Not found")
 			},
 		},
 		{
 			name: "Log standard error",
-			handler: func(c echo.Context) error {
+			handler: func(c context.Context) error {
 				return fmt.Errorf("standard error")
 			},
 		},
@@ -387,10 +383,9 @@ func TestErrorHandlerLogging(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			e := echo.New()
 			req := httptest.NewRequest(http.MethodGet, "/test", nil)
 			rec := httptest.NewRecorder()
-			c := e.NewContext(req, rec)
+			c := context.NewContext(req, rec)
 
 			// Apply middleware
 			ErrorHandlerWithConfig(config)(tt.handler)(c)

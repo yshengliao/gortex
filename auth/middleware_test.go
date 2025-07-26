@@ -6,14 +6,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yshengliao/gortex/auth"
+	"github.com/yshengliao/gortex/context"
+	"github.com/yshengliao/gortex/router"
 )
 
 func TestMiddleware(t *testing.T) {
-	e := echo.New()
+	r := router.NewGortexRouter()
 	jwtService := auth.NewJWTService("test-secret", time.Hour, 24*time.Hour, "test")
 
 	// Generate a valid token
@@ -21,7 +22,7 @@ func TestMiddleware(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test handler that requires authentication
-	handler := func(c echo.Context) error {
+	handler := func(c context.Context) error {
 		claims := auth.GetClaims(c)
 		if claims == nil {
 			return c.JSON(500, map[string]string{"error": "no claims"})
@@ -33,7 +34,8 @@ func TestMiddleware(t *testing.T) {
 	}
 
 	// Apply middleware
-	e.GET("/protected", handler, auth.Middleware(jwtService))
+	r.Use(auth.Middleware(jwtService))
+	r.GET("/protected", handler)
 
 	tests := []struct {
 		name           string
@@ -74,7 +76,7 @@ func TestMiddleware(t *testing.T) {
 				req.Header.Set("Authorization", tt.authHeader)
 			}
 			rec := httptest.NewRecorder()
-			e.ServeHTTP(rec, req)
+			r.ServeHTTP(rec, req)
 
 			assert.Equal(t, tt.expectedStatus, rec.Code)
 			assert.Contains(t, rec.Body.String(), tt.expectedBody)
@@ -83,8 +85,9 @@ func TestMiddleware(t *testing.T) {
 }
 
 func TestGetClaims(t *testing.T) {
-	e := echo.New()
-	c := e.NewContext(nil, nil)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := context.NewContext(req, rec)
 
 	// No claims set
 	claims := auth.GetClaims(c)
@@ -107,8 +110,9 @@ func TestGetClaims(t *testing.T) {
 }
 
 func TestGetUserID(t *testing.T) {
-	e := echo.New()
-	c := e.NewContext(nil, nil)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := context.NewContext(req, rec)
 
 	// No claims
 	userID := auth.GetUserID(c)
@@ -121,8 +125,9 @@ func TestGetUserID(t *testing.T) {
 }
 
 func TestGetUsername(t *testing.T) {
-	e := echo.New()
-	c := e.NewContext(nil, nil)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := context.NewContext(req, rec)
 
 	// No claims
 	username := auth.GetUsername(c)
@@ -135,9 +140,9 @@ func TestGetUsername(t *testing.T) {
 }
 
 func TestRequireRole(t *testing.T) {
-	e := echo.New()
-	
-	handler := func(c echo.Context) error {
+	e := router.NewGortexRouter()
+
+	handler := func(c context.Context) error {
 		return c.JSON(200, map[string]string{"message": "success"})
 	}
 
@@ -170,19 +175,19 @@ func TestRequireRole(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/admin", nil)
 			rec := httptest.NewRecorder()
-			c := e.NewContext(req, rec)
-			
+			c := context.NewContext(req, rec)
+
 			if tt.claims != nil {
 				c.Set(auth.ClaimsContextKey, tt.claims)
 			}
-			
+
 			// Execute middleware and handler
 			h := auth.RequireRole("admin")(handler)
 			err := h(c)
-			
+
 			if tt.expectedStatus >= 400 {
 				require.Error(t, err)
-				httpErr, ok := err.(*echo.HTTPError)
+				httpErr, ok := err.(*context.HTTPError)
 				require.True(t, ok)
 				assert.Equal(t, tt.expectedStatus, httpErr.Code)
 			} else {
@@ -194,9 +199,9 @@ func TestRequireRole(t *testing.T) {
 }
 
 func TestRequireGameID(t *testing.T) {
-	e := echo.New()
-	
-	handler := func(c echo.Context) error {
+	e := router.NewGortexRouter()
+
+	handler := func(c context.Context) error {
 		return c.JSON(200, map[string]string{"message": "success"})
 	}
 
@@ -229,19 +234,19 @@ func TestRequireGameID(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/game", nil)
 			rec := httptest.NewRecorder()
-			c := e.NewContext(req, rec)
-			
+			c := context.NewContext(req, rec)
+
 			if tt.claims != nil {
 				c.Set(auth.ClaimsContextKey, tt.claims)
 			}
-			
+
 			// Execute middleware and handler
 			h := auth.RequireGameID()(handler)
 			err := h(c)
-			
+
 			if tt.expectedStatus >= 400 {
 				require.Error(t, err)
-				httpErr, ok := err.(*echo.HTTPError)
+				httpErr, ok := err.(*context.HTTPError)
 				require.True(t, ok)
 				assert.Equal(t, tt.expectedStatus, httpErr.Code)
 			} else {

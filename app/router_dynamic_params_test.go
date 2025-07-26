@@ -1,12 +1,13 @@
 package app
 
 import (
+	"github.com/yshengliao/gortex/router"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/labstack/echo/v4"
+	"github.com/yshengliao/gortex/context"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 )
@@ -16,14 +17,14 @@ type DynamicParamHandler struct {
 	Logger *zap.Logger
 }
 
-func (h *DynamicParamHandler) GET(c echo.Context) error {
+func (h *DynamicParamHandler) GET(c context.Context) error {
 	id := c.Param("id")
 	return c.JSON(http.StatusOK, map[string]string{
 		"id": id,
 	})
 }
 
-func (h *DynamicParamHandler) GetProfile(c echo.Context) error {
+func (h *DynamicParamHandler) GetProfile(c context.Context) error {
 	id := c.Param("id")
 	return c.JSON(http.StatusOK, map[string]string{
 		"id":     id,
@@ -36,14 +37,14 @@ type GameHandler struct {
 	Logger *zap.Logger
 }
 
-func (h *GameHandler) GET(c echo.Context) error {
+func (h *GameHandler) GET(c context.Context) error {
 	gameID := c.Param("gameid")
 	return c.JSON(http.StatusOK, map[string]string{
 		"gameid": gameID,
 	})
 }
 
-func (h *GameHandler) PlaceBet(c echo.Context) error {
+func (h *GameHandler) PlaceBet(c context.Context) error {
 	gameID := c.Param("gameid")
 	betID := c.Param("betid")
 	return c.JSON(http.StatusOK, map[string]string{
@@ -96,7 +97,7 @@ func TestDynamicRouteParameters(t *testing.T) {
 		},
 	}
 
-	e := echo.New()
+	r := router.NewGortexRouter()
 	ctx := NewContext()
 	logger := zap.NewNop()
 	Register(ctx, logger)
@@ -106,14 +107,14 @@ func TestDynamicRouteParameters(t *testing.T) {
 		Game: &GameHandler{Logger: logger},
 	}
 
-	err := RegisterRoutes(e, handlersManager, ctx)
+	err := RegisterRoutes(&App{router: r, ctx: ctx}, handlersManager)
 	assert.NoError(t, err)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(tt.method, tt.path, nil)
 			rec := httptest.NewRecorder()
-			e.ServeHTTP(rec, req)
+			r.ServeHTTP(rec, req)
 
 			assert.Equal(t, tt.expectedCode, rec.Code)
 			if tt.expectedBody != nil {
@@ -140,7 +141,7 @@ type NestedHandlersManager struct {
 }
 
 func TestNestedGroupsWithDynamicParams(t *testing.T) {
-	e := echo.New()
+	r := router.NewGortexRouter()
 	ctx := NewContext()
 	logger := zap.NewNop()
 	Register(ctx, logger)
@@ -151,15 +152,11 @@ func TestNestedGroupsWithDynamicParams(t *testing.T) {
 		},
 	}
 
-	err := RegisterRoutes(e, handlersManager, ctx)
+	err := RegisterRoutes(&App{router: r, ctx: ctx}, handlersManager)
 	assert.NoError(t, err)
 
-	// Debug: print all registered routes
-	routes := e.Routes()
-	t.Logf("Registered routes:")
-	for _, route := range routes {
-		t.Logf("  %s %s", route.Method, route.Path)
-	}
+	// Debug: print registered routes info
+	t.Logf("Routes registered successfully")
 
 	// Test nested routes work correctly
 	tests := []struct {
@@ -189,7 +186,7 @@ func TestNestedGroupsWithDynamicParams(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(tt.method, tt.path, nil)
 			rec := httptest.NewRecorder()
-			e.ServeHTTP(rec, req)
+			r.ServeHTTP(rec, req)
 
 			assert.Equal(t, tt.expectedCode, rec.Code)
 			if tt.expectedBody != nil {
@@ -211,7 +208,7 @@ type StaticHandler struct {
 	Logger *zap.Logger
 }
 
-func (h *StaticHandler) GET(c echo.Context) error {
+func (h *StaticHandler) GET(c context.Context) error {
 	filepath := c.Param("*")
 	return c.JSON(http.StatusOK, map[string]string{
 		"filepath": filepath,
@@ -223,7 +220,7 @@ type WildcardHandlersManager struct {
 }
 
 func TestWildcardRoutes(t *testing.T) {
-	e := echo.New()
+	r := router.NewGortexRouter()
 	ctx := NewContext()
 	logger := zap.NewNop()
 	Register(ctx, logger)
@@ -232,7 +229,7 @@ func TestWildcardRoutes(t *testing.T) {
 		Static: &StaticHandler{Logger: logger},
 	}
 
-	err := RegisterRoutes(e, handlersManager, ctx)
+	err := RegisterRoutes(&App{router: r, ctx: ctx}, handlersManager)
 	assert.NoError(t, err)
 
 	tests := []struct {
@@ -261,7 +258,7 @@ func TestWildcardRoutes(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest("GET", tt.path, nil)
 			rec := httptest.NewRecorder()
-			e.ServeHTTP(rec, req)
+			r.ServeHTTP(rec, req)
 
 			assert.Equal(t, http.StatusOK, rec.Code)
 			var response map[string]string

@@ -6,34 +6,32 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
+	gortexContext "github.com/yshengliao/gortex/context"
 	"go.uber.org/zap"
 )
 
-func TestFromEchoContext(t *testing.T) {
-	e := echo.New()
-
+func TestFromGortexContext(t *testing.T) {
 	t.Run("from context value", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
+		c := gortexContext.NewContext(req, rec)
 		
 		expectedID := "test-request-id"
 		c.Set("request_id", expectedID)
 		
-		assert.Equal(t, expectedID, FromEchoContext(c))
+		assert.Equal(t, expectedID, FromGortexContext(c))
 	})
 
 	t.Run("from response header", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
+		c := gortexContext.NewContext(req, rec)
 		
 		expectedID := "header-request-id"
 		c.Response().Header().Set(HeaderXRequestID, expectedID)
 		
-		assert.Equal(t, expectedID, FromEchoContext(c))
+		assert.Equal(t, expectedID, FromGortexContext(c))
 	})
 
 	t.Run("from request header", func(t *testing.T) {
@@ -41,30 +39,30 @@ func TestFromEchoContext(t *testing.T) {
 		expectedID := "request-header-id"
 		req.Header.Set(HeaderXRequestID, expectedID)
 		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
+		c := gortexContext.NewContext(req, rec)
 		
-		assert.Equal(t, expectedID, FromEchoContext(c))
+		assert.Equal(t, expectedID, FromGortexContext(c))
 	})
 
 	t.Run("priority order", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		req.Header.Set(HeaderXRequestID, "request-id")
 		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
+		c := gortexContext.NewContext(req, rec)
 		
 		c.Response().Header().Set(HeaderXRequestID, "response-id")
 		c.Set("request_id", "context-id")
 		
 		// Context value should have highest priority
-		assert.Equal(t, "context-id", FromEchoContext(c))
+		assert.Equal(t, "context-id", FromGortexContext(c))
 	})
 
 	t.Run("no request ID", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
+		c := gortexContext.NewContext(req, rec)
 		
-		assert.Empty(t, FromEchoContext(c))
+		assert.Empty(t, FromGortexContext(c))
 	})
 }
 
@@ -85,17 +83,16 @@ func TestContextOperations(t *testing.T) {
 		assert.Empty(t, FromContext(ctx))
 	})
 
-	t.Run("WithEchoContext", func(t *testing.T) {
-		e := echo.New()
+	t.Run("WithGortexContext", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
+		c := gortexContext.NewContext(req, rec)
 		
 		requestID := "echo-request-id"
 		c.Set("request_id", requestID)
 		
 		ctx := context.Background()
-		ctx = WithEchoContext(ctx, c)
+		ctx = WithGortexContext(ctx, c)
 		
 		assert.Equal(t, requestID, FromContext(ctx))
 	})
@@ -121,10 +118,9 @@ func TestHTTPHeaderOperations(t *testing.T) {
 
 func TestPropagation(t *testing.T) {
 	t.Run("PropagateToRequest", func(t *testing.T) {
-		e := echo.New()
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
+		c := gortexContext.NewContext(req, rec)
 		
 		requestID := "propagate-123"
 		c.Set("request_id", requestID)
@@ -165,17 +161,16 @@ func TestLoggerIntegration(t *testing.T) {
 		assert.Equal(t, logger, newLogger) // Should return same logger
 	})
 
-	t.Run("LoggerFromEcho", func(t *testing.T) {
-		e := echo.New()
+	t.Run("LoggerFromGortex", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
+		c := gortexContext.NewContext(req, rec)
 		
 		requestID := "echo-logger-id"
 		c.Set("request_id", requestID)
 		
 		logger := zap.NewNop()
-		newLogger := LoggerFromEcho(logger, c)
+		newLogger := LoggerFromGortex(logger, c)
 		assert.NotNil(t, newLogger)
 	})
 
@@ -268,16 +263,15 @@ func TestHTTPClient(t *testing.T) {
 }
 
 // Benchmarks
-func BenchmarkFromEchoContext(b *testing.B) {
-	e := echo.New()
+func BenchmarkFromGortexContext(b *testing.B) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
+	c := gortexContext.NewContext(req, rec)
 	c.Set("request_id", "bench-id")
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = FromEchoContext(c)
+		_ = FromGortexContext(c)
 	}
 }
 

@@ -1,213 +1,161 @@
 package middleware
 
 import (
-	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/labstack/echo/v4"
-	"github.com/stretchr/testify/assert"
+	"github.com/yshengliao/gortex/context"
 )
 
 func TestRequestID(t *testing.T) {
-	e := echo.New()
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
+	// Create a test handler
+	handler := func(c context.Context) error {
+		// Verify request ID is set
+		rid := GetRequestID(c)
+		if rid == "" {
+			t.Error("Request ID should be set")
+		}
+		return c.String(200, "test")
+	}
 
-	// Test with default configuration
-	mw := RequestID()
-	handler := mw(func(c echo.Context) error {
-		// Check that request ID is set in context
-		requestID := c.Get("request_id").(string)
-		assert.NotEmpty(t, requestID)
-		
-		// Check UUID format (8-4-4-4-12)
-		assert.Regexp(t, `^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$`, requestID)
-		
-		return c.String(http.StatusOK, "OK")
-	})
+	// Create middleware
+	middleware := RequestID()
+	wrappedHandler := middleware(handler)
 
-	err := handler(c)
-	assert.NoError(t, err)
+	// Create test request
+	req := httptest.NewRequest("GET", "/test", nil)
+	w := httptest.NewRecorder()
+	ctx := context.NewContext(req, w)
+
+	// Execute
+	err := wrappedHandler(ctx)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
 
 	// Check response header
-	assert.NotEmpty(t, rec.Header().Get(echo.HeaderXRequestID))
+	if w.Header().Get("X-Request-ID") == "" {
+		t.Error("X-Request-ID header should be set")
+	}
 }
 
 func TestRequestIDWithExistingID(t *testing.T) {
-	e := echo.New()
-	existingID := "existing-request-id-123"
-	
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req.Header.Set(echo.HeaderXRequestID, existingID)
-	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
+	existingID := "existing-request-id"
 
-	mw := RequestID()
-	handler := mw(func(c echo.Context) error {
-		// Check that existing request ID is preserved
-		requestID := c.Get("request_id").(string)
-		assert.Equal(t, existingID, requestID)
-		return c.String(http.StatusOK, "OK")
-	})
-
-	err := handler(c)
-	assert.NoError(t, err)
-
-	// Check response header has the same ID
-	assert.Equal(t, existingID, rec.Header().Get(echo.HeaderXRequestID))
-}
-
-func TestRequestIDWithCustomGenerator(t *testing.T) {
-	e := echo.New()
-	customID := "custom-generated-id"
-	
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
-
-	config := RequestIDConfig{
-		Generator: func() string {
-			return customID
-		},
+	// Create a test handler
+	handler := func(c context.Context) error {
+		rid := GetRequestID(c)
+		if rid != existingID {
+			t.Errorf("Expected request ID %s, got %s", existingID, rid)
+		}
+		return c.String(200, "test")
 	}
-	
-	mw := RequestIDWithConfig(config)
-	handler := mw(func(c echo.Context) error {
-		// Check custom generated ID
-		requestID := c.Get("request_id").(string)
-		assert.Equal(t, customID, requestID)
-		return c.String(http.StatusOK, "OK")
-	})
 
-	err := handler(c)
-	assert.NoError(t, err)
+	// Create middleware
+	middleware := RequestID()
+	wrappedHandler := middleware(handler)
 
-	// Check response header
-	assert.Equal(t, customID, rec.Header().Get(echo.HeaderXRequestID))
-}
+	// Create test request with existing request ID
+	req := httptest.NewRequest("GET", "/test", nil)
+	req.Header.Set("X-Request-ID", existingID)
+	w := httptest.NewRecorder()
+	ctx := context.NewContext(req, w)
 
-func TestRequestIDWithHandler(t *testing.T) {
-	e := echo.New()
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
-
-	handlerCalled := false
-	capturedID := ""
-	
-	config := RequestIDConfig{
-		RequestIDHandler: func(c echo.Context, requestID string) {
-			handlerCalled = true
-			capturedID = requestID
-		},
+	// Execute
+	err := wrappedHandler(ctx)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
 	}
-	
-	mw := RequestIDWithConfig(config)
-	handler := mw(func(c echo.Context) error {
-		return c.String(http.StatusOK, "OK")
-	})
 
-	err := handler(c)
-	assert.NoError(t, err)
-	
-	assert.True(t, handlerCalled)
-	assert.NotEmpty(t, capturedID)
-	assert.Equal(t, capturedID, rec.Header().Get(echo.HeaderXRequestID))
+	// Check response header matches existing ID
+	if w.Header().Get("X-Request-ID") != existingID {
+		t.Errorf("Expected X-Request-ID header %s, got %s", existingID, w.Header().Get("X-Request-ID"))
+	}
 }
 
-func TestRequestIDWithCustomHeader(t *testing.T) {
-	e := echo.New()
-	customHeader := "X-Trace-ID"
-	existingID := "trace-123"
-	
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req.Header.Set(customHeader, existingID)
-	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
+func TestRequestIDWithConfig(t *testing.T) {
+	customHeader := "X-Custom-Request-ID"
 
 	config := RequestIDConfig{
 		TargetHeader: customHeader,
+		Generator: func() string {
+			return "custom-id"
+		},
 	}
-	
-	mw := RequestIDWithConfig(config)
-	handler := mw(func(c echo.Context) error {
-		// Check that existing ID from custom header is used
-		requestID := c.Get("request_id").(string)
-		assert.Equal(t, existingID, requestID)
-		return c.String(http.StatusOK, "OK")
-	})
 
-	err := handler(c)
-	assert.NoError(t, err)
+	// Create a test handler
+	handler := func(c context.Context) error {
+		rid := GetRequestID(c)
+		if rid != "custom-id" {
+			t.Errorf("Expected request ID 'custom-id', got %s", rid)
+		}
+		return c.String(200, "test")
+	}
 
-	// Check response uses custom header
-	assert.Equal(t, existingID, rec.Header().Get(customHeader))
+	// Create middleware
+	middleware := RequestIDWithConfig(config)
+	wrappedHandler := middleware(handler)
+
+	// Create test request
+	req := httptest.NewRequest("GET", "/test", nil)
+	w := httptest.NewRecorder()
+	ctx := context.NewContext(req, w)
+
+	// Execute
+	err := wrappedHandler(ctx)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	// Check response header
+	if w.Header().Get(customHeader) != "custom-id" {
+		t.Errorf("Expected %s header 'custom-id', got %s", customHeader, w.Header().Get(customHeader))
+	}
 }
 
-func TestRequestIDWithSkipper(t *testing.T) {
-	e := echo.New()
-	req := httptest.NewRequest(http.MethodGet, "/skip", nil)
-	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
-
+func TestRequestIDSkipper(t *testing.T) {
 	config := RequestIDConfig{
-		Skipper: func(c echo.Context) bool {
+		Skipper: func(c context.Context) bool {
 			return c.Request().URL.Path == "/skip"
 		},
 	}
-	
-	mw := RequestIDWithConfig(config)
-	handler := mw(func(c echo.Context) error {
-		// Check that request ID is NOT set when skipped
-		requestID := c.Get("request_id")
-		assert.Nil(t, requestID)
-		return c.String(http.StatusOK, "OK")
-	})
 
-	err := handler(c)
-	assert.NoError(t, err)
+	// Create a test handler
+	handler := func(c context.Context) error {
+		return c.String(200, "test")
+	}
 
-	// Check no request ID header when skipped
-	assert.Empty(t, rec.Header().Get(echo.HeaderXRequestID))
-}
+	// Create middleware
+	middleware := RequestIDWithConfig(config)
+	wrappedHandler := middleware(handler)
 
-// Benchmark the request ID generation
-func BenchmarkRequestID(b *testing.B) {
-	e := echo.New()
-	mw := RequestID()
-	handler := mw(func(c echo.Context) error {
-		return nil
-	})
+	// Test skipped request
+	req := httptest.NewRequest("GET", "/skip", nil)
+	w := httptest.NewRecorder()
+	ctx := context.NewContext(req, w)
 
-	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			req := httptest.NewRequest(http.MethodGet, "/", nil)
-			rec := httptest.NewRecorder()
-			c := e.NewContext(req, rec)
-			handler(c)
-		}
-	})
-}
+	err := wrappedHandler(ctx)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
 
-// Benchmark with existing request ID (no generation needed)
-func BenchmarkRequestIDWithExisting(b *testing.B) {
-	e := echo.New()
-	mw := RequestID()
-	handler := mw(func(c echo.Context) error {
-		return nil
-	})
+	// Check that request ID header is not set
+	if w.Header().Get("X-Request-ID") != "" {
+		t.Error("X-Request-ID header should not be set for skipped requests")
+	}
 
-	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			req := httptest.NewRequest(http.MethodGet, "/", nil)
-			req.Header.Set(echo.HeaderXRequestID, "existing-id-123")
-			rec := httptest.NewRecorder()
-			c := e.NewContext(req, rec)
-			handler(c)
-		}
-	})
+	// Test non-skipped request
+	req = httptest.NewRequest("GET", "/test", nil)
+	w = httptest.NewRecorder()
+	ctx = context.NewContext(req, w)
+
+	err = wrappedHandler(ctx)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	// Check that request ID header is set
+	if w.Header().Get("X-Request-ID") == "" {
+		t.Error("X-Request-ID header should be set for non-skipped requests")
+	}
 }

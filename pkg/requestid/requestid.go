@@ -6,7 +6,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/labstack/echo/v4"
+	gortexContext "github.com/yshengliao/gortex/context"
 	"go.uber.org/zap"
 )
 
@@ -18,17 +18,17 @@ const (
 	RequestIDKey contextKey = "request_id"
 
 	// HeaderXRequestID is the standard header name for request ID
-	HeaderXRequestID = echo.HeaderXRequestID
+	HeaderXRequestID = "X-Request-ID"
 )
 
-// FromEchoContext extracts the request ID from an Echo context
-func FromEchoContext(c echo.Context) string {
+// FromGortexContext extracts the request ID from a Gortex context
+func FromGortexContext(c gortexContext.Context) string {
 	// First try to get from context value (set by our middleware)
 	if rid, ok := c.Get("request_id").(string); ok && rid != "" {
 		return rid
 	}
 
-	// Fallback to checking response header (set by Echo's middleware)
+	// Fallback to checking response header (set by middleware)
 	if rid := c.Response().Header().Get(HeaderXRequestID); rid != "" {
 		return rid
 	}
@@ -54,9 +54,9 @@ func WithContext(ctx context.Context, requestID string) context.Context {
 	return context.WithValue(ctx, RequestIDKey, requestID)
 }
 
-// WithEchoContext adds the request ID from Echo context to a standard context
-func WithEchoContext(ctx context.Context, c echo.Context) context.Context {
-	rid := FromEchoContext(c)
+// WithGortexContext adds the request ID from Gortex context to a standard context
+func WithGortexContext(ctx context.Context, c gortexContext.Context) context.Context {
+	rid := FromGortexContext(c)
 	if rid != "" {
 		return WithContext(ctx, rid)
 	}
@@ -75,9 +75,9 @@ func GetHeader(req *http.Request) string {
 	return req.Header.Get(HeaderXRequestID)
 }
 
-// PropagateToRequest propagates the request ID from an Echo context to an outgoing HTTP request
-func PropagateToRequest(c echo.Context, req *http.Request) {
-	rid := FromEchoContext(c)
+// PropagateToRequest propagates the request ID from a Gortex context to an outgoing HTTP request
+func PropagateToRequest(c gortexContext.Context, req *http.Request) {
+	rid := FromGortexContext(c)
 	if rid != "" {
 		SetHeader(req, rid)
 	}
@@ -99,9 +99,9 @@ func Logger(logger *zap.Logger, requestID string) *zap.Logger {
 	return logger
 }
 
-// LoggerFromEcho returns a logger with the request ID from Echo context
-func LoggerFromEcho(logger *zap.Logger, c echo.Context) *zap.Logger {
-	return Logger(logger, FromEchoContext(c))
+// LoggerFromGortex returns a logger with the request ID from Gortex context
+func LoggerFromGortex(logger *zap.Logger, c gortexContext.Context) *zap.Logger {
+	return Logger(logger, FromGortexContext(c))
 }
 
 // LoggerFromContext returns a logger with the request ID from context

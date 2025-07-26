@@ -4,8 +4,8 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/labstack/echo/v4"
 	"github.com/yshengliao/gortex/app"
+	"github.com/yshengliao/gortex/context"
 	"github.com/yshengliao/gortex/response"
 	"go.uber.org/zap"
 )
@@ -51,7 +51,7 @@ type APIv2Group struct {
 // HomeHandler handles the root route
 type HomeHandler struct{}
 
-func (h *HomeHandler) GET(c echo.Context) error {
+func (h *HomeHandler) GET(c context.Context) error {
 	return c.JSON(200, map[string]string{
 		"message": "Welcome to Gortex",
 		"version": "v0.3.0",
@@ -61,7 +61,7 @@ func (h *HomeHandler) GET(c echo.Context) error {
 // HealthHandler demonstrates simple health check
 type HealthHandler struct{}
 
-func (h *HealthHandler) GET(c echo.Context) error {
+func (h *HealthHandler) GET(c context.Context) error {
 	return c.JSON(200, map[string]string{
 		"status": "healthy",
 	})
@@ -71,7 +71,7 @@ func (h *HealthHandler) GET(c echo.Context) error {
 type UserHandler struct{}
 
 // GET /users/:id
-func (h *UserHandler) GET(c echo.Context) error {
+func (h *UserHandler) GET(c context.Context) error {
 	id := c.Param("id")
 	return c.JSON(200, map[string]interface{}{
 		"id":   id,
@@ -80,7 +80,7 @@ func (h *UserHandler) GET(c echo.Context) error {
 }
 
 // POST /users/:id
-func (h *UserHandler) POST(c echo.Context) error {
+func (h *UserHandler) POST(c context.Context) error {
 	id := c.Param("id")
 	return response.Success(c, 201, map[string]string{
 		"message": "User created",
@@ -89,7 +89,7 @@ func (h *UserHandler) POST(c echo.Context) error {
 }
 
 // Profile creates a sub-route: POST /users/:id/profile
-func (h *UserHandler) Profile(c echo.Context) error {
+func (h *UserHandler) Profile(c context.Context) error {
 	id := c.Param("id")
 	return c.JSON(200, map[string]string{
 		"userId":  id,
@@ -100,7 +100,7 @@ func (h *UserHandler) Profile(c echo.Context) error {
 // StaticHandler demonstrates wildcard routes
 type StaticHandler struct{}
 
-func (h *StaticHandler) GET(c echo.Context) error {
+func (h *StaticHandler) GET(c context.Context) error {
 	filepath := c.Param("*")
 	return c.JSON(200, map[string]string{
 		"file": filepath,
@@ -111,7 +111,7 @@ func (h *StaticHandler) GET(c echo.Context) error {
 // UserAPIHandler for API v1
 type UserAPIHandler struct{}
 
-func (h *UserAPIHandler) GET(c echo.Context) error {
+func (h *UserAPIHandler) GET(c context.Context) error {
 	return c.JSON(200, map[string]string{
 		"version": "v1",
 		"user":    c.Param("id"),
@@ -121,7 +121,7 @@ func (h *UserAPIHandler) GET(c echo.Context) error {
 // ProductHandler for API v1
 type ProductHandler struct{}
 
-func (h *ProductHandler) GET(c echo.Context) error {
+func (h *ProductHandler) GET(c context.Context) error {
 	return c.JSON(200, map[string]string{
 		"version": "v1",
 		"product": c.Param("id"),
@@ -131,7 +131,7 @@ func (h *ProductHandler) GET(c echo.Context) error {
 // UserAPIHandlerV2 for API v2
 type UserAPIHandlerV2 struct{}
 
-func (h *UserAPIHandlerV2) GET(c echo.Context) error {
+func (h *UserAPIHandlerV2) GET(c context.Context) error {
 	return c.JSON(200, map[string]string{
 		"version": "v2",
 		"user":    c.Param("id"),
