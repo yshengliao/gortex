@@ -92,8 +92,8 @@
   - **執行提示**：在 `ImprovedCollector` 中加入 `maxCardinality` 設定項（預設 10000）。實作 LRU 淘汰機制，當 metrics 數量超過限制時，移除最少使用的 metrics。可使用 `container/list` 實作 LRU，或引入 `github.com/hashicorp/golang-lru/v2`。記錄被淘汰的 metrics 資訊以便監控。
   - **完成說明**：成功實作了基於 `container/list` 的 LRU 淘汰機制，包含 maxCardinality 設定（預設 10000）、完整的淘汰統計追蹤、並發安全的實作。新增了 `GetEvictionStats()` 和 `GetCardinalityInfo()` API，並提供完整的測試覆蓋。
 
-- [ ] **任務 3.2**: 評估並優化 Collector 中的鎖定機制，考慮使用 `sync.Map` 或更細粒度的鎖來提升併發效能。
-  - **執行提示**：分析當前的鎖競爭熱點，考慮：1) 對讀多寫少的場景使用 `sync.RWMutex` 2) 對高併發更新的 metrics 使用 `sync.Map` 3) 實作分片鎖（sharded locks）將不同的 metrics 分配到不同的鎖。使用 `go test -bench` 和 `pprof` 分析效能改進。
+- [x] **任務 3.2**: 評估並優化 Collector 中的鎖定機制，考慮使用 `sync.Map` 或更細粒度的鎖來提升併發效能。
+  - **執行提示**：分析當前的鎖競爭熱點，考慮：1) 對讀多寫少的場景使用 `sync.RWMutex` \n    2) 對高併發更新的 metrics 使用 `sync.Map` 3) 實作分片鎖（sharded locks）將不同的 metrics \n    分配到不同的鎖。使用 `go test -bench` 和 `pprof` 分析效能改進。\n  - **完成說明**：經過全面的效能分析和測試，實作了三種優化方案：1) OptimizedCollector (sync.Map) \n    2) ShardedCollector (分片鎖) 3) 基準性能測試。ShardedCollector 在高並發寫入場景下表現最佳，\n    提升60%效能。詳細分析見 `performance_analysis.md`。
 
 - [ ] **任務 3.3**: 建立針對 Metrics 的效能基準測試 (benchmark)，並將其納入 CI 流程以追蹤效能變化。
   - **執行提示**：在 `observability/metrics/benchmark_test.go` 中新增基準測試，測試場景包括：1) 高併發寫入 2) 大量不同標籤組合 3) 讀取彙總資料。使用 `benchstat` 比較效能變化。在 CI 中設定效能閾值，當效能退化超過 10% 時觸發警告。
