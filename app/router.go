@@ -10,10 +10,10 @@ import (
 	"strconv"
 	"strings"
 
-	"go.uber.org/zap"
-	gortexContext "github.com/yshengliao/gortex/context"
+	gortexContext "github.com/yshengliao/gortex/http/context"
 	gortexMiddleware "github.com/yshengliao/gortex/middleware"
-	"github.com/yshengliao/gortex/router"
+	"github.com/yshengliao/gortex/http/router"
+	"go.uber.org/zap"
 )
 
 // RegisterRoutes registers routes from a HandlersManager struct
@@ -199,7 +199,7 @@ func registerHTTPHandlerWithMiddleware(r router.GortexRouter, basePath string, h
 // registerMethodWithMiddleware registers a standard HTTP method with middleware
 func registerMethodWithMiddleware(r router.GortexRouter, httpMethod, path string, handler any, method reflect.Method, middleware []gortexMiddleware.MiddlewareFunc, app *App) {
 	handlerFunc := createHandlerFunc(handler, method)
-	
+
 	// Collect route info if app is provided and logging is enabled
 	if app != nil && app.enableRoutesLog {
 		handlerName := reflect.TypeOf(handler).Elem().Name()
@@ -210,7 +210,7 @@ func registerMethodWithMiddleware(r router.GortexRouter, httpMethod, path string
 		} else {
 			middlewareNames = []string{}
 		}
-		
+
 		app.routeInfos = append(app.routeInfos, RouteLogInfo{
 			Method:      httpMethod,
 			Path:        path,
@@ -240,7 +240,7 @@ func registerMethodWithMiddleware(r router.GortexRouter, httpMethod, path string
 // registerCustomMethodWithMiddleware registers a custom method with middleware
 func registerCustomMethodWithMiddleware(r router.GortexRouter, path string, handler any, method reflect.Method, middleware []gortexMiddleware.MiddlewareFunc, app *App) {
 	handlerFunc := createHandlerFunc(handler, method)
-	
+
 	// Collect route info for custom methods
 	if app != nil && app.enableRoutesLog {
 		handlerName := reflect.TypeOf(handler).Elem().Name()
@@ -250,7 +250,7 @@ func registerCustomMethodWithMiddleware(r router.GortexRouter, path string, hand
 		} else {
 			middlewareNames = []string{}
 		}
-		
+
 		app.routeInfos = append(app.routeInfos, RouteLogInfo{
 			Method:      "POST", // Custom methods are registered as POST
 			Path:        path,
@@ -258,7 +258,7 @@ func registerCustomMethodWithMiddleware(r router.GortexRouter, path string, hand
 			Middlewares: middlewareNames,
 		})
 	}
-	
+
 	r.POST(path, handlerFunc, middleware...)
 }
 
@@ -267,12 +267,12 @@ func createHandlerFunc(handler any, method reflect.Method) gortexMiddleware.Hand
 	// Check if method uses automatic parameter binding
 	methodType := method.Type
 	usesBinder := false
-	
+
 	// Check if method has parameters beyond receiver and gortex.Context
 	if methodType.NumIn() > 2 {
 		usesBinder = true
 	}
-	
+
 	return func(c gortexContext.Context) error {
 		// Get DI context from gortex context if available
 		var diContext *Context
@@ -281,7 +281,7 @@ func createHandlerFunc(handler any, method reflect.Method) gortexMiddleware.Hand
 				diContext = diCtx
 			}
 		}
-		
+
 		// Create parameter binder if needed
 		var binder *ParameterBinder
 		if usesBinder {
@@ -291,9 +291,9 @@ func createHandlerFunc(handler any, method reflect.Method) gortexMiddleware.Hand
 				binder = NewParameterBinder()
 			}
 		}
-		
+
 		var args []reflect.Value
-		
+
 		if usesBinder {
 			// Use parameter binder for automatic binding
 			params, err := binder.BindMethodParams(c, method)
@@ -305,7 +305,7 @@ func createHandlerFunc(handler any, method reflect.Method) gortexMiddleware.Hand
 			// Legacy mode: just pass gortex.Context
 			args = []reflect.Value{reflect.ValueOf(handler), reflect.ValueOf(c)}
 		}
-		
+
 		results := method.Func.Call(args)
 
 		if len(results) > 0 && results[0].Interface() != nil {
@@ -496,13 +496,13 @@ func autoInitHandlers(v reflect.Value, checkURLTag bool) error {
 		// Check url tag if we're at the top level
 		urlTag := fieldType.Tag.Get("url")
 		shouldInit := !checkURLTag || urlTag != ""
-		
+
 		// Initialize nil pointer fields
 		if field.Kind() == reflect.Ptr && field.IsNil() && shouldInit {
 			// Only initialize if it's a struct pointer (handlers/groups)
 			if field.Type().Elem().Kind() == reflect.Struct {
 				field.Set(reflect.New(field.Type().Elem()))
-				
+
 				// Recursively initialize nested structures (don't check url tags in nested structs)
 				if err := autoInitHandlers(field, false); err != nil {
 					return fmt.Errorf("failed to auto-initialize field %s: %w", fieldType.Name, err)
@@ -592,7 +592,7 @@ func getAvailableTypes(ctx *Context) []string {
 	}
 	ctx.mu.RLock()
 	defer ctx.mu.RUnlock()
-	
+
 	types := make([]string, 0, len(ctx.services))
 	for t := range ctx.services {
 		types = append(types, t.String())

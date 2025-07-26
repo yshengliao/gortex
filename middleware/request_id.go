@@ -3,7 +3,7 @@ package middleware
 
 import (
 	"github.com/google/uuid"
-	"github.com/yshengliao/gortex/context"
+	"github.com/yshengliao/gortex/http/context"
 )
 
 // RequestIDConfig defines the config for RequestID middleware.

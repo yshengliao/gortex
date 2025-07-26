@@ -1,132 +1,199 @@
-# Gortex Framework - Actionable Improvement Plan
+# Gortex 框架改進計畫：任務清單與實施藍圖
 
-> **Status**: Active | **Last Updated**: 2025/07/26 | **Version**: 3.0
+## 概述
 
-This document contains actionable tasks for improving the Gortex framework. Each task includes the exact prompt to execute the improvement.
+本文件旨在將 Gortex 框架改進計畫轉化為一份可執行的開發藍圖。計畫核心圍繞 Context Propagation、Observability、自動化文件、Tracing 功能增強及專案結構重構五大主題。所有任務均已根據優先級和依賴關係進行排序。
 
-## ✅ Completed Tasks
+## 總體實施藍圖 (Roadmap)
 
-### 1. Metrics Collector Improvements
-- [x] **Remove SimpleCollector** - Removed deprecated SimpleCollector implementation
-- [x] **Set ImprovedCollector as default** - `NewCollector()` now returns ImprovedCollector
-- [x] **Clean up deprecated functions** - Removed deprecated response helper functions
+此藍圖整合了原計畫的時程與優先級，提供一個清晰的交付順序。
 
-### 2. Code Quality
-- [x] **Run go vet** - No issues found
-- [x] **Fix all tests** - All tests passing after removing deprecated code
+| 階段 | 核心主題 | 預計時程 | 關鍵交付成果 |
+|------|----------|----------|--------------|
+| Phase 1 | 核心穩定性 & 結構重構 | 2-3 週 | Context 靜態檢查工具、Observability 目錄重組、App 測試整合 ✅ |
+| Phase 2 | Observability 增強 | 3-4 週 | 增強型 Tracing 介面 (8 級嚴重性)、OpenTelemetry Tracing 整合與適配器 |
+| Phase 3 | 開發體驗提升 | 3-4 週 | 自動化 API 文件生成功能 (基於 Struct Tag) |
+| Phase 4 | 持續整合與維護 | 持續進行 | CI/CD 整合、效能回歸測試、最佳實踐文件 |
+| **總計** | | **約 8-11 週** | |
 
-## 📋 Pending Tasks
+## Phase 1: 核心穩定性 & 結構重構
 
-### Priority 1: Context Cancellation Support
+此階段專注於解決當前最急迫的穩定性問題，並進行結構性重構，為後續功能開發奠定基礎。
 
-#### Task 1.1: Add Context Checker Tool
-**Prompt**: "Create a Go static analysis tool at `internal/analyzer/context_checker.go` that scans all handler and middleware functions to verify they properly handle context cancellation. The tool should check for: 1) Functions accepting context.Context that don't check ctx.Done(), 2) Long-running operations without cancellation checks, 3) Missing context propagation to child operations. Generate a report showing which files need fixes."
+### 1. Context Propagation 完整性 ✅
 
-#### Task 1.2: Implement Context Cancellation in Handlers
-**Prompt**: "Update all HTTP handlers and middleware in the `app/` directory to properly handle context cancellation. For each handler: 1) Add ctx.Done() checks before long operations, 2) Use context.WithTimeout for external calls, 3) Return immediately when context is cancelled. Focus on router.go, handler.go, and all middleware implementations."
+**目標**：確保框架內所有長時間操作都能正確響應 context 的取消信號，避免資源洩漏。
 
-#### Task 1.3: Add Context Cancellation Tests
-**Prompt**: "Create comprehensive tests for context cancellation in `app/context_cancellation_test.go`. Tests should cover: 1) Request cancellation during handler execution, 2) Timeout scenarios, 3) Cascading cancellation through middleware chain, 4) WebSocket connection cancellation. Use test helpers to simulate slow operations."
+- [x] **任務 1.1**: 建立靜態分析工具 `internal/analyzer/context_checker.go`，用於檢測 `context.Context` 是否被正確傳遞與使用。
+  - **執行提示**：使用 `go/ast` 套件解析 Go 程式碼，檢查所有接收 `context.Context` 的函式是否正確傳遞給子函式呼叫。檢測到問題時應輸出檔案名、行號和具體問題描述。參考 `golang.org/x/tools/go/analysis` 框架實作。
 
-### Priority 2: Observability Enhancements
+- [x] **任務 1.2**: 建立 context 相關的單元測試，特別是針對 context cancellation 的場景。
+  - **執行提示**：在 `app/context_test.go` 中新增測試案例，使用 `context.WithCancel` 和 `context.WithTimeout` 測試各種取消場景。確保測試覆蓋：1) 請求中途取消 2) 超時自動取消 3) 父 context 取消傳播到子 context。使用 goroutine 模擬長時間操作。
 
-#### Task 2.1: Integrate OpenTelemetry Tracing
-**Prompt**: "Create OpenTelemetry integration in `observability/otel/` directory. Implement: 1) `provider.go` with OTLP exporter configuration, 2) `tracing.go` with span creation helpers, 3) `middleware.go` for automatic HTTP tracing. The integration should be optional and configured via `TracingConfig` in the app config."
+- [x] **任務 1.3**: 在所有 Handler 和 Middleware 中，針對 I/O 操作或長時間運行的業務邏輯，加入 `context.Done()` 檢查點。
+  - **執行提示**：審查所有 HTTP 請求、資料庫查詢、檔案操作等 I/O 操作，在操作前後加入 `select { case <-ctx.Done(): return ctx.Err() }` 檢查。對於迴圈操作，在每次迭代開始時檢查 context 狀態。重點關注 `app/`, `middleware/`, `websocket/` 目錄下的實作。
 
-#### Task 2.2: Add Metrics Limits
-**Prompt**: "Update ImprovedCollector in `observability/improved_collector.go` to add configurable limits: 1) Max unique paths (default 1000), 2) Max business metrics (default 100), 3) LRU eviction when limits reached. Add configuration options and ensure thread-safe implementation."
+- [x] **任務 1.4**: 提供一組 context-aware 的輔助函式，簡化在業務邏輯中處理 cancellation 的複雜度。
+  - **執行提示**：在 `internal/contextutil/` 建立輔助函式，例如：`DoWithContext(ctx, fn)` - 執行函式並自動處理取消、`RetryWithContext(ctx, fn, opts)` - 帶重試的 context-aware 操作、`ParallelWithContext(ctx, fns...)` - 並行執行多個操作。所有函式都應該在檢測到 context 取消時立即返回。
 
-#### Task 2.3: Create Observability Examples
-**Prompt**: "Create a new example at `examples/observability/` demonstrating: 1) Metrics collection with custom business metrics, 2) Health checks for database/Redis/external APIs, 3) OpenTelemetry integration with Jaeger. Include docker-compose.yml for running Jaeger locally."
+### 2. 專案結構簡潔化 ✅
 
-### Priority 3: Project Structure Simplification
+**目標**：重組專案目錄，使功能模組化，降低認知負擔並簡化維護。
 
-#### Task 3.1: Reorganize Observability Package
-**Prompt**: "Reorganize the observability package structure: 1) Create `observability/metrics/` and move all metrics-related files, 2) Create `observability/health/` for health check files, 3) Create `observability/tracing/` for tracing files. Update all imports and ensure tests still pass."
+- [x] **任務 2.1**: 重構 observability 目錄
+  - [x] 將 `metrics.go` 和 `improved_collector.go` 合併為 `observability/metrics/collector.go`。
+    - **執行提示**：保留 `ImprovedCollector` 實作，移除已標記為 deprecated 的 `SimpleCollector`。確保所有公開 API 保持不變。合併時整理相關的型別定義和介面，確保匯出的符號維持向後相容。
+  
+  - [x] 將 health 相關實作移至 `observability/health/` 子目錄。
+    - **執行提示**：移動 `health.go` 和 `health_safe.go` 到新目錄，更新所有 import 路徑。確保 `health.NewHealthService()` 等公開 API 仍可正常存取。
 
-#### Task 3.2: Consolidate App Tests
-**Prompt**: "Consolidate test files in the app package: 1) Merge all router tests into `router_test.go` and `router_integration_test.go`, 2) Combine binder tests into single `binder_test.go`, 3) Remove redundant test files. Group tests by functionality using subtests."
+  - [x] 將 tracing 相關實作移至 `observability/tracing/` 子目錄。
+    - **執行提示**：移動 `tracing.go` 到新目錄，更新相關 import。注意保持與 `observability/otel/` 的整合點不變。
 
-#### Task 3.3: Create Test Utilities
-**Prompt**: "Create `internal/testutil/` package with: 1) Common mock implementations in `mock/`, 2) Test fixtures in `fixture/`, 3) Custom test assertions in `assert/`. Extract all repeated test helpers from existing tests into this package."
+  - [x] 整合各子目錄內的測試檔案，確保命名與結構一致。
+    - **執行提示**：遵循 `<package>_test.go` 命名規範，benchmark 測試獨立為 `benchmark_test.go`。每個子目錄應有對應的測試檔案，移除重複的測試案例。
 
-### Priority 4: Auto Documentation
+- [x] **任務 2.2**: 整合 app 目錄測試
+  - [x] 合併 `binder_test.go` 和 `binder_extended_test.go`。
+    - **執行提示**：將 extended 測試中的案例整合到主測試檔案，使用 `t.Run()` 組織測試子群組。保留所有測試覆蓋率，移除重複的測試案例。
 
-#### Task 4.1: Design Documentation Interface
-**Prompt**: "Create documentation interfaces in `pkg/doc/interfaces.go`: 1) `DocProvider` interface for different doc formats, 2) `RouteDoc` struct for route documentation, 3) `HandlerDoc` for handler metadata. The design should support OpenAPI/Swagger generation."
+  - [x] 將 router 相關測試重構為 `router_test.go` (單元測試) 和 `router_integration_test.go` (整合測試)。
+    - **執行提示**：單元測試專注於路由匹配邏輯、參數解析等獨立功能。整合測試包含完整的 HTTP 請求流程、middleware 串接等。使用 `httptest` 套件進行測試。
+    - **完成說明**：已存在完整的 router 測試檔案，無需重新建立。
 
-#### Task 4.2: Implement Swagger Provider
-**Prompt**: "Implement Swagger/OpenAPI provider in `pkg/doc/swagger/`: 1) Parse struct tags for API documentation, 2) Generate OpenAPI 3.0 spec from routes, 3) Support request/response schema generation from struct tags. Include example tags like `api:\"group=User,version=v1\"`."
+  - [x] 建立 `app/testutil/` 目錄，用於存放 app 層級的測試輔助工具。
+    - **執行提示**：移動測試中重複使用的 mock handler、test server 建立函式等到此目錄。提供 `NewTestApp()` 等輔助函式簡化測試設置。
 
-#### Task 4.3: Add Documentation Middleware
-**Prompt**: "Create documentation middleware that: 1) Serves Swagger UI at `/_docs`, 2) Exposes OpenAPI spec at `/_docs/openapi.json`, 3) Auto-generates documentation from registered routes. Add `WithAutoDoc()` option to app initialization."
+- [x] **任務 2.3**: 建立全域測試工具目錄
+  - [x] 建立 `internal/testutil/` 目錄，集中管理 mock 物件、測試 fixtures 及自定義 assertions。
+    - **執行提示**：建立子目錄結構：`mock/` 存放介面的 mock 實作、`fixture/` 存放測試資料和配置、`assert/` 存放自定義斷言函式。提供 README 說明各工具的使用方式。
 
-### Priority 5: Enhanced Tracing
+### 3. 專案結構重組 ✅
 
-#### Task 5.1: Extend Span Interface
-**Prompt**: "Enhance the tracing span interface in `observability/tracing.go` to support severity levels: 1) Add Debug, Info, Warn, Error, Critical methods to Span, 2) Add structured logging with fields, 3) Maintain backward compatibility. Follow the severity level design from Bofry/trace but keep it lightweight."
+**目標**：改善專案結構，提升程式碼組織的清晰度和可維護性。
 
-#### Task 5.2: Add Trace Context Propagation
-**Prompt**: "Implement W3C Trace Context propagation: 1) Extract trace headers in middleware, 2) Inject headers for outgoing HTTP requests, 3) Support both W3C and Jaeger formats. Add helpers for common HTTP clients."
+- [x] **任務 3.1**: 重組目錄結構以提升清晰度
+  - [x] 將 HTTP 相關套件整合到 `http/` 目錄下（router, middleware, context, response）
+  - [x] 將 WebSocket hub 移至 `websocket/` 目錄
+  - [x] 將工具類套件整合到 `utils/` 目錄下
+  - [x] 移除 `pkg/` 目錄，直接使用頂層套件組織
+  - [x] 將 service interfaces 移至 `app/interfaces/`
+  - **完成說明**：成功重組專案結構，提升了程式碼組織的清晰度和可維護性。
 
-## 🚀 Quick Start Commands
+## Phase 2: Observability 增強
 
-### Run Tests
-```bash
-go test ./... -race -cover
-```
+此階段專注於整合 OpenTelemetry 並增強 Tracing 功能，提供更細緻、更標準化的可觀測性能力。
 
-### Check Code Quality
-```bash
-go vet ./...
-golangci-lint run
-```
+### 3. Metrics 效能優化
 
-### Build Examples
-```bash
-cd examples/simple && go build
-cd examples/auth && go build
-cd examples/websocket && go build
-```
+**目標**：解決現有 Collector 的潛在效能瓶頸，確保在高併發場景下的穩定性。
 
-## 📊 Success Metrics
+- [ ] **任務 3.1**: 為 `ImprovedCollector` 實作基於 LRU (Least Recently Used) 策略的基數限制 (cardinality limit)，防止記憶體無界增長。
+  - **執行提示**：在 `ImprovedCollector` 中加入 `maxCardinality` 設定項（預設 10000）。實作 LRU 淘汰機制，當 metrics 數量超過限制時，移除最少使用的 metrics。可使用 `container/list` 實作 LRU，或引入 `github.com/hashicorp/golang-lru/v2`。記錄被淘汰的 metrics 資訊以便監控。
 
-- **Test Coverage**: Maintain >80% coverage
-- **Benchmark Performance**: No regression in router benchmarks
-- **Memory Usage**: No memory leaks in 24-hour stress tests
-- **API Compatibility**: Zero breaking changes to public APIs
+- [ ] **任務 3.2**: 評估並優化 Collector 中的鎖定機制，考慮使用 `sync.Map` 或更細粒度的鎖來提升併發效能。
+  - **執行提示**：分析當前的鎖競爭熱點，考慮：1) 對讀多寫少的場景使用 `sync.RWMutex` 2) 對高併發更新的 metrics 使用 `sync.Map` 3) 實作分片鎖（sharded locks）將不同的 metrics 分配到不同的鎖。使用 `go test -bench` 和 `pprof` 分析效能改進。
 
-## 🔄 Development Workflow
+- [ ] **任務 3.3**: 建立針對 Metrics 的效能基準測試 (benchmark)，並將其納入 CI 流程以追蹤效能變化。
+  - **執行提示**：在 `observability/metrics/benchmark_test.go` 中新增基準測試，測試場景包括：1) 高併發寫入 2) 大量不同標籤組合 3) 讀取彙總資料。使用 `benchstat` 比較效能變化。在 CI 中設定效能閾值，當效能退化超過 10% 時觸發警告。
 
-1. Pick a task from the pending list
-2. Copy the prompt and execute it
-3. Run tests to ensure nothing breaks
-4. Create focused commits (one task = one commit)
-5. Update this document marking task as completed
+### 4. 增強型 Tracing 功能 (基於 OpenTelemetry)
 
-## 📝 Commit Message Format
+**目標**：借鑑業界優秀實踐，在不增加外部依賴的前提下，提供更豐富的 Tracing 功能。
 
-```
-<type>(<scope>): <subject>
+- [ ] **任務 4.1**: 擴充 Tracing 核心介面
+  - [ ] 擴充 `SpanStatus` enum，增加 `DEBUG`, `INFO`, `NOTICE`, `WARN`, `ERROR`, `CRITICAL`, `ALERT`, `EMERGENCY` 共八個嚴重性等級。
+    - **執行提示**：在 `observability/tracing/span.go` 中擴充 `SpanStatus` 常數定義。保持向後相容，原有的 `Unset`, `OK`, `Error` 對應到新的等級。加入 `String()` 方法和嚴重性比較方法 `IsMoreSevere(other SpanStatus) bool`。
+  
+  - [ ] 擴充 `Span` 介面，新增 `LogEvent(severity SpanStatus, msg string, fields map[string]any)` 和 `SetError(err error)` 方法。
+    - **執行提示**：建立 `EnhancedSpan` 介面繼承現有 `Span`。實作時將事件儲存在 span 內部的事件列表中。`SetError()` 應自動設定 span 狀態為 ERROR 並記錄錯誤詳情。確保與現有 tracer 實作相容。
 
-<body>
+- [ ] **任務 4.2**: 實作 OpenTelemetry 適配器
+  - [ ] 在 `observability/otel/tracing.go` 中實作適配器，將增強後的 Span 介面與標準 OpenTelemetry API 對接。
+    - **執行提示**：實作 `OTelTracerAdapter` 將內部 `EnhancedSpan` 轉換為 OpenTelemetry span。使用 `trace.WithAttributes()` 將自定義欄位轉換為 OTLP attributes。實作雙向轉換，支援從 OTel span 建立內部 span。
 
-<footer>
-```
+  - [ ] 實作嚴重性等級到 OTLP attributes 的標準化映射。
+    - **執行提示**：定義映射表將內部嚴重性等級對應到 OpenTelemetry 的 `level` 屬性。使用 semantic conventions，例如 `level=DEBUG` 對應 `severity.number=5`。參考 OpenTelemetry Log Data Model 規範。
 
-Types: feat, fix, docs, style, refactor, perf, test, chore
+- [ ] **任務 4.3**: 整合 Tracing Middleware
+  - [ ] 於 `setupRouter()` 函式中自動注入 TracingMiddleware。
+    - **執行提示**：在 `app/app.go` 的 `setupRouter()` 中，檢查 tracer 是否啟用，若啟用則自動加入 `TracingMiddleware` 作為第一個 middleware。確保 middleware 建立 root span 並設定必要的 HTTP 屬性（method, path, status code 等）。
 
-Example:
-```
-feat(observability): add OpenTelemetry tracing support
+  - [ ] 確保 Trace Context 能自動在所有 Handlers 中傳播。
+    - **執行提示**：在 `Context` 實作中加入 `Span()` 方法取得當前 span。使用 `context.WithValue()` 在請求 context 中儲存 span。支援 W3C Trace Context 標準的 header 傳播（`traceparent`, `tracestate`）。
 
-- Implement OTLP exporter configuration
-- Add tracing middleware for automatic spans
-- Support configurable sampling rates
+- [ ] **任務 4.4**: 撰寫文件與範例
+  - [ ] 提供完整的 Tracing 配置範例，涵蓋 OTLP Exporter 和 Jaeger。
+    - **執行提示**：在 `examples/tracing/` 建立範例專案，展示：1) YAML 配置檔設定 2) 程式碼中建立 child spans 3) 記錄自定義事件 4) 錯誤追蹤。提供 docker-compose.yml 啟動 Jaeger 進行本地測試。
 
-Closes #123
-```
+  - [ ] 撰寫遷移指南，說明如何從舊有 Tracing 遷移至新的增強型介面。
+    - **執行提示**：在 `docs/migration/tracing.md` 中說明：1) API 變更對照表 2) 配置檔更新方式 3) 程式碼遷移範例 4) 相容性說明。強調零破壞性變更，舊程式碼可繼續運作。
 
----
+## Phase 3: 開發體驗提升
 
-**Note**: This is a living document. Update task status as you complete them, and add new tasks as they're identified.
+**目標**：實現 API 文件自動化，減少人工維護成本，提升開發與協作效率。
+
+### 5. 自動化 API 文件生成
+
+- [ ] **任務 5.1**: 設計可插拔文件提供者介面
+  - [ ] 定義 `DocProvider` 介面，使其能夠支援 Swagger/OpenAPI 等不同格式。
+    - **執行提示**：在 `app/doc/provider.go` 定義介面：`type DocProvider interface { Generate(routes []Route) ([]byte, error); ContentType() string; UIHandler() http.Handler }`。設計時考慮支援多種格式（JSON, YAML, HTML）。
+  
+  - [ ] 實作 `app.WithDocProvider(DocProvider)` 選項。
+    - **執行提示**：在 `app/options.go` 新增選項函式。在 `App` struct 中加入 `docProvider` 欄位。當設定 provider 時，自動註冊文件端點（如 `/_docs` 和 `/_docs/ui`）。
+
+- [ ] **任務 5.2**: 實作 Struct Tag 解析
+  - [ ] 設計並實作 struct tag (`api:"group=..."`) 的解析邏輯，以自動從 Handler struct 提取版本、分組、描述等 metadata。
+    - **執行提示**：支援的 tag 格式：`api:"group=User,version=v1,desc=用戶管理,tags=user|auth"`。使用 `reflect` 套件解析 struct tags。建立 `HandlerMetadata` 結構儲存解析結果。處理巢狀 handler groups 時要正確繼承父層的 metadata。
+
+  - [ ] 實作路由資訊的自動收集機制。
+    - **執行提示**：擴充現有的路由註冊流程，在 `registerHandlers()` 中收集每個路由的完整資訊：HTTP 方法、路徑、參數、中介軟體等。建立 `RouteInfo` 結構包含所有必要資訊。支援從方法簽名自動推導請求/回應型別。
+
+- [ ] **任務 5.3**: 實作預設 Provider
+  - [ ] 實作一個基於 Swagger (OpenAPI 3.0) 的預設 DocProvider。
+    - **執行提示**：在 `app/doc/swagger/provider.go` 實作 `SwaggerProvider`。使用 `openapi3` 結構定義 API 規範。自動生成 operation ID、參數定義、回應碼等。支援從 struct tag 讀取額外的 Swagger 註解（如 example, required 等）。
+
+  - [ ] 將解析後的 Handler 資訊與路由資訊整合，生成結構化的 `swagger.json`。
+    - **執行提示**：實作轉換邏輯將內部的 `RouteInfo` 和 `HandlerMetadata` 轉換為 OpenAPI 3.0 規範。自動偵測路徑參數（如 `:id`）並生成對應的 parameter 定義。為常見的回應格式（JSON, error）建立 schema 定義。
+
+- [ ] **任務 5.4**: 提供互動式 UI
+  - [ ] 整合 Swagger UI 或類似工具，提供一個可互動的 API 文件頁面。
+    - **執行提示**：使用 embed 功能嵌入 Swagger UI 的靜態檔案。實作 `UIHandler()` 返回一個 http.Handler 服務這些檔案。自動注入 `swagger.json` 的 URL 到 UI 配置中。考慮支援自定義主題和品牌設定。
+
+## Phase 4: 持續整合與維護
+
+**目標**：將開發成果固化到 CI/CD 流程中，並完善相關文件，形成長效機制。
+
+- [ ] **任務 6.1**: 將 `context_checker` 靜態分析工具整合至 CI Pipeline。
+  - **執行提示**：在 `.github/workflows/` 中新增或更新 workflow，加入執行 context checker 的步驟。使用 `go run ./internal/analyzer/context_checker/main.go ./...` 掃描整個專案。設定為 PR 的必要檢查項目，失敗時阻擋合併。產生報告並以 comment 形式回饋到 PR。
+
+- [ ] **任務 6.2**: 將 metrics 和 tracing 的效能回歸測試整合至 CI Pipeline。
+  - **執行提示**：建立 `benchmark.yml` workflow，使用 `benchstat` 比較 PR 與 main branch 的效能差異。儲存歷史 benchmark 結果到 `benchmarks/` 目錄。當效能退化超過設定閾值（如 10%）時，workflow 失敗並提供詳細報告。考慮使用 `gobenchdata` 產生視覺化圖表。
+
+- [ ] **任務 6.3**: 撰寫 Context 處理、Observability 配置和自動化文件的最佳實踐指南。
+  - **執行提示**：在 `docs/best-practices/` 建立三份指南：1) `context-handling.md` - 說明何時使用 context、如何處理取消、常見錯誤模式 2) `observability-setup.md` - 配置範例、效能調校建議、監控指標解讀 3) `api-documentation.md` - struct tag 使用、文件客製化、整合到 CI 的方法。每份指南都應包含具體的程式碼範例。
+
+- [ ] **任務 6.4**: 更新 `examples/` 目錄，提供涵蓋所有新功能的範例專案。
+  - **執行提示**：建立或更新以下範例：1) `examples/advanced-tracing/` - 展示 8 級嚴重性、分散式追蹤、錯誤處理 2) `examples/metrics-dashboard/` - 整合 Prometheus 和 Grafana 的完整範例 3) `examples/api-docs/` - 自動文件生成的各種配置方式。每個範例都應有獨立的 README、docker-compose.yml 和測試腳本。
+
+## 核心設計原則
+
+在執行以上任務時，應始終遵循以下原則：
+
+1. **保持簡單 (Keep it Simple)**: 預設配置應開箱即用，避免複雜化。
+2. **功能可選 (Opt-in Features)**: 進階功能應為可選，不影響框架核心的輕量性。
+3. **標準相容 (Be Compatible)**: 盡可能與 OpenTelemetry 等業界標準保持相容。
+4. **結構清晰 (Be Clear)**: 專案結構與程式碼應清晰易懂，降低維護成本。
+5. **向後相容 (Be Compatible)**: 盡力保持 API 的向後相容性，並為任何破壞性變更提供清晰的遷移指南。
+
+## 任務執行注意事項
+
+1. **程式碼品質**：所有新增程式碼都必須通過 `go fmt`、`go vet` 和 `golangci-lint` 檢查。
+2. **測試覆蓋**：新功能必須有對應的單元測試，覆蓋率不低於 80%。
+3. **文件同步**：程式碼變更時同步更新相關文件和註解。
+4. **效能考量**：任何改動都不應顯著影響框架的效能基準。
+5. **錯誤處理**：所有錯誤都應有明確的錯誤訊息，幫助使用者快速定位問題。
+
+## 進度追蹤
+
+建議使用專案管理工具（如 GitHub Projects）追蹤各任務的進度，並定期回顧和調整優先級。每完成一個 Phase 應進行整體測試和效能評估，確保改進的品質和穩定性。

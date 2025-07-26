@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/go-playground/validator/v10"
-	"github.com/yshengliao/gortex/context"
+	"github.com/yshengliao/gortex/http/context"
 )
 
 // Validator wraps go-playground/validator

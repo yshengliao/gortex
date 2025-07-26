@@ -30,10 +30,37 @@ type HandlersManager struct {
 - **Auto-Initialization**: Handlers automatically initialized
 - **Memory Efficient**: Context pooling & smart parameter storage
 
+## Project Structure
+
+```
+gortex/
+├── app/                    # Core application framework
+│   ├── interfaces/         # Service interfaces
+│   └── testutil/           # App-specific test utilities
+├── http/                   # HTTP-related packages
+│   ├── router/             # Routing engine
+│   ├── middleware/         # HTTP middleware
+│   ├── context/            # Request/response context
+│   └── response/           # Response utilities
+├── websocket/              # WebSocket functionality
+│   └── hub/                # Connection management
+├── auth/                   # Authentication
+├── validation/             # Input validation
+├── observability/          # Monitoring & metrics
+├── config/                 # Configuration
+├── errors/                 # Error handling
+├── utils/                  # Utility packages
+├── middleware/             # Framework middleware
+├── internal/               # Internal packages
+└── examples/               # Example applications
+```
+
 ## Quick Start
 
 ### 1. Basic Handler with Struct Tags
 ```go
+import "github.com/yshengliao/gortex/http/context"
+
 type HandlersManager struct {
     Home  *HomeHandler  `url:"/"`
     Users *UserHandler  `url:"/users/:id"`

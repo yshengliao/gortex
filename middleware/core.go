@@ -1,7 +1,7 @@
 // Package middleware provides the core middleware interface and utilities for Gortex framework
 package middleware
 
-import "github.com/yshengliao/gortex/context"
+import "github.com/yshengliao/gortex/http/context"
 
 // MiddlewareFunc defines the middleware function type for Gortex framework.
 // It takes a HandlerFunc and returns a new HandlerFunc, allowing middleware to wrap handlers.

@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yshengliao/gortex/app"
-	"github.com/yshengliao/gortex/context"
+	"github.com/yshengliao/gortex/http/context"
 	"github.com/yshengliao/gortex/middleware"
 	"go.uber.org/zap"
 )
@@ -27,16 +27,16 @@ func (s *TestService) GetName() string {
 type TaggedHandlers struct {
 	// Basic handler with inject tag
 	Basic *BasicHandler `url:"/basic"`
-	
+
 	// Handler with middleware tags
 	Protected *ProtectedHandler `url:"/protected" middleware:"auth,requestid"`
-	
+
 	// Handler with rate limiting
 	Limited *LimitedHandler `url:"/limited" ratelimit:"10/min"`
-	
+
 	// Handler with combined tags
 	Advanced *AdvancedHandler `url:"/advanced" middleware:"requestid" ratelimit:"100/hour"`
-	
+
 	// Nested group with middleware
 	Admin *AdminGroup `url:"/admin" middleware:"auth"`
 }
@@ -98,7 +98,7 @@ func TestStructTagsBasic(t *testing.T) {
 	// Register with the proper type
 	app.Register(ctx, testService)
 	app.Register(ctx, logger)
-	
+
 	// Debug: log the service
 	t.Logf("Registered service: %s (ptr: %p)", testService.Name, testService)
 
@@ -117,7 +117,7 @@ func TestStructTagsBasic(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/basic", nil)
 	rec := httptest.NewRecorder()
 	application.Router().ServeHTTP(rec, req)
-	
+
 	// Debug: print what we got
 	t.Logf("Response status: %d", rec.Code)
 	t.Logf("Response body: %s", rec.Body.String())
@@ -163,7 +163,7 @@ func TestStructTagsMiddleware(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/protected", nil)
 		rec := httptest.NewRecorder()
 		application.Router().ServeHTTP(rec, req)
-		
+
 		assert.Equal(t, http.StatusUnauthorized, rec.Code)
 		assert.Equal(t, "unauthorized", rec.Body.String())
 	})
@@ -173,7 +173,7 @@ func TestStructTagsMiddleware(t *testing.T) {
 		req.Header.Set("Authorization", "Bearer token")
 		rec := httptest.NewRecorder()
 		application.Router().ServeHTTP(rec, req)
-		
+
 		assert.Equal(t, http.StatusOK, rec.Code)
 		// Request ID middleware should have added a header
 		assert.Contains(t, rec.Body.String(), "protected")
@@ -204,7 +204,7 @@ func TestStructTagsRateLimit(t *testing.T) {
 	req.RemoteAddr = "127.0.0.1:12345"
 	rec := httptest.NewRecorder()
 	application.Router().ServeHTTP(rec, req)
-	
+
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Equal(t, "limited", rec.Body.String())
 }
@@ -244,7 +244,7 @@ func TestStructTagsNestedGroup(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/admin/dashboard", nil)
 		rec := httptest.NewRecorder()
 		application.Router().ServeHTTP(rec, req)
-		
+
 		assert.Equal(t, http.StatusUnauthorized, rec.Code)
 	})
 
@@ -253,7 +253,7 @@ func TestStructTagsNestedGroup(t *testing.T) {
 		req.Header.Set("Authorization", "Bearer admin-token")
 		rec := httptest.NewRecorder()
 		application.Router().ServeHTTP(rec, req)
-		
+
 		assert.Equal(t, http.StatusOK, rec.Code)
 		assert.Equal(t, "admin dashboard", rec.Body.String())
 	})

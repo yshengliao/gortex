@@ -10,11 +10,11 @@ import (
 	"sync"
 	"time"
 
-	"go.uber.org/zap"
 	"github.com/yshengliao/gortex/config"
-	gortexContext "github.com/yshengliao/gortex/context"
+	gortexContext "github.com/yshengliao/gortex/http/context"
 	gortexMiddleware "github.com/yshengliao/gortex/middleware"
-	"github.com/yshengliao/gortex/router"
+	"github.com/yshengliao/gortex/http/router"
+	"go.uber.org/zap"
 )
 
 // ShutdownHook is a function that gets called during shutdown
@@ -43,18 +43,18 @@ func getRuntimeModeName(mode RuntimeMode) string {
 
 // App represents the main application instance
 type App struct {
-	router           router.GortexRouter
-	server           *http.Server
-	config           *Config
-	logger           *zap.Logger
-	ctx              *Context
-	shutdownHooks    []ShutdownHook
-	shutdownTimeout  time.Duration
-	mu               sync.RWMutex
-	runtimeMode      RuntimeMode
-	routeInfos       []RouteLogInfo
-	enableRoutesLog  bool
-	developmentMode  bool
+	router          router.GortexRouter
+	server          *http.Server
+	config          *Config
+	logger          *zap.Logger
+	ctx             *Context
+	shutdownHooks   []ShutdownHook
+	shutdownTimeout time.Duration
+	mu              sync.RWMutex
+	runtimeMode     RuntimeMode
+	routeInfos      []RouteLogInfo
+	enableRoutesLog bool
+	developmentMode bool
 }
 
 // RouteLogInfo stores information about a registered route for logging
@@ -78,7 +78,7 @@ func NewApp(opts ...Option) (*App, error) {
 		ctx:             NewContext(),
 		shutdownHooks:   make([]ShutdownHook, 0),
 		shutdownTimeout: 30 * time.Second, // Default 30 seconds
-		runtimeMode:     ModeGortex,        // Default to Gortex
+		runtimeMode:     ModeGortex,       // Default to Gortex
 	}
 
 	// Apply all options
@@ -129,12 +129,12 @@ func WithHandlers(manager any) Option {
 		if err != nil {
 			return err
 		}
-		
+
 		// Log routes if enabled
 		if app.enableRoutesLog && app.logger != nil {
 			app.logRoutes()
 		}
-		
+
 		return nil
 	}
 }
@@ -198,10 +198,9 @@ func (app *App) setupRouter() {
 		app.router.Use(gortexMiddleware.RecoverWithErrorPage())
 		// TODO: Add development logger middleware
 	}
-	
+
 	// TODO: Add error handler middleware
 }
-
 
 // Router returns the underlying Gortex router
 func (app *App) Router() router.GortexRouter {
@@ -237,8 +236,8 @@ func (app *App) Run() error {
 			app.logger.Info("💡 Tip: Install air for hot reload: go install github.com/cosmtrek/air@latest")
 			app.logger.Info("🚀 Starting Gortex server")
 		}
-		
-		app.logger.Info("Starting server", 
+
+		app.logger.Info("Starting server",
 			zap.String("address", address),
 			zap.String("runtime_mode", getRuntimeModeName(app.runtimeMode)),
 			zap.Bool("development_mode", app.IsDevelopment()))
@@ -292,7 +291,7 @@ func (app *App) Shutdown(ctx context.Context) error {
 	if app.logger != nil {
 		app.logger.Info("Shutting down HTTP server")
 	}
-	
+
 	if app.server != nil {
 		if err := app.server.Shutdown(ctx); err != nil {
 			if app.logger != nil {
@@ -306,7 +305,7 @@ func (app *App) Shutdown(ctx context.Context) error {
 	if app.logger != nil {
 		app.logger.Info("Graceful shutdown completed")
 	}
-	
+
 	return shutdownErr
 }
 
@@ -333,11 +332,11 @@ func (app *App) runShutdownHooks(ctx context.Context) error {
 		wg.Add(1)
 		go func(idx int, h ShutdownHook) {
 			defer wg.Done()
-			
+
 			if app.logger != nil {
 				app.logger.Debug("Running shutdown hook", zap.Int("index", idx))
 			}
-			
+
 			if err := h(ctx); err != nil {
 				errChan <- fmt.Errorf("shutdown hook %d failed: %w", idx, err)
 			}
@@ -410,7 +409,7 @@ type devHandler struct {
 func (h *devHandler) Routes(c gortexContext.Context) error {
 	// Since GortexRouter doesn't expose routes, we'll return a placeholder
 	// In a real implementation, we'd need to add a Routes() method to the router
-	
+
 	return c.JSON(200, map[string]any{
 		"total_routes": 4, // Dev routes count
 		"routes": []map[string]string{
@@ -426,7 +425,7 @@ func (h *devHandler) Routes(c gortexContext.Context) error {
 // Error returns test error pages for development
 func (h *devHandler) Error(c gortexContext.Context) error {
 	errorType := c.QueryParam("type")
-	
+
 	switch errorType {
 	case "panic":
 		panic("Development test panic")
@@ -461,29 +460,29 @@ func (h *devHandler) Monitor(c gortexContext.Context) error {
 
 	// Get system info
 	systemInfo := map[string]any{
-		"goroutines":      runtime.NumGoroutine(),
-		"cpu_count":       runtime.NumCPU(),
-		"go_version":      runtime.Version(),
-		"max_procs":       runtime.GOMAXPROCS(0),
-		"timestamp":       time.Now().Format(time.RFC3339),
-		"uptime_seconds":  time.Since(startTime).Seconds(),
+		"goroutines":     runtime.NumGoroutine(),
+		"cpu_count":      runtime.NumCPU(),
+		"go_version":     runtime.Version(),
+		"max_procs":      runtime.GOMAXPROCS(0),
+		"timestamp":      time.Now().Format(time.RFC3339),
+		"uptime_seconds": time.Since(startTime).Seconds(),
 	}
 
 	// Memory statistics
 	memoryInfo := map[string]any{
-		"alloc_mb":        float64(m.Alloc) / 1024 / 1024,
-		"total_alloc_mb":  float64(m.TotalAlloc) / 1024 / 1024,
-		"sys_mb":          float64(m.Sys) / 1024 / 1024,
-		"heap_alloc_mb":   float64(m.HeapAlloc) / 1024 / 1024,
-		"heap_sys_mb":     float64(m.HeapSys) / 1024 / 1024,
-		"heap_idle_mb":    float64(m.HeapIdle) / 1024 / 1024,
-		"heap_inuse_mb":   float64(m.HeapInuse) / 1024 / 1024,
+		"alloc_mb":         float64(m.Alloc) / 1024 / 1024,
+		"total_alloc_mb":   float64(m.TotalAlloc) / 1024 / 1024,
+		"sys_mb":           float64(m.Sys) / 1024 / 1024,
+		"heap_alloc_mb":    float64(m.HeapAlloc) / 1024 / 1024,
+		"heap_sys_mb":      float64(m.HeapSys) / 1024 / 1024,
+		"heap_idle_mb":     float64(m.HeapIdle) / 1024 / 1024,
+		"heap_inuse_mb":    float64(m.HeapInuse) / 1024 / 1024,
 		"heap_released_mb": float64(m.HeapReleased) / 1024 / 1024,
-		"heap_objects":    m.HeapObjects,
-		"stack_inuse_mb":  float64(m.StackInuse) / 1024 / 1024,
-		"stack_sys_mb":    float64(m.StackSys) / 1024 / 1024,
-		"num_gc":          m.NumGC,
-		"gc_cpu_fraction": m.GCCPUFraction,
+		"heap_objects":     m.HeapObjects,
+		"stack_inuse_mb":   float64(m.StackInuse) / 1024 / 1024,
+		"stack_sys_mb":     float64(m.StackSys) / 1024 / 1024,
+		"num_gc":           m.NumGC,
+		"gc_cpu_fraction":  m.GCCPUFraction,
 	}
 
 	// Get GC stats
@@ -508,12 +507,12 @@ func (h *devHandler) Monitor(c gortexContext.Context) error {
 
 	// Get compression status
 	compressionInfo := map[string]any{
-		"enabled": false,
-		"gzip_enabled": false,
-		"brotli_enabled": false,
+		"enabled":           false,
+		"gzip_enabled":      false,
+		"brotli_enabled":    false,
 		"compression_level": "not configured",
 	}
-	
+
 	if h.config != nil {
 		// Check new compression config first
 		if h.config.Server.Compression.Enabled {
@@ -523,13 +522,13 @@ func (h *devHandler) Monitor(c gortexContext.Context) error {
 			compressionInfo["prefer_brotli"] = h.config.Server.Compression.PreferBrotli
 			compressionInfo["compression_level"] = h.config.Server.Compression.Level
 			compressionInfo["min_size_bytes"] = h.config.Server.Compression.MinSize
-			
+
 			contentTypes := h.config.Server.Compression.ContentTypes
 			if len(contentTypes) == 0 {
 				// Use defaults if not specified
 				contentTypes = []string{
 					"text/html",
-					"text/css", 
+					"text/css",
 					"text/plain",
 					"text/javascript",
 					"application/javascript",
@@ -545,7 +544,7 @@ func (h *devHandler) Monitor(c gortexContext.Context) error {
 			compressionInfo["compression_level"] = "default (gzip.DefaultCompression)"
 			compressionInfo["content_types"] = []string{
 				"text/html",
-				"text/css", 
+				"text/css",
 				"text/plain",
 				"text/javascript",
 				"application/javascript",
@@ -565,7 +564,7 @@ func (h *devHandler) Monitor(c gortexContext.Context) error {
 		"routes":      routesInfo,
 		"compression": compressionInfo,
 		"server_info": map[string]any{
-			"framework": "Gortex",
+			"framework":  "Gortex",
 			"debug_mode": h.config != nil && h.config.Logger.Level == "debug",
 		},
 	})
@@ -581,7 +580,7 @@ func (app *App) logRoutes() {
 	// Sort routes by path and method for better readability
 	sortedRoutes := make([]RouteLogInfo, len(app.routeInfos))
 	copy(sortedRoutes, app.routeInfos)
-	
+
 	// Simple sort by path then method
 	for i := 0; i < len(sortedRoutes); i++ {
 		for j := i + 1; j < len(sortedRoutes); j++ {
@@ -593,9 +592,9 @@ func (app *App) logRoutes() {
 	}
 
 	// Calculate column widths
-	methodWidth := 6   // "Method"
-	pathWidth := 4     // "Path"
-	handlerWidth := 7  // "Handler"
+	methodWidth := 6      // "Method"
+	pathWidth := 4        // "Path"
+	handlerWidth := 7     // "Handler"
 	middlewareWidth := 11 // "Middlewares"
 
 	for _, route := range sortedRoutes {
@@ -622,7 +621,7 @@ func (app *App) logRoutes() {
 
 	// Build the table
 	var output strings.Builder
-	
+
 	// Header
 	output.WriteString("\n")
 	output.WriteString("┌")
@@ -634,7 +633,7 @@ func (app *App) logRoutes() {
 	output.WriteString("┬")
 	output.WriteString(strings.Repeat("─", middlewareWidth))
 	output.WriteString("┐\n")
-	
+
 	// Header row
 	output.WriteString("│")
 	output.WriteString(padRight(" Method", methodWidth))
@@ -645,7 +644,7 @@ func (app *App) logRoutes() {
 	output.WriteString("│")
 	output.WriteString(padRight(" Middlewares", middlewareWidth))
 	output.WriteString("│\n")
-	
+
 	// Separator
 	output.WriteString("├")
 	output.WriteString(strings.Repeat("─", methodWidth))
@@ -656,7 +655,7 @@ func (app *App) logRoutes() {
 	output.WriteString("┼")
 	output.WriteString(strings.Repeat("─", middlewareWidth))
 	output.WriteString("┤\n")
-	
+
 	// Data rows
 	for _, route := range sortedRoutes {
 		output.WriteString("│")
@@ -673,7 +672,7 @@ func (app *App) logRoutes() {
 		output.WriteString(padRight(" "+middlewareStr, middlewareWidth))
 		output.WriteString("│\n")
 	}
-	
+
 	// Footer
 	output.WriteString("└")
 	output.WriteString(strings.Repeat("─", methodWidth))
@@ -684,7 +683,7 @@ func (app *App) logRoutes() {
 	output.WriteString("┴")
 	output.WriteString(strings.Repeat("─", middlewareWidth))
 	output.WriteString("┘\n")
-	
+
 	app.logger.Info("Registered routes", zap.String("table", output.String()))
 }
 

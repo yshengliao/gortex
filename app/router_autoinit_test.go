@@ -5,8 +5,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yshengliao/gortex/context"
-	"github.com/yshengliao/gortex/router"
+	"github.com/yshengliao/gortex/http/context"
+	"github.com/yshengliao/gortex/http/router"
 )
 
 // Test handlers for auto-initialization
@@ -82,28 +82,28 @@ func TestAutoInitHandlers(t *testing.T) {
 	// Test 1: All handlers are nil initially
 	t.Run("AutoInitializeAllNilHandlers", func(t *testing.T) {
 		handlers := &AutoInitHandlersManager{}
-		
+
 		// Verify all handlers are nil
 		assert.Nil(t, handlers.Home)
 		assert.Nil(t, handlers.User)
 		assert.Nil(t, handlers.Admin)
 		assert.Nil(t, handlers.Static)
 		assert.Nil(t, handlers.API)
-		
+
 		// Create router and register routes
 		r := router.NewGortexRouter()
 		ctx := NewContext()
-		
+
 		err := RegisterRoutesFromStruct(r, handlers, ctx)
 		require.NoError(t, err)
-		
+
 		// Verify all handlers are now initialized
 		assert.NotNil(t, handlers.Home)
 		assert.NotNil(t, handlers.User)
 		assert.NotNil(t, handlers.Admin)
 		assert.NotNil(t, handlers.Static)
 		assert.NotNil(t, handlers.API)
-		
+
 		// Verify nested handlers are also initialized
 		assert.NotNil(t, handlers.Admin.Dashboard)
 		assert.NotNil(t, handlers.Admin.Users)
@@ -112,7 +112,7 @@ func TestAutoInitHandlers(t *testing.T) {
 		assert.NotNil(t, handlers.API.V1.Products)
 		assert.NotNil(t, handlers.API.V2.Items)
 	})
-	
+
 	// Test 2: Some handlers are already initialized
 	t.Run("AutoInitializePartiallyInitializedHandlers", func(t *testing.T) {
 		handlers := &AutoInitHandlersManager{
@@ -121,7 +121,7 @@ func TestAutoInitHandlers(t *testing.T) {
 				V1: &AutoInitAPIv1Group{}, // V1 initialized but not its children
 			},
 		}
-		
+
 		// Verify initial state
 		assert.NotNil(t, handlers.Home)
 		assert.Nil(t, handlers.User)
@@ -130,21 +130,21 @@ func TestAutoInitHandlers(t *testing.T) {
 		assert.NotNil(t, handlers.API.V1)
 		assert.Nil(t, handlers.API.V2)
 		assert.Nil(t, handlers.API.V1.Products)
-		
+
 		// Create router and register routes
 		r := router.NewGortexRouter()
 		ctx := NewContext()
-		
+
 		err := RegisterRoutesFromStruct(r, handlers, ctx)
 		require.NoError(t, err)
-		
+
 		// Verify all handlers are now initialized
 		assert.NotNil(t, handlers.Home)
 		assert.NotNil(t, handlers.User)
 		assert.NotNil(t, handlers.Admin)
 		assert.NotNil(t, handlers.Static)
 		assert.NotNil(t, handlers.API)
-		
+
 		// Verify nested handlers
 		assert.NotNil(t, handlers.Admin.Dashboard)
 		assert.NotNil(t, handlers.Admin.Users)
@@ -153,35 +153,35 @@ func TestAutoInitHandlers(t *testing.T) {
 		assert.NotNil(t, handlers.API.V1.Products)
 		assert.NotNil(t, handlers.API.V2.Items)
 	})
-	
+
 	// Test 3: Empty handlers struct
 	t.Run("AutoInitializeEmptyStruct", func(t *testing.T) {
 		type EmptyHandlers struct{}
-		
+
 		handlers := &EmptyHandlers{}
 		r := router.NewGortexRouter()
 		ctx := NewContext()
-		
+
 		// Should not error on empty struct
 		err := RegisterRoutesFromStruct(r, handlers, ctx)
 		require.NoError(t, err)
 	})
-	
+
 	// Test 4: Handler with no url tag should be ignored
 	t.Run("IgnoreHandlersWithoutURLTag", func(t *testing.T) {
 		type MixedHandlers struct {
-			Public  *AutoInitHomeHandler   `url:"/public"`
-			Private *AutoInitUserHandler   // No url tag, should be ignored
-			Admin   *AutoInitAdminGroup    `url:"/admin"`
+			Public  *AutoInitHomeHandler `url:"/public"`
+			Private *AutoInitUserHandler // No url tag, should be ignored
+			Admin   *AutoInitAdminGroup  `url:"/admin"`
 		}
-		
+
 		handlers := &MixedHandlers{}
 		r := router.NewGortexRouter()
 		ctx := NewContext()
-		
+
 		err := RegisterRoutesFromStruct(r, handlers, ctx)
 		require.NoError(t, err)
-		
+
 		// Only handlers with url tags should be initialized
 		assert.NotNil(t, handlers.Public)
 		assert.Nil(t, handlers.Private) // Should remain nil

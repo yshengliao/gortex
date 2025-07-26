@@ -8,8 +8,8 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/yshengliao/gortex/app"
-	gortexContext "github.com/yshengliao/gortex/context"
-	"github.com/yshengliao/gortex/hub"
+	gortexContext "github.com/yshengliao/gortex/http/context"
+	"github.com/yshengliao/gortex/websocket/hub"
 	"go.uber.org/zap"
 )
 

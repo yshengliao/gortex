@@ -8,9 +8,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
 	"github.com/yshengliao/gortex/app"
-	"github.com/yshengliao/gortex/context"
+	"github.com/yshengliao/gortex/http/context"
+	"go.uber.org/zap"
 )
 
 type TestHandlers struct {
@@ -109,7 +109,7 @@ func TestDeclarativeRouting(t *testing.T) {
 
 func TestDependencyInjection(t *testing.T) {
 	logger, _ := zap.NewDevelopment()
-	
+
 	application, err := app.NewApp(
 		app.WithLogger(logger),
 	)
@@ -153,7 +153,7 @@ func (h *ErrorHandler) GET(c context.Context) error {
 
 func TestCustomErrorHandler(t *testing.T) {
 	logger, _ := zap.NewDevelopment()
-	
+
 	handlers := &struct {
 		Error *ErrorHandler `url:"/error"`
 	}{

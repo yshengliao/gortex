@@ -7,17 +7,17 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yshengliao/gortex/context"
+	"github.com/yshengliao/gortex/http/context"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
 // Test handlers for routes logging
 type RoutesLogHandlersManager struct {
-	Home    *RoutesLogHomeHandler    `url:"/"`
-	User    *RoutesLogUserHandler    `url:"/users/:id"`
-	Admin   *RoutesLogAdminGroup     `url:"/admin" middleware:"auth"`
-	API     *RoutesLogAPIGroup       `url:"/api"`
+	Home  *RoutesLogHomeHandler `url:"/"`
+	User  *RoutesLogUserHandler `url:"/users/:id"`
+	Admin *RoutesLogAdminGroup  `url:"/admin" middleware:"auth"`
+	API   *RoutesLogAPIGroup    `url:"/api"`
 }
 
 type RoutesLogHomeHandler struct{}
@@ -75,7 +75,7 @@ func TestRoutesLogger(t *testing.T) {
 	t.Run("WithRoutesLogger enables route logging", func(t *testing.T) {
 		// Create a buffer to capture log output
 		var buf bytes.Buffer
-		
+
 		// Create a custom logger that writes to our buffer
 		encoderConfig := zapcore.EncoderConfig{
 			TimeKey:        "ts",
@@ -90,22 +90,22 @@ func TestRoutesLogger(t *testing.T) {
 			EncodeDuration: zapcore.SecondsDurationEncoder,
 			EncodeCaller:   zapcore.ShortCallerEncoder,
 		}
-		
+
 		core := zapcore.NewCore(
 			zapcore.NewJSONEncoder(encoderConfig),
 			zapcore.AddSync(&buf),
 			zapcore.InfoLevel,
 		)
 		logger := zap.New(core)
-		
+
 		// Create handlers
 		handlers := &RoutesLogHandlersManager{}
-		
+
 		// Create app with routes logger enabled
 		cfg := &Config{}
 		cfg.Server.Address = ":18181"
 		cfg.Logger.Level = "info"
-		
+
 		app, err := NewApp(
 			WithConfig(cfg),
 			WithLogger(logger),
@@ -114,7 +114,7 @@ func TestRoutesLogger(t *testing.T) {
 		)
 		require.NoError(t, err)
 		require.NotNil(t, app)
-		
+
 		// Check that routes were logged
 		logOutput := buf.String()
 		assert.Contains(t, logOutput, "Registered routes")
@@ -127,23 +127,23 @@ func TestRoutesLogger(t *testing.T) {
 		assert.Contains(t, logOutput, "/admin/dashboard")
 		assert.Contains(t, logOutput, "/admin/users")
 		assert.Contains(t, logOutput, "/api/v1/products/:id")
-		
+
 		// Debug: print how many routes were collected
 		t.Logf("Collected %d routes", len(app.routeInfos))
 		for i, route := range app.routeInfos {
 			t.Logf("Route %d: %s %s -> %s (middlewares: %v)", i, route.Method, route.Path, route.Handler, route.Middlewares)
 		}
-		
+
 		// Verify route infos were collected
 		assert.Greater(t, len(app.routeInfos), 0)
-		
+
 		// Check specific routes
 		foundHome := false
 		foundUserGET := false
 		foundUserPOST := false
 		foundUserProfile := false
 		foundAdminDashboard := false
-		
+
 		for _, route := range app.routeInfos {
 			switch {
 			case route.Method == "GET" && route.Path == "/":
@@ -165,41 +165,41 @@ func TestRoutesLogger(t *testing.T) {
 				// assert.NotEmpty(t, route.Middlewares)
 			}
 		}
-		
+
 		assert.True(t, foundHome, "Home route not found")
 		assert.True(t, foundUserGET, "User GET route not found")
 		assert.True(t, foundUserPOST, "User POST route not found")
 		assert.True(t, foundUserProfile, "User profile route not found")
 		assert.True(t, foundAdminDashboard, "Admin dashboard route not found")
 	})
-	
+
 	t.Run("Without WithRoutesLogger, no routes are logged", func(t *testing.T) {
 		// Create a buffer to capture log output
 		var buf bytes.Buffer
-		
+
 		// Create a custom logger
 		encoderConfig := zapcore.EncoderConfig{
-			MessageKey:     "msg",
-			LevelKey:       "level",
-			EncodeLevel:    zapcore.LowercaseLevelEncoder,
-			LineEnding:     zapcore.DefaultLineEnding,
+			MessageKey:  "msg",
+			LevelKey:    "level",
+			EncodeLevel: zapcore.LowercaseLevelEncoder,
+			LineEnding:  zapcore.DefaultLineEnding,
 		}
-		
+
 		core := zapcore.NewCore(
 			zapcore.NewJSONEncoder(encoderConfig),
 			zapcore.AddSync(&buf),
 			zapcore.InfoLevel,
 		)
 		logger := zap.New(core)
-		
+
 		// Create handlers
 		handlers := &RoutesLogHandlersManager{}
-		
+
 		// Create app without routes logger
 		cfg := &Config{}
 		cfg.Server.Address = ":18182"
 		cfg.Logger.Level = "info"
-		
+
 		app, err := NewApp(
 			WithConfig(cfg),
 			WithLogger(logger),
@@ -207,19 +207,19 @@ func TestRoutesLogger(t *testing.T) {
 		)
 		require.NoError(t, err)
 		require.NotNil(t, app)
-		
+
 		// Check that routes were NOT logged
 		logOutput := buf.String()
 		assert.NotContains(t, logOutput, "Registered routes")
-		
+
 		// Route infos should not be collected
 		assert.Empty(t, app.routeInfos)
 	})
-	
+
 	t.Run("Route table formatting", func(t *testing.T) {
 		// Create a buffer to capture log output
 		var buf bytes.Buffer
-		
+
 		// Create a custom logger
 		core := zapcore.NewCore(
 			zapcore.NewConsoleEncoder(zap.NewDevelopmentEncoderConfig()),
@@ -227,23 +227,23 @@ func TestRoutesLogger(t *testing.T) {
 			zapcore.InfoLevel,
 		)
 		logger := zap.New(core)
-		
+
 		// Create simple handlers for predictable output
 		type RoutesLogSimpleAPIGroup struct {
 			Users *RoutesLogUserHandler `url:"/users/:id"`
 		}
-		
+
 		type SimpleHandlers struct {
-			Home *RoutesLogHomeHandler      `url:"/"`
-			API  *RoutesLogSimpleAPIGroup  `url:"/api"`
+			Home *RoutesLogHomeHandler    `url:"/"`
+			API  *RoutesLogSimpleAPIGroup `url:"/api"`
 		}
-		
+
 		handlers := &SimpleHandlers{}
-		
+
 		// Create app with routes logger
 		cfg := &Config{}
 		cfg.Server.Address = ":18183"
-		
+
 		app, err := NewApp(
 			WithConfig(cfg),
 			WithLogger(logger),
@@ -252,11 +252,11 @@ func TestRoutesLogger(t *testing.T) {
 		)
 		require.NoError(t, err)
 		require.NotNil(t, app)
-		
+
 		// Check table formatting
 		logOutput := buf.String()
 		lines := strings.Split(logOutput, "\n")
-		
+
 		// Find the table in the output
 		tableFound := false
 		for _, line := range lines {
@@ -265,9 +265,9 @@ func TestRoutesLogger(t *testing.T) {
 				break
 			}
 		}
-		
+
 		assert.True(t, tableFound, "Route table not found in output")
-		
+
 		// Verify table contains expected elements
 		assert.Contains(t, logOutput, "│ Method")
 		assert.Contains(t, logOutput, "│ Path")

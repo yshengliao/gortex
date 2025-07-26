@@ -6,8 +6,8 @@ import (
 	"net/http"
 
 	"go.uber.org/zap"
-	"github.com/yshengliao/gortex/context"
-	"github.com/yshengliao/gortex/pkg/errors"
+	"github.com/yshengliao/gortex/http/context"
+	"github.com/yshengliao/gortex/errors"
 )
 
 // ErrorHandlerConfig contains configuration for the error handler middleware

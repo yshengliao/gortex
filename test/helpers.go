@@ -16,8 +16,8 @@ import (
 	"strings"
 
 	"github.com/yshengliao/gortex/app"
-	"github.com/yshengliao/gortex/context"
-	"github.com/yshengliao/gortex/router"
+	"github.com/yshengliao/gortex/http/context"
+	"github.com/yshengliao/gortex/http/router"
 )
 
 // TestApp creates a test application with handlers

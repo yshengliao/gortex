@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yshengliao/gortex/context"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yshengliao/gortex/app"
+	"github.com/yshengliao/gortex/http/context"
 	"go.uber.org/zap"
 )
 
@@ -42,8 +42,6 @@ func TestMonitoringEndpoint(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	
-
 	// Test monitoring endpoint
 	req := httptest.NewRequest(http.MethodGet, "/_monitor", nil)
 	rec := httptest.NewRecorder()
@@ -58,7 +56,7 @@ func TestMonitoringEndpoint(t *testing.T) {
 
 	// Verify structure
 	assert.Equal(t, "healthy", response["status"])
-	
+
 	// Check system info
 	system, ok := response["system"].(map[string]interface{})
 	require.True(t, ok, "system info should be present")
@@ -92,7 +90,7 @@ func TestMonitoringEndpoint(t *testing.T) {
 	serverInfo, ok := response["server_info"].(map[string]interface{})
 	require.True(t, ok, "server_info should be present")
 	assert.NotNil(t, serverInfo["debug_mode"])
-	
+
 	// Check compression info
 	compression, ok := response["compression"].(map[string]interface{})
 	require.True(t, ok, "compression info should be present")
@@ -115,8 +113,6 @@ func TestMonitoringEndpointNotInProduction(t *testing.T) {
 		app.WithHandlers(&MockHandlers{Root: &MockHandler{}}),
 	)
 	require.NoError(t, err)
-
-	
 
 	// Test monitoring endpoint should not exist
 	req := httptest.NewRequest(http.MethodGet, "/_monitor", nil)
@@ -143,8 +139,6 @@ func TestMonitoringMetricsValues(t *testing.T) {
 		app.WithDevelopmentMode(),
 	)
 	require.NoError(t, err)
-
-	
 
 	// Make a request to generate some activity
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -204,8 +198,6 @@ func TestMonitoringCompressionStatus(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		
-
 		req := httptest.NewRequest(http.MethodGet, "/_monitor", nil)
 		rec := httptest.NewRecorder()
 		application.Router().ServeHTTP(rec, req)
@@ -219,11 +211,11 @@ func TestMonitoringCompressionStatus(t *testing.T) {
 		compression := response["compression"].(map[string]interface{})
 		assert.Equal(t, true, compression["gzip_enabled"])
 		assert.Contains(t, compression["compression_level"].(string), "default")
-		
+
 		contentTypes, ok := compression["content_types"].([]interface{})
 		assert.True(t, ok)
 		assert.Greater(t, len(contentTypes), 0)
-		
+
 		minSize, ok := compression["min_size_bytes"].(float64)
 		assert.True(t, ok)
 		assert.Equal(t, float64(1024), minSize)
@@ -242,8 +234,6 @@ func TestMonitoringCompressionStatus(t *testing.T) {
 			app.WithDevelopmentMode(),
 		)
 		require.NoError(t, err)
-
-		
 
 		req := httptest.NewRequest(http.MethodGet, "/_monitor", nil)
 		rec := httptest.NewRecorder()
@@ -276,8 +266,6 @@ func BenchmarkMonitoringEndpoint(b *testing.B) {
 		app.WithHandlers(&MockHandlers{Root: &MockHandler{}}),
 		app.WithDevelopmentMode(),
 	)
-
-	
 
 	b.ResetTimer()
 	b.ReportAllocs()

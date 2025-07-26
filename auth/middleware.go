@@ -3,7 +3,7 @@ package auth
 import (
 	"strings"
 
-	"github.com/yshengliao/gortex/context"
+	"github.com/yshengliao/gortex/http/context"
 	"github.com/yshengliao/gortex/middleware"
 )
 

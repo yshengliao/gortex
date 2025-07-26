@@ -1,12 +1,12 @@
 package app
 
 import (
-	"github.com/yshengliao/gortex/router"
+	"github.com/yshengliao/gortex/http/router"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/yshengliao/gortex/context"
 	"github.com/stretchr/testify/assert"
+	"github.com/yshengliao/gortex/http/context"
 	"go.uber.org/zap"
 )
 
@@ -49,7 +49,7 @@ func (h *WSTestHandler) HandleConnection(c context.Context) error {
 
 type TestHandlersManager struct {
 	API       *TestHandler   `url:"/api"`
-	Users     *TestHandler   `url:"/users"`  
+	Users     *TestHandler   `url:"/users"`
 	WebSocket *WSTestHandler `url:"/ws" hijack:"ws"`
 	Root      *TestHandler   `url:"/"`
 }
@@ -87,7 +87,7 @@ func TestRouterGeneration(t *testing.T) {
 		},
 		{
 			name:           "API GET",
-			method:         "GET", 
+			method:         "GET",
 			path:           "/api",
 			expectedStatus: 200,
 			expectedBody:   `{"method":"GET","path":"/api"}`,
@@ -140,9 +140,9 @@ func TestRouterGeneration(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(tt.method, tt.path, nil)
 			rec := httptest.NewRecorder()
-			
+
 			r.ServeHTTP(rec, req)
-			
+
 			assert.Equal(t, tt.expectedStatus, rec.Code)
 			assert.JSONEq(t, tt.expectedBody, rec.Body.String())
 		})
@@ -176,7 +176,7 @@ func TestCamelToKebab(t *testing.T) {
 func TestStaticRouteGeneration(t *testing.T) {
 	r := router.NewGortexRouter()
 	logger, _ := zap.NewProduction()
-	
+
 	// This is what the generated code should look like
 	apiHandler := &TestHandler{Logger: logger}
 	usersHandler := &TestHandler{Logger: logger}
@@ -212,7 +212,7 @@ func TestStaticRouteGeneration(t *testing.T) {
 	req := httptest.NewRequest("GET", "/api", nil)
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
-	
+
 	assert.Equal(t, 200, rec.Code)
 	assert.Contains(t, rec.Body.String(), `"method":"GET"`)
 	assert.Contains(t, rec.Body.String(), `"path":"/api"`)
@@ -221,7 +221,7 @@ func TestStaticRouteGeneration(t *testing.T) {
 	req = httptest.NewRequest("POST", "/api/custom-endpoint", nil)
 	rec = httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
-	
+
 	assert.Equal(t, 200, rec.Code)
 	assert.Contains(t, rec.Body.String(), `"custom":"true"`)
 }

@@ -1,16 +1,16 @@
 package app
 
 import (
-	gortexMiddleware "github.com/yshengliao/gortex/middleware"
-	"github.com/yshengliao/gortex/router"
 	"encoding/json"
+	gortexMiddleware "github.com/yshengliao/gortex/middleware"
+	"github.com/yshengliao/gortex/http/router"
 	"net/http"
 	"net/http/httptest"
 	"sync"
 	"testing"
 
-	"github.com/yshengliao/gortex/context"
 	"github.com/stretchr/testify/assert"
+	"github.com/yshengliao/gortex/http/context"
 	"go.uber.org/zap"
 )
 

@@ -7,10 +7,9 @@ import (
 
 	"github.com/yshengliao/gortex/app"
 	"github.com/yshengliao/gortex/auth"
-	"github.com/yshengliao/gortex/context"
+	"github.com/yshengliao/gortex/http/context"
 	"github.com/yshengliao/gortex/middleware"
-	"github.com/yshengliao/gortex/pkg/errors"
-	"github.com/yshengliao/gortex/response"
+	"github.com/yshengliao/gortex/errors"
 	"go.uber.org/zap"
 )
 

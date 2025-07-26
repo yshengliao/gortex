@@ -1,15 +1,15 @@
 package app
 
 import (
-	"github.com/yshengliao/gortex/router"
 	"fmt"
+	"github.com/yshengliao/gortex/http/router"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"runtime/pprof"
 	"testing"
 
-	"github.com/yshengliao/gortex/context"
+	"github.com/yshengliao/gortex/http/context"
 	"go.uber.org/zap"
 )
 

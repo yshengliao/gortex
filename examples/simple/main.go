@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/yshengliao/gortex/app"
-	"github.com/yshengliao/gortex/context"
+	"github.com/yshengliao/gortex/http/context"
 	"go.uber.org/zap"
 )
 

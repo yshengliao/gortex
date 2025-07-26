@@ -34,7 +34,7 @@ package main
 
 import (
     "github.com/yshengliao/gortex/app"
-    "github.com/yshengliao/gortex/context"
+    "github.com/yshengliao/gortex/http/context"
 )
 
 // Define routes with struct tags
@@ -220,6 +220,40 @@ func (h *UserHandler) GET(c context.Context) error {
 | HTTP Request | 1.57 μs/op | 15% faster | 50% less |
 | Context Pool | 139 ns/op | N/A | 4 allocs |
 | Smart Params | 99.9 ns/op | N/A | 1 alloc |
+
+## Project Structure
+
+The framework is organized into clear, purpose-driven modules:
+
+```
+gortex/
+├── app/                    # Core application framework
+│   ├── interfaces/         # Service interfaces
+│   └── testutil/           # App-specific test utilities
+├── http/                   # HTTP-related packages
+│   ├── router/             # HTTP routing engine
+│   ├── middleware/         # HTTP middleware
+│   ├── context/            # Request/response context
+│   └── response/           # Response utilities
+├── websocket/              # WebSocket functionality
+│   └── hub/                # WebSocket connection hub
+├── auth/                   # Authentication (JWT, etc.)
+├── validation/             # Input validation
+├── observability/          # Monitoring & metrics
+│   ├── health/             # Health checks
+│   ├── metrics/            # Metrics collection
+│   └── tracing/            # Distributed tracing
+├── config/                 # Configuration management
+├── errors/                 # Error handling
+├── utils/                  # Utility packages
+│   ├── pool/               # Object pools
+│   ├── circuitbreaker/     # Circuit breaker pattern
+│   ├── httpclient/         # HTTP client utilities
+│   └── requestid/          # Request ID generation
+├── middleware/             # Framework middleware
+├── internal/               # Internal packages
+└── examples/               # Example applications
+```
 
 ## Best Practices
 

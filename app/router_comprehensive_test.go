@@ -1,15 +1,15 @@
 package app
 
 import (
-	"github.com/yshengliao/gortex/router"
 	"encoding/json"
+	"github.com/yshengliao/gortex/http/router"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
-	"github.com/yshengliao/gortex/context"
 	"github.com/stretchr/testify/assert"
+	"github.com/yshengliao/gortex/http/context"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
 )

@@ -18,24 +18,24 @@ func TestShutdownHooks(t *testing.T) {
 		logger := zaptest.NewLogger(t)
 		app, err := NewApp(
 			WithLogger(logger),
-			WithShutdownTimeout(5 * time.Second),
+			WithShutdownTimeout(5*time.Second),
 		)
 		require.NoError(t, err)
 
 		var called atomic.Int32
-		
+
 		// Register multiple hooks
 		app.OnShutdown(func(ctx context.Context) error {
 			called.Add(1)
 			return nil
 		})
-		
+
 		app.RegisterShutdownHook(func(ctx context.Context) error {
 			called.Add(1)
 			time.Sleep(100 * time.Millisecond) // Simulate work
 			return nil
 		})
-		
+
 		app.OnShutdown(func(ctx context.Context) error {
 			called.Add(1)
 			return nil
@@ -52,7 +52,7 @@ func TestShutdownHooks(t *testing.T) {
 		logger := zaptest.NewLogger(t)
 		app, err := NewApp(
 			WithLogger(logger),
-			WithShutdownTimeout(100 * time.Millisecond),
+			WithShutdownTimeout(100*time.Millisecond),
 		)
 		require.NoError(t, err)
 
@@ -71,7 +71,7 @@ func TestShutdownHooks(t *testing.T) {
 		start := time.Now()
 		err = app.Shutdown(ctx)
 		duration := time.Since(start)
-		
+
 		// Should timeout after configured duration
 		assert.Error(t, err)
 		assert.Less(t, duration, 200*time.Millisecond)
@@ -81,7 +81,7 @@ func TestShutdownHooks(t *testing.T) {
 		logger := zaptest.NewLogger(t)
 		app, err := NewApp(
 			WithLogger(logger),
-			WithShutdownTimeout(5 * time.Second), // Long default timeout
+			WithShutdownTimeout(5*time.Second), // Long default timeout
 		)
 		require.NoError(t, err)
 
@@ -94,11 +94,11 @@ func TestShutdownHooks(t *testing.T) {
 		// Shutdown with short deadline
 		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 		defer cancel()
-		
+
 		start := time.Now()
 		err = app.Shutdown(ctx)
 		duration := time.Since(start)
-		
+
 		// Should use the context deadline, not default timeout
 		assert.Error(t, err)
 		assert.Less(t, duration, 100*time.Millisecond)
@@ -108,23 +108,23 @@ func TestShutdownHooks(t *testing.T) {
 		logger := zaptest.NewLogger(t)
 		app, err := NewApp(
 			WithLogger(logger),
-			WithShutdownTimeout(1 * time.Second),
+			WithShutdownTimeout(1*time.Second),
 		)
 		require.NoError(t, err)
 
 		var mu sync.Mutex
 		var order []int
-		
+
 		// Register hooks that should run in parallel
 		for i := 0; i < 3; i++ {
 			idx := i
 			app.OnShutdown(func(ctx context.Context) error {
 				time.Sleep(50 * time.Millisecond) // Simulate work
-				
+
 				mu.Lock()
 				order = append(order, idx)
 				mu.Unlock()
-				
+
 				return nil
 			})
 		}
@@ -133,7 +133,7 @@ func TestShutdownHooks(t *testing.T) {
 		start := time.Now()
 		err = app.Shutdown(context.Background())
 		duration := time.Since(start)
-		
+
 		assert.NoError(t, err)
 		assert.Len(t, order, 3)
 		// If they ran in parallel, total time should be ~50ms, not 150ms
@@ -151,11 +151,11 @@ func TestShutdownHooks(t *testing.T) {
 		app.OnShutdown(func(ctx context.Context) error {
 			return errors.New("hook 1 failed")
 		})
-		
+
 		app.OnShutdown(func(ctx context.Context) error {
 			return nil // This one succeeds
 		})
-		
+
 		app.OnShutdown(func(ctx context.Context) error {
 			return errors.New("hook 3 failed")
 		})
@@ -210,7 +210,7 @@ func TestWithShutdownTimeout(t *testing.T) {
 		)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "shutdown timeout must be positive")
-		
+
 		_, err = NewApp(
 			WithShutdownTimeout(-1 * time.Second),
 		)

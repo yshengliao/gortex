@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/yshengliao/gortex/context"
+	"github.com/yshengliao/gortex/http/context"
 )
 
 // HandlerCache caches reflection results for handlers
@@ -32,20 +32,20 @@ func (c *HandlerCache) GetHandlerMethods(t reflect.Type) map[string]HandlerMetho
 	c.mu.RLock()
 	methods, exists := c.methods[t]
 	c.mu.RUnlock()
-	
+
 	if exists {
 		return methods
 	}
-	
+
 	// Build cache
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	// Double-check after acquiring write lock
 	if methods, exists := c.methods[t]; exists {
 		return methods
 	}
-	
+
 	methods = c.buildMethodCache(t)
 	c.methods[t] = methods
 	return methods
@@ -54,10 +54,10 @@ func (c *HandlerCache) GetHandlerMethods(t reflect.Type) map[string]HandlerMetho
 // buildMethodCache builds the method cache for a type
 func (c *HandlerCache) buildMethodCache(t reflect.Type) map[string]HandlerMethod {
 	methods := make(map[string]HandlerMethod)
-	
+
 	// HTTP methods to check
 	httpMethods := []string{"GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"}
-	
+
 	// Check standard HTTP methods
 	for _, httpMethod := range httpMethods {
 		if method, exists := t.MethodByName(httpMethod); exists {
@@ -72,21 +72,21 @@ func (c *HandlerCache) buildMethodCache(t reflect.Type) map[string]HandlerMethod
 			}
 		}
 	}
-	
+
 	// Check custom methods
 	for i := 0; i < t.NumMethod(); i++ {
 		method := t.Method(i)
 		name := method.Name
-		
+
 		// Skip if already processed
 		if _, exists := methods[name]; exists {
 			continue
 		}
-		
+
 		// Check if it's a valid handler
 		if isValidGortexHandler(method) {
 			httpMethod := "GET" // Default
-			
+
 			// Determine HTTP method from name
 			prefixMap := map[string]string{
 				"Post":   "POST",
@@ -97,14 +97,14 @@ func (c *HandlerCache) buildMethodCache(t reflect.Type) map[string]HandlerMethod
 				"Remove": "DELETE",
 				"Patch":  "PATCH",
 			}
-			
+
 			for prefix, method := range prefixMap {
 				if len(name) > len(prefix) && name[:len(prefix)] == prefix {
 					httpMethod = method
 					break
 				}
 			}
-			
+
 			methods[name] = HandlerMethod{
 				Name:       name,
 				HTTPMethod: httpMethod,
@@ -114,7 +114,7 @@ func (c *HandlerCache) buildMethodCache(t reflect.Type) map[string]HandlerMethod
 			}
 		}
 	}
-	
+
 	return methods
 }
 
@@ -156,7 +156,7 @@ func ClearCache() {
 	handlerCache.mu.Lock()
 	handlerCache.methods = make(map[reflect.Type]map[string]HandlerMethod)
 	handlerCache.mu.Unlock()
-	
+
 	routeCache.mu.Lock()
 	routeCache.routes = make(map[string][]RouteInfo)
 	routeCache.mu.Unlock()

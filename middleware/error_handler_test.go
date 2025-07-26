@@ -10,8 +10,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yshengliao/gortex/context"
-	"github.com/yshengliao/gortex/pkg/errors"
+	"github.com/yshengliao/gortex/http/context"
+	"github.com/yshengliao/gortex/errors"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest"
