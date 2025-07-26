@@ -129,45 +129,64 @@ if cfg.IsDevelopment() {
 - 請求詳情
 - 可能的解決方案建議
 
-### 4. 🎨 程式碼生成器
+### 4. 🏷️ 進階 Struct Tags（Spring 哲學 + Effective Go）
 
-#### 快速生成 Handler
+#### 聲明式編程
 
-```bash
-# 生成新的 handler
-gortex gen handler User
-
-# 自動生成：
-# - handlers/user_handler.go
-# - handlers/user_handler_test.go
-# - 自動註冊到 HandlersManager
-```
-
-生成的代碼：
+參考 Spring 的註解哲學，但保持 Go 的簡潔性：
 
 ```go
-type UserHandler struct{}
-
-// GET /users/:id
-func (h *UserHandler) GET(c context.Context) error {
-    id := c.Param("id")
-    // TODO: Implement your logic here
-    return c.JSON(200, map[string]interface{}{
-        "id": id,
-        "message": "Get user",
-    })
+// 豐富的 struct tags 支援
+type UserHandler struct {
+    userService *UserService `inject:""` // 依賴注入
 }
 
-// POST /users/:id
-func (h *UserHandler) POST(c context.Context) error {
-    // TODO: Implement your logic here
-    return c.JSON(200, map[string]interface{}{
-        "message": "Create user",
-    })
+// 方法級別的註解（通過約定）
+type UserAPI struct{} `url:"/api/users"`
+
+// validate tag 自動驗證請求
+func (h *UserAPI) CreateUser(c context.Context) error {
+    var req CreateUserRequest
+    if err := c.Bind(&req); err != nil {
+        return err
+    }
+    // 可選：使用 validator tag 驗證
+    return c.Created(req)
+}
+
+// 快取控制（未來功能）
+type CachedHandler struct{} `cache:"5m"`
+
+func (h *CachedHandler) GetPopularItems(c context.Context) error {
+    // 結果會自動快取 5 分鐘
+    return c.OK(items)
+}
+
+// 組合多個 middleware
+type AdminAPI struct{} `url:"/admin" middleware:"auth,rbac,audit"`
+
+// 限流控制
+type PublicAPI struct{} `url:"/public" ratelimit:"100/min"`
+```
+
+#### Effective Go 原則應用
+
+```go
+// ❌ 過度設計
+handler.SetURL("/users")
+handler.AddMiddleware("auth") 
+handler.RegisterMethod("GET", getUser)
+
+// ✅ 符合 Go 慣例：簡潔、直接
+type UserHandler struct{} `url:"/users" middleware:"auth"`
+
+func (h *UserHandler) GET(c context.Context) error {
+    // 清晰、簡潔、慣用
+    return c.OK(user)
 }
 ```
 
-### 5. 🔧 Context 輔助方法
+### 5. 🔧 Context 輔助方法（Effective Go 風格）
 
 #### 更友善的 API
 
@@ -252,12 +271,13 @@ type smartParams struct {
    - 自動重載提示
    - Debug 端點增強
 
-### 第三階段：工具鏈（1 週）
+### 第三階段：進階特性（1 週）
 
-5. **程式碼生成器** ⭐⭐⭐
-   - CLI 工具開發
-   - 模板系統
-   - 自動註冊機制
+5. **Struct Tags 系統** ⭐⭐⭐⭐
+   - 依賴注入 tags
+   - 中間件組合 tags
+   - 限流控制 tags
+   - 快取策略 tags（未來）
 
 6. **效能優化** ⭐⭐⭐
    - Context Pool
@@ -356,3 +376,72 @@ Gortex 的目標是成為 Go 開發者最喜愛的 Web 框架。通過優先考�
 > "Make it work, make it right, then make it fast" - Kent Beck
 
 我們現在專注於前兩步，讓框架先「能用」且「好用」，效能優化可以在未來逐步進行。
+
+## Go 哲學與 Spring 思想的融合
+
+### 1. 簡潔性（Go） + 聲明式（Spring）
+
+```go
+// 保持 Go 的簡潔，借鑒 Spring 的聲明式
+type UserAPI struct {
+    DB *sql.DB `inject:""`  // 簡單的依賴注入
+}
+
+// 方法簽名清晰，無魔法
+func (api *UserAPI) GetUser(c context.Context) error {
+    // 直接、明確、無隱藏行為
+    return c.OK(user)
+}
+```
+
+### 2. 組合優於繼承
+
+```go
+// Go 風格的組合
+type AuthenticatedHandler struct {
+    *BaseHandler           // 組合基礎功能
+    AuthService *AuthService `inject:""`
+}
+
+// 清晰的介面定義
+type Handler interface {
+    GET(context.Context) error
+    POST(context.Context) error
+}
+```
+
+### 3. 錯誤即值（Go） + 統一異常處理（Spring）
+
+```go
+// Go 風格的錯誤處理
+func (h *Handler) Process(c context.Context) error {
+    if err := h.validate(c); err != nil {
+        return err // 框架統一處理，如 Spring 的 @ExceptionHandler
+    }
+    return c.OK(result)
+}
+
+// 框架層級的錯誤處理
+app.WithErrorHandler(func(c context.Context, err error) {
+    // 統一的錯誤回應格式
+})
+```
+
+### 4. 約定優於配置，但保持透明
+
+```go
+// 預設約定
+type UserHandler struct{} // 自動映射到 /user
+
+// 明確覆蓋
+type CustomHandler struct{} `url:"/api/v2/special"`
+
+// 所有行為都是可預測的，無隱藏魔法
+```
+
+## 最佳實踐建議
+
+1. **保持 Go 的簡單性**：不要為了功能而犧牲清晰度
+2. **借鑒但不照搬**：Spring 的理念要適應 Go 的文化
+3. **顯式優於隱式**：所有行為都應該是明確和可追蹤的
+4. **工具輔助而非依賴**：讓開發者可以不使用任何工具也能理解代碼
