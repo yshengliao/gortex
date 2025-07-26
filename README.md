@@ -1,7 +1,7 @@
 # Gortex - High-Performance Go Web Framework
 
 [![Go Version](https://img.shields.io/badge/go-1.24+-blue.svg)](https://go.dev/)
-![Status](https://img.shields.io/badge/status-v0.3.0--alpha-orange.svg)
+![Status](https://img.shields.io/badge/status-v0.4.0--alpha-orange.svg)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 
 > **Zero boilerplate, pure Go web framework. Define routes with struct tags, not code.**

@@ -62,7 +62,7 @@ func (h *HomeHandler) GET(c context.Context) error {
 	// Using the new OK helper method
 	return c.OK(map[string]string{
 		"message": "Welcome to Gortex",
-		"version": "v0.3.0",
+		"version": "v0.4.0",
 	})
 }
 

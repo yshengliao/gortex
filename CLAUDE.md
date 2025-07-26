@@ -1,6 +1,6 @@
 # Gortex Framework - Development Guide
 
-> **Framework**: Gortex | **Language**: Go 1.24 | **Status**: v0.3.0-alpha | **Updated**: 2025/07/26
+> **Framework**: Gortex | **Language**: Go 1.24 | **Status**: v0.4.0-alpha | **Updated**: 2025/07/26
 
 Development guide for Gortex web framework - a high-performance Go framework with declarative struct tag routing.
 
@@ -181,7 +181,7 @@ app.Register(ctx, dbConnection)
 
 ## Framework Development
 
-### Completed Features (v0.3.0-alpha)
+### Completed Features (v0.4.0-alpha)
 ✅ **Core Features**
 - Struct tag routing with 45% performance improvement
 - WebSocket support with hub pattern and metrics
@@ -235,4 +235,4 @@ app.Register(ctx, dbConnection)
 
 ---
 
-**Last Updated**: 2025/07/26 | **Framework**: Gortex v0.3.0-alpha | **Go**: 1.24+
+**Last Updated**: 2025/07/26 | **Framework**: Gortex v0.4.0-alpha | **Go**: 1.24+
