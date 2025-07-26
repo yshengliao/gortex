@@ -91,7 +91,7 @@ func TestRouterWithAutoBinder(t *testing.T) {
 	t.Run("primitive parameter binding", func(t *testing.T) {
 		// Register a single handler
 		err := registerHTTPHandlerWithMiddleware(r, "/test/:id", handler, 
-			reflect.TypeOf(handler), []gortexMiddleware.MiddlewareFunc{})
+			reflect.TypeOf(handler), []gortexMiddleware.MiddlewareFunc{}, nil)
 		require.NoError(t, err)
 
 		// Test the route

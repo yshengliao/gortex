@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/yshengliao/gortex/app"
@@ -544,4 +545,62 @@ func (c *MockContext) StdContext() stdContext.Context {
 // SetStdContext sets the standard context.Context
 func (c *MockContext) SetStdContext(ctx stdContext.Context) {
 	c.req = c.req.WithContext(ctx)
+}
+
+// ParamInt returns path parameter as int with default value
+func (c *MockContext) ParamInt(name string, defaultValue int) int {
+	param := c.Param(name)
+	if param == "" {
+		return defaultValue
+	}
+	if value, err := strconv.Atoi(param); err == nil {
+		return value
+	}
+	return defaultValue
+}
+
+// QueryInt returns query parameter as int with default value
+func (c *MockContext) QueryInt(name string, defaultValue int) int {
+	query := c.QueryParam(name)
+	if query == "" {
+		return defaultValue
+	}
+	if value, err := strconv.Atoi(query); err == nil {
+		return value
+	}
+	return defaultValue
+}
+
+// QueryBool returns query parameter as bool with default value
+func (c *MockContext) QueryBool(name string, defaultValue bool) bool {
+	query := c.QueryParam(name)
+	if query == "" {
+		return defaultValue
+	}
+	if value, err := strconv.ParseBool(query); err == nil {
+		return value
+	}
+	return defaultValue
+}
+
+// OK sends a successful response with data (200 OK)
+func (c *MockContext) OK(data interface{}) error {
+	return c.JSON(http.StatusOK, data)
+}
+
+// Created sends a created response with data (201 Created)
+func (c *MockContext) Created(data interface{}) error {
+	return c.JSON(http.StatusCreated, data)
+}
+
+// NoContent204 sends a no content response (204 No Content)
+func (c *MockContext) NoContent204() error {
+	return c.NoContent(http.StatusNoContent)
+}
+
+// BadRequest sends a bad request response with message (400 Bad Request)
+func (c *MockContext) BadRequest(message string) error {
+	return c.JSON(http.StatusBadRequest, map[string]string{
+		"error": message,
+	})
 }

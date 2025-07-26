@@ -24,8 +24,9 @@ func Register[T any](ctx *Context, service T) {
 	ctx.mu.Lock()
 	defer ctx.mu.Unlock()
 	
-	t := reflect.TypeOf((*T)(nil)).Elem()
-	ctx.services[t] = service
+	// Get the actual type, not the generic type parameter
+	actualType := reflect.TypeOf(service)
+	ctx.services[actualType] = service
 }
 
 // Get retrieves a service from the context

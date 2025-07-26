@@ -1,6 +1,6 @@
 # Gortex Framework - Development Guide
 
-> **Framework**: Gortex | **Language**: Go 1.24 | **Status**: v0.3.0-alpha | **Updated**: 2025/07/25
+> **Framework**: Gortex | **Language**: Go 1.24 | **Status**: v0.3.0-alpha | **Updated**: 2025/07/26
 
 Development guide for Gortex web framework - a high-performance Go framework with declarative struct tag routing.
 
@@ -27,6 +27,8 @@ type HandlersManager struct {
 - **45% Faster Routing**: Optimized reflection caching  
 - **WebSocket Native**: First-class real-time support
 - **Type-Safe**: Compile-time route validation
+- **Auto-Initialization**: Handlers automatically initialized
+- **Memory Efficient**: Context pooling & smart parameter storage
 
 ## Quick Start
 
@@ -70,6 +72,9 @@ type HandlersManager struct {
     
     // WebSocket
     Chat   *ChatHandler   `url:"/chat" hijack:"ws"`
+    
+    // Advanced features
+    API    *APIHandler    `url:"/api" middleware:"cors" ratelimit:"100/min"`
 }
 ```
 
@@ -105,10 +110,11 @@ With `cfg.Logger.Level = "debug"`:
 - `/_config` - Masked configuration view
 - Request/response logging with body capture
 
-### Performance Targets
-- **Routing**: 541 ns/op (45% faster than Echo)
-- **Memory**: Zero allocations for cached routes
-- **Throughput**: >10k RPS on standard hardware
+### Performance Optimizations
+- **Context Pool**: 38% reduction in memory allocations
+- **Smart Params**: Optimized for 1-4 parameters (common case)
+- **Route Caching**: Zero allocations for cached routes
+- **Reflection Caching**: 45% faster than standard routers
 
 ## Testing
 
@@ -162,6 +168,50 @@ func (h *WSHandler) HandleConnection(c context.Context) error {
 }
 ```
 
+### Dependency Injection
+```go
+type UserService struct {
+    DB *sql.DB `inject:""`  // Auto-injected from DI container
+}
+
+// Register services
+ctx := app.NewContext()
+app.Register(ctx, dbConnection)
+```
+
+## Framework Development
+
+### Completed Features (v0.3.0-alpha)
+✅ **Core Features**
+- Struct tag routing with 45% performance improvement
+- WebSocket support with hub pattern and metrics
+- JWT authentication with middleware integration
+- Multi-source configuration (YAML, .env, env vars)
+- Development tools (debug endpoints, monitoring)
+
+✅ **Developer Experience**
+- Auto handler initialization - no more nil pointer panics
+- Route logging system - automatic route documentation
+- Context helper methods - simplified parameter access
+- Development mode enhancements - helpful error pages
+- Friendly error pages with stack traces
+
+✅ **Advanced Features**
+- Struct tag system for DI, middleware, rate limiting
+- Performance optimizations with context pooling
+- Smart parameter storage for common cases
+
+### Development Guidelines
+- **Tests Required**: Unit tests + benchmarks for all changes
+- **Examples Updated**: Verify affected examples still work
+- **Documentation Current**: Keep README.md performance metrics updated
+- **Zero Regressions**: `go test ./...` must pass before commits
+
+### Performance Targets
+- **Routing**: <600 ns/op (currently 541 ns/op)
+- **Memory**: Zero allocations for cached routes
+- **Throughput**: >10k RPS on standard hardware
+
 ## Framework Context
 
 ### Positioning
@@ -171,27 +221,18 @@ func (h *WSHandler) HandleConnection(c context.Context) error {
 - **Rapid prototyping**: No infrastructure setup required
 - **Edge computing**: Minimal resource usage
 
-### Current Status (v0.3.0-alpha)
-✅ **Core Features Complete**
-- Struct tag routing with 45% performance improvement
-- WebSocket support with hub pattern and metrics
-- JWT authentication with middleware integration
-- Multi-source configuration (YAML, .env, env vars)
-- Development tools (debug endpoints, monitoring)
+### Design Philosophy
+1. **Simplicity First**: If a feature needs explanation, redesign it
+2. **Convention Over Configuration**: Sensible defaults everywhere
+3. **Errors Should Help**: Every error tells you how to fix it
+4. **Progressive Complexity**: Simple things simple, complex things possible
 
-✅ **Production Optimizations**
-- Memory leak fixes in metrics and rate limiting
-- Race condition resolution in health checks
-- Graceful shutdown with WebSocket client notification
-- Error handling unification with categorized codes
-
-### Development Guidelines
-- **Tests Required**: Unit tests + benchmarks for all changes
-- **Examples Updated**: Verify affected examples still work
-- **Documentation Current**: Keep README.md performance metrics updated
-- **Zero Regressions**: `go test ./...` must pass before commits
+### Not Goals
+- ❌ Not chasing extreme performance at the cost of usability
+- ❌ Not implementing complex optimizations that confuse developers
+- ❌ Not sacrificing developer experience for minor gains
+- ❌ Not increasing learning curve unnecessarily
 
 ---
 
 **Last Updated**: 2025/07/26 | **Framework**: Gortex v0.3.0-alpha | **Go**: 1.24+
-

@@ -10,49 +10,38 @@
 
 # Output of the go coverage tool
 *.out
+coverage.html
+
+# Dependency directories
+vendor/
 
 # Go workspace file
 go.work
-go.work.sum
 
-# Dependency directories (remove the comment below to include it)
-# vendor/
-
-# IDE specific files
+# IDE files
 .idea/
 .vscode/
 *.swp
 *.swo
 *~
 
-# OS specific files
+# OS files
 .DS_Store
 Thumbs.db
 
-# Application specific
-/gortex
-/gortex-cli
-.gortex-dev-server
-*.log
-coverage.html
-coverage.out
-
-# Example binaries
-examples/*/auth
-examples/*/simple
-examples/*/websocket
-examples/auth/auth
-examples/simple/simple
-examples/websocket/websocket
-
-# Configuration
+# Environment files
 .env
 .env.local
-config.local.yaml
-config.production.yaml
+
+# Build artifacts
+/bin/
+/dist/
+
+# Example binaries
+examples/simple/simple
+examples/auth/auth
+examples/websocket/websocket
 
 # Temporary files
-tmp/
-temp/
-dist/
-build/
+*.tmp
+*.log

@@ -196,22 +196,17 @@ func (r *gortexRouter) addToTree(root *routeNode, path string, handler middlewar
 
 // ServeHTTP implements the http.Handler interface
 func (r *gortexRouter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	ctx := context.NewContext(req, w)
+	// Use context pool for better performance
+	ctx := context.AcquireContext(req, w)
+	defer context.ReleaseContext(ctx)
 	
 	// Set the request path
 	ctx.SetPath(req.URL.Path)
 
 	if handler, params := r.findRoute(req.Method, req.URL.Path); handler != nil {
-		// Set path parameters
+		// Set path parameters efficiently
 		if len(params) > 0 {
-			names := make([]string, 0, len(params))
-			values := make([]string, 0, len(params))
-			for key, value := range params {
-				names = append(names, key)
-				values = append(values, value)
-			}
-			ctx.SetParamNames(names...)
-			ctx.SetParamValues(values...)
+			context.SetParams(ctx, params)
 		}
 
 		if err := handler(ctx); err != nil {

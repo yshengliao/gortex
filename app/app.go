@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -42,15 +43,26 @@ func getRuntimeModeName(mode RuntimeMode) string {
 
 // App represents the main application instance
 type App struct {
-	router          router.GortexRouter
-	server          *http.Server
-	config          *Config
-	logger          *zap.Logger
-	ctx             *Context
-	shutdownHooks   []ShutdownHook
-	shutdownTimeout time.Duration
-	mu              sync.RWMutex
-	runtimeMode     RuntimeMode
+	router           router.GortexRouter
+	server           *http.Server
+	config           *Config
+	logger           *zap.Logger
+	ctx              *Context
+	shutdownHooks    []ShutdownHook
+	shutdownTimeout  time.Duration
+	mu               sync.RWMutex
+	runtimeMode      RuntimeMode
+	routeInfos       []RouteLogInfo
+	enableRoutesLog  bool
+	developmentMode  bool
+}
+
+// RouteLogInfo stores information about a registered route for logging
+type RouteLogInfo struct {
+	Method      string
+	Path        string
+	Handler     string
+	Middlewares []string
 }
 
 // Config is re-exported from the config package for convenience
@@ -80,7 +92,7 @@ func NewApp(opts ...Option) (*App, error) {
 	app.setupRouter()
 
 	// Register development routes if in development mode
-	if app.config != nil && app.config.Logger.Level == "debug" {
+	if app.IsDevelopment() {
 		app.registerDevelopmentRoutes()
 	}
 
@@ -113,14 +125,28 @@ func WithLogger(logger *zap.Logger) Option {
 func WithHandlers(manager any) Option {
 	return func(app *App) error {
 		// Use Gortex registration
-		return RegisterRoutes(app, manager)
+		err := RegisterRoutes(app, manager)
+		if err != nil {
+			return err
+		}
+		
+		// Log routes if enabled
+		if app.enableRoutesLog && app.logger != nil {
+			app.logRoutes()
+		}
+		
+		return nil
 	}
 }
 
 // WithDevelopmentMode enables development mode features
-func WithDevelopmentMode(enabled bool) Option {
+func WithDevelopmentMode() Option {
 	return func(app *App) error {
-		// Development mode features will be enabled based on config
+		app.developmentMode = true
+		// Automatically set debug logging level for development mode
+		if app.config != nil {
+			app.config.Logger.Level = "debug"
+		}
 		return nil
 	}
 }
@@ -145,6 +171,14 @@ func WithRuntimeMode(mode RuntimeMode) Option {
 	}
 }
 
+// WithRoutesLogger enables automatic route logging
+func WithRoutesLogger() Option {
+	return func(app *App) error {
+		app.enableRoutesLog = true
+		return nil
+	}
+}
+
 // setupRouter configures the Gortex router with middleware
 func (app *App) setupRouter() {
 	// Apply middleware based on configuration
@@ -159,11 +193,10 @@ func (app *App) setupRouter() {
 	app.router.Use(gortexMiddleware.RequestID())
 
 	// Development mode enhancements
-	isDevelopment := app.config != nil && app.config.Logger.Level == "debug"
-	
-	if isDevelopment {
+	if app.IsDevelopment() {
+		// Add development error page middleware
+		app.router.Use(gortexMiddleware.RecoverWithErrorPage())
 		// TODO: Add development logger middleware
-		// TODO: Add development error page middleware
 	}
 	
 	// TODO: Add error handler middleware
@@ -180,6 +213,11 @@ func (app *App) Context() *Context {
 	return app.ctx
 }
 
+// IsDevelopment returns true if the application is running in development mode
+func (app *App) IsDevelopment() bool {
+	return app.developmentMode || (app.config != nil && app.config.Logger.Level == "debug")
+}
+
 // Run starts the HTTP server
 func (app *App) Run() error {
 	address := ":8080"
@@ -188,9 +226,22 @@ func (app *App) Run() error {
 	}
 
 	if app.logger != nil {
+		// Development mode startup messages
+		if app.IsDevelopment() {
+			app.logger.Info("🔥 Development mode enabled!")
+			app.logger.Info("📝 Available debug endpoints:")
+			app.logger.Info("   • /_routes   - View all routes")
+			app.logger.Info("   • /_config   - View configuration")
+			app.logger.Info("   • /_monitor  - System metrics")
+			app.logger.Info("   • /_error    - Test error pages")
+			app.logger.Info("💡 Tip: Install air for hot reload: go install github.com/cosmtrek/air@latest")
+			app.logger.Info("🚀 Starting Gortex server")
+		}
+		
 		app.logger.Info("Starting server", 
 			zap.String("address", address),
-			zap.String("runtime_mode", getRuntimeModeName(app.runtimeMode)))
+			zap.String("runtime_mode", getRuntimeModeName(app.runtimeMode)),
+			zap.Bool("development_mode", app.IsDevelopment()))
 	}
 
 	// Create HTTP server
@@ -518,4 +569,129 @@ func (h *devHandler) Monitor(c gortexContext.Context) error {
 			"debug_mode": h.config != nil && h.config.Logger.Level == "debug",
 		},
 	})
+}
+
+// logRoutes logs all registered routes in a formatted table
+func (app *App) logRoutes() {
+	if len(app.routeInfos) == 0 {
+		app.logger.Info("No routes registered")
+		return
+	}
+
+	// Sort routes by path and method for better readability
+	sortedRoutes := make([]RouteLogInfo, len(app.routeInfos))
+	copy(sortedRoutes, app.routeInfos)
+	
+	// Simple sort by path then method
+	for i := 0; i < len(sortedRoutes); i++ {
+		for j := i + 1; j < len(sortedRoutes); j++ {
+			if sortedRoutes[i].Path > sortedRoutes[j].Path ||
+				(sortedRoutes[i].Path == sortedRoutes[j].Path && sortedRoutes[i].Method > sortedRoutes[j].Method) {
+				sortedRoutes[i], sortedRoutes[j] = sortedRoutes[j], sortedRoutes[i]
+			}
+		}
+	}
+
+	// Calculate column widths
+	methodWidth := 6   // "Method"
+	pathWidth := 4     // "Path"
+	handlerWidth := 7  // "Handler"
+	middlewareWidth := 11 // "Middlewares"
+
+	for _, route := range sortedRoutes {
+		if len(route.Method) > methodWidth {
+			methodWidth = len(route.Method)
+		}
+		if len(route.Path) > pathWidth {
+			pathWidth = len(route.Path)
+		}
+		if len(route.Handler) > handlerWidth {
+			handlerWidth = len(route.Handler)
+		}
+		middlewareStr := strings.Join(route.Middlewares, ", ")
+		if len(middlewareStr) > middlewareWidth {
+			middlewareWidth = len(middlewareStr)
+		}
+	}
+
+	// Add padding
+	methodWidth += 2
+	pathWidth += 2
+	handlerWidth += 2
+	middlewareWidth += 2
+
+	// Build the table
+	var output strings.Builder
+	
+	// Header
+	output.WriteString("\n")
+	output.WriteString("┌")
+	output.WriteString(strings.Repeat("─", methodWidth))
+	output.WriteString("┬")
+	output.WriteString(strings.Repeat("─", pathWidth))
+	output.WriteString("┬")
+	output.WriteString(strings.Repeat("─", handlerWidth))
+	output.WriteString("┬")
+	output.WriteString(strings.Repeat("─", middlewareWidth))
+	output.WriteString("┐\n")
+	
+	// Header row
+	output.WriteString("│")
+	output.WriteString(padRight(" Method", methodWidth))
+	output.WriteString("│")
+	output.WriteString(padRight(" Path", pathWidth))
+	output.WriteString("│")
+	output.WriteString(padRight(" Handler", handlerWidth))
+	output.WriteString("│")
+	output.WriteString(padRight(" Middlewares", middlewareWidth))
+	output.WriteString("│\n")
+	
+	// Separator
+	output.WriteString("├")
+	output.WriteString(strings.Repeat("─", methodWidth))
+	output.WriteString("┼")
+	output.WriteString(strings.Repeat("─", pathWidth))
+	output.WriteString("┼")
+	output.WriteString(strings.Repeat("─", handlerWidth))
+	output.WriteString("┼")
+	output.WriteString(strings.Repeat("─", middlewareWidth))
+	output.WriteString("┤\n")
+	
+	// Data rows
+	for _, route := range sortedRoutes {
+		output.WriteString("│")
+		output.WriteString(padRight(" "+route.Method, methodWidth))
+		output.WriteString("│")
+		output.WriteString(padRight(" "+route.Path, pathWidth))
+		output.WriteString("│")
+		output.WriteString(padRight(" "+route.Handler, handlerWidth))
+		output.WriteString("│")
+		middlewareStr := strings.Join(route.Middlewares, ", ")
+		if middlewareStr == "" {
+			middlewareStr = "none"
+		}
+		output.WriteString(padRight(" "+middlewareStr, middlewareWidth))
+		output.WriteString("│\n")
+	}
+	
+	// Footer
+	output.WriteString("└")
+	output.WriteString(strings.Repeat("─", methodWidth))
+	output.WriteString("┴")
+	output.WriteString(strings.Repeat("─", pathWidth))
+	output.WriteString("┴")
+	output.WriteString(strings.Repeat("─", handlerWidth))
+	output.WriteString("┴")
+	output.WriteString(strings.Repeat("─", middlewareWidth))
+	output.WriteString("┘\n")
+	
+	app.logger.Info("Registered routes", zap.String("table", output.String()))
+}
+
+// padRight pads a string to the right with spaces
+func padRight(s string, width int) string {
+	if len(s) >= width {
+		return s[:width]
+	}
+	return s + strings.Repeat(" ", width-len(s))
 }
