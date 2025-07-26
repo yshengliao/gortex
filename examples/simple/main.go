@@ -145,22 +145,17 @@ func main() {
 	defer logger.Sync()
 
 	// Create handlers structure
-	// No manual route registration needed!
-	handlers := &HandlersManager{
-		Home:   &HomeHandler{},
-		Health: &HealthHandler{},
-		User:   &UserHandler{},
-		Static: &StaticHandler{},
-		API: &APIGroup{
-			V1: &APIv1Group{
-				Users:    &UserAPIHandler{},
-				Products: &ProductHandler{},
-			},
-			V2: &APIv2Group{
-				Users: &UserAPIHandlerV2{},
-			},
-		},
-	}
+	// With auto-initialization, you don't need to manually initialize each handler!
+	// The framework will automatically initialize all handlers for you.
+	
+	// Option 1: Let the framework auto-initialize everything
+	handlers := &HandlersManager{} // All handlers will be auto-initialized!
+	
+	// Option 2: Mix manual and auto initialization
+	// handlers := &HandlersManager{
+	//     Home: &HomeHandler{}, // Manually initialized
+	//     // Other handlers will be auto-initialized
+	// }
 
 	// Simple configuration
 	cfg := &app.Config{}

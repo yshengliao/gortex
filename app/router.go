@@ -39,6 +39,11 @@ func registerRoutesRecursiveWithMiddleware(r router.GortexRouter, manager any, c
 		return fmt.Errorf("handlers must be a pointer to struct")
 	}
 
+	// Auto-initialize the manager if needed
+	if err := autoInitHandlers(v, true); err != nil {
+		return fmt.Errorf("failed to auto-initialize handlers: %w", err)
+	}
+
 	t := v.Elem().Type()
 	logger, _ := Get[*zap.Logger](ctx)
 
@@ -315,6 +320,66 @@ func isHandlerGroup(handler any) bool {
 	}
 
 	return false
+}
+
+// autoInitHandlers recursively initializes nil pointer fields in handlers
+func autoInitHandlers(v reflect.Value, checkURLTag bool) error {
+	// Handle pointer
+	if v.Kind() == reflect.Ptr && v.IsNil() {
+		if !v.CanSet() {
+			return fmt.Errorf("cannot set nil pointer")
+		}
+		v.Set(reflect.New(v.Type().Elem()))
+	}
+
+	// Get the actual struct (dereference pointer if needed)
+	elem := v
+	if v.Kind() == reflect.Ptr {
+		elem = v.Elem()
+	}
+
+	// Only process structs
+	if elem.Kind() != reflect.Struct {
+		return nil
+	}
+
+	// Recursively process all fields
+	t := elem.Type()
+	for i := 0; i < elem.NumField(); i++ {
+		field := elem.Field(i)
+		fieldType := t.Field(i)
+
+		// Skip unexported fields
+		if !field.CanSet() {
+			continue
+		}
+
+		// Check url tag if we're at the top level
+		urlTag := fieldType.Tag.Get("url")
+		shouldInit := !checkURLTag || urlTag != ""
+		
+		// Initialize nil pointer fields
+		if field.Kind() == reflect.Ptr && field.IsNil() && shouldInit {
+			// Only initialize if it's a struct pointer (handlers/groups)
+			if field.Type().Elem().Kind() == reflect.Struct {
+				field.Set(reflect.New(field.Type().Elem()))
+				
+				// Recursively initialize nested structures (don't check url tags in nested structs)
+				if err := autoInitHandlers(field, false); err != nil {
+					return fmt.Errorf("failed to auto-initialize field %s: %w", fieldType.Name, err)
+				}
+			}
+		} else if field.Kind() == reflect.Ptr && !field.IsNil() {
+			// Recursively process already initialized pointers
+			if field.Type().Elem().Kind() == reflect.Struct {
+				if err := autoInitHandlers(field, false); err != nil {
+					return fmt.Errorf("failed to auto-initialize field %s: %w", fieldType.Name, err)
+				}
+			}
+		}
+	}
+
+	return nil
 }
 
 // Helper functions are now in utils.go
