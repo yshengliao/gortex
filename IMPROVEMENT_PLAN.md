@@ -62,46 +62,46 @@
    - 支援時間、記憶體、分配次數監控
    - 關鍵路徑的嚴格限制
 
-### 任務 6.3: 最佳實踐文件撰寫
+### 任務 6.3: 最佳實踐文件撰寫 ✅
+
+**狀態**: 已完成  
+**完成日期**: 2025/01/26
 
 **目標**: 提供全面的技術指南，幫助開發者正確使用框架功能。
 
-**預期交付成果**：
-- Context 處理最佳實踐指南
-- Observability 配置指南
-- API 文件自動化指南
+**完成內容**：
+1. **context-handling.md** - Context 處理最佳實踐
+   - 10 個完整的程式碼範例
+   - Context 生命週期管理詳解
+   - 常見錯誤模式與解決方案
+   - 完整的 HTTP 請求追蹤範例
+   - 效能考量與 troubleshooting 章節
+
+2. **observability-setup.md** - 可觀測性配置指南
+   - 16 個實際配置範例
+   - Metrics、Tracing、Logging 完整設置
+   - Prometheus & Grafana 整合步驟
+   - 效能優化策略
+   - 完整的 Docker Compose 配置
+
+3. **api-documentation.md** - API 文件自動化指南  
+   - 16 個文件範例
+   - Struct tag 設計模式
+   - 版本管理與棄用策略
+   - 自定義主題實作
+   - CI/CD 整合工作流程
+   - API Playground 實作
+
+4. **README.md** - 文件索引
+   - 清晰的導航結構
+   - 快速入門指南
+   - 核心原則說明
 
 **驗收標準**：
-- [ ] 每份指南至少包含 5 個實際程式碼範例
-- [ ] 涵蓋常見錯誤模式及解決方案
-- [ ] 包含效能優化建議
-- [ ] 提供 troubleshooting 章節
-
-**實施內容**：
-
-1. **context-handling.md**
-   - Context 生命週期管理
-   - 取消信號的正確傳播方式
-   - 常見的 context 洩漏模式
-   - 與 goroutine 的配合使用
-   - 超時設定最佳實踐
-   - 實際案例：HTTP 請求鏈路追蹤
-
-2. **observability-setup.md**
-   - Metrics 收集器配置優化
-   - Tracing 採樣策略設定
-   - 日誌等級與效能的平衡
-   - 監控儀表板設計原則
-   - 警報規則配置建議
-   - 與 Prometheus/Grafana 整合步驟
-
-3. **api-documentation.md**
-   - Struct tag 設計規範
-   - 文件版本管理策略
-   - 自定義文件主題
-   - API 分組與標籤管理
-   - 整合到 CI/CD 流程
-   - 文件即程式碼 (Docs as Code) 實踐
+- [x] 每份指南至少包含 5 個實際程式碼範例（實際超過 10 個）
+- [x] 涵蓋常見錯誤模式及解決方案
+- [x] 包含效能優化建議
+- [x] 提供 troubleshooting 章節
 
 ### 任務 6.4: 範例專案完善
 
