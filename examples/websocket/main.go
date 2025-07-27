@@ -147,7 +147,7 @@ func (h *WSHandler) HandleConnection(c gortexContext.Context) error {
 	go client.ReadPump()
 	
 	// Send welcome message
-	client.Send(&hub.Message{
+	client.Send(&websocket.Message{
 		Type: "chat",
 		Data: map[string]any{
 			"message": "Welcome to Gortex WebSocket!",
@@ -173,7 +173,7 @@ func (h *APIHandler) Broadcast(c gortexContext.Context) error {
 	}
 	
 	// Broadcast to all clients
-	h.hub.Broadcast(&hub.Message{
+	h.hub.Broadcast(&websocket.Message{
 		Type: "broadcast",
 		Data: map[string]any{
 			"message": req.Message,
@@ -195,7 +195,7 @@ func main() {
 	defer logger.Sync()
 
 	// Create WebSocket hub
-	wsHub := hub.NewHub(logger)
+	wsHub := websocket.NewHub(logger)
 	go wsHub.Run()
 
 	// Create handlers
@@ -205,7 +205,7 @@ func main() {
 		WS: &WSHandler{
 			hub:    wsHub,
 			logger: logger,
-			upgrader: websocket.Upgrader{
+			upgrader: gorillaws.Upgrader{
 				CheckOrigin: func(r *http.Request) bool {
 					return true // Allow all origins for demo
 				},
