@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/yshengliao/gortex/core/app"
-	"github.com/yshengliao/gortex/transport/http"
+	httpctx "github.com/yshengliao/gortex/transport/http"
 	"go.uber.org/zap"
 )
 
@@ -58,9 +58,9 @@ type APIv2Group struct {
 // HomeHandler handles the root route
 type HomeHandler struct{}
 
-func (h *HomeHandler) GET(c context.Context) error {
+func (h *HomeHandler) GET(c httpctx.Context) error {
 	// Using the new OK helper method
-	return c.OK(map[string]string{
+	return c.JSON(200, map[string]string{
 		"message": "Welcome to Gortex",
 		"version": "v0.4.0",
 	})
@@ -69,9 +69,9 @@ func (h *HomeHandler) GET(c context.Context) error {
 // HealthHandler demonstrates simple health check
 type HealthHandler struct{}
 
-func (h *HealthHandler) GET(c context.Context) error {
+func (h *HealthHandler) GET(c httpctx.Context) error {
 	// Using the OK helper
-	return c.OK(map[string]string{
+	return c.JSON(200, map[string]string{
 		"status": "healthy",
 	})
 }
@@ -80,7 +80,7 @@ func (h *HealthHandler) GET(c context.Context) error {
 type UserHandler struct{}
 
 // GET /users/:id
-func (h *UserHandler) GET(c context.Context) error {
+func (h *UserHandler) GET(c httpctx.Context) error {
 	// Using the new helper method to get parameter as int
 	id := c.ParamInt("id", 0)
 	
@@ -89,7 +89,7 @@ func (h *UserHandler) GET(c context.Context) error {
 	active := c.QueryBool("active", true)
 	
 	// Using the new OK helper method
-	return c.OK(map[string]interface{}{
+	return c.JSON(200, map[string]interface{}{
 		"id":     id,
 		"name":   fmt.Sprintf("User %d", id),
 		"page":   page,
@@ -98,7 +98,7 @@ func (h *UserHandler) GET(c context.Context) error {
 }
 
 // POST /users/:id
-func (h *UserHandler) POST(c context.Context) error {
+func (h *UserHandler) POST(c httpctx.Context) error {
 	id := c.ParamInt("id", 0)
 	
 	// Using the new Created helper method
@@ -109,7 +109,7 @@ func (h *UserHandler) POST(c context.Context) error {
 }
 
 // Profile creates a sub-route: POST /users/:id/profile
-func (h *UserHandler) Profile(c context.Context) error {
+func (h *UserHandler) Profile(c httpctx.Context) error {
 	id := c.Param("id")
 	return c.JSON(200, map[string]string{
 		"userId":  id,
@@ -120,7 +120,7 @@ func (h *UserHandler) Profile(c context.Context) error {
 // StaticHandler demonstrates wildcard routes
 type StaticHandler struct{}
 
-func (h *StaticHandler) GET(c context.Context) error {
+func (h *StaticHandler) GET(c httpctx.Context) error {
 	filepath := c.Param("*")
 	return c.JSON(200, map[string]string{
 		"file": filepath,
@@ -131,7 +131,7 @@ func (h *StaticHandler) GET(c context.Context) error {
 // UserAPIHandler for API v1
 type UserAPIHandler struct{}
 
-func (h *UserAPIHandler) GET(c context.Context) error {
+func (h *UserAPIHandler) GET(c httpctx.Context) error {
 	return c.JSON(200, map[string]string{
 		"version": "v1",
 		"user":    c.Param("id"),
@@ -141,7 +141,7 @@ func (h *UserAPIHandler) GET(c context.Context) error {
 // ProductHandler for API v1
 type ProductHandler struct{}
 
-func (h *ProductHandler) GET(c context.Context) error {
+func (h *ProductHandler) GET(c httpctx.Context) error {
 	return c.JSON(200, map[string]string{
 		"version": "v1",
 		"product": c.Param("id"),
@@ -151,7 +151,7 @@ func (h *ProductHandler) GET(c context.Context) error {
 // UserAPIHandlerV2 for API v2
 type UserAPIHandlerV2 struct{}
 
-func (h *UserAPIHandlerV2) GET(c context.Context) error {
+func (h *UserAPIHandlerV2) GET(c httpctx.Context) error {
 	return c.JSON(200, map[string]string{
 		"version": "v2",
 		"user":    c.Param("id"),
@@ -216,9 +216,9 @@ type UserServiceHandler struct {
 	DB *DatabaseService `inject:""` // Will be automatically injected from DI container
 }
 
-func (h *UserServiceHandler) GET(c context.Context) error {
+func (h *UserServiceHandler) GET(c httpctx.Context) error {
 	// h.DB is automatically injected
-	return c.OK("User service with injected DB")
+	return c.JSON(200, "User service with injected DB")
 }
 
 // Example 2: Middleware composition

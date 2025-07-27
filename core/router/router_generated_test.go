@@ -1,12 +1,11 @@
 package router
 
 import (
-	"github.com/yshengliao/gortex/transport/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/yshengliao/gortex/transport/http"
+	httpctx "github.com/yshengliao/gortex/transport/http"
 	"go.uber.org/zap"
 )
 
@@ -15,27 +14,27 @@ type TestHandler struct {
 	Logger *zap.Logger
 }
 
-func (h *TestHandler) GET(c context.Context) error {
+func (h *TestHandler) GET(c httpctx.Context) error {
 	return c.JSON(200, map[string]string{"method": "GET", "path": c.Path()})
 }
 
-func (h *TestHandler) POST(c context.Context) error {
+func (h *TestHandler) POST(c httpctx.Context) error {
 	return c.JSON(200, map[string]string{"method": "POST", "path": c.Path()})
 }
 
-func (h *TestHandler) PUT(c context.Context) error {
+func (h *TestHandler) PUT(c httpctx.Context) error {
 	return c.JSON(200, map[string]string{"method": "PUT", "path": c.Path()})
 }
 
-func (h *TestHandler) DELETE(c context.Context) error {
+func (h *TestHandler) DELETE(c httpctx.Context) error {
 	return c.JSON(200, map[string]string{"method": "DELETE", "path": c.Path()})
 }
 
-func (h *TestHandler) CustomEndpoint(c context.Context) error {
+func (h *TestHandler) CustomEndpoint(c httpctx.Context) error {
 	return c.JSON(200, map[string]string{"method": "POST", "path": c.Path(), "custom": "true"})
 }
 
-func (h *TestHandler) MultiWordEndpoint(c context.Context) error {
+func (h *TestHandler) MultiWordEndpoint(c httpctx.Context) error {
 	return c.JSON(200, map[string]string{"method": "POST", "path": c.Path(), "multiword": "true"})
 }
 
@@ -43,7 +42,7 @@ type WSTestHandler struct {
 	Logger *zap.Logger
 }
 
-func (h *WSTestHandler) HandleConnection(c context.Context) error {
+func (h *WSTestHandler) HandleConnection(c httpctx.Context) error {
 	return c.JSON(200, map[string]string{"type": "websocket"})
 }
 
@@ -327,7 +326,7 @@ func TestMethodCasingHandling(t *testing.T) {
 	}
 
 	// Define methods for CasingHandler
-	getCasingHandler := func(c context.Context) error {
+	getCasingHandler := func(c httpctx.Context) error {
 		return c.JSON(200, map[string]string{"method": "GET"})
 	}
 

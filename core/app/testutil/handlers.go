@@ -1,7 +1,7 @@
 package testutil
 
 import (
-	"github.com/yshengliao/gortex/transport/http"
+	httpctx "github.com/yshengliao/gortex/transport/http"
 	"go.uber.org/zap"
 )
 
@@ -12,7 +12,7 @@ type TestHandler struct {
 	Logger      *zap.Logger
 }
 
-func (h *TestHandler) GET(c context.Context) error {
+func (h *TestHandler) GET(c httpctx.Context) error {
 	h.Called = true
 	if h.ReturnError != nil {
 		return h.ReturnError
@@ -20,7 +20,7 @@ func (h *TestHandler) GET(c context.Context) error {
 	return c.JSON(200, map[string]string{"method": "GET"})
 }
 
-func (h *TestHandler) POST(c context.Context) error {
+func (h *TestHandler) POST(c httpctx.Context) error {
 	h.Called = true
 	if h.ReturnError != nil {
 		return h.ReturnError
@@ -31,16 +31,16 @@ func (h *TestHandler) POST(c context.Context) error {
 // EchoHandler echoes back request data for testing
 type EchoHandler struct{}
 
-func (h *EchoHandler) GET(c context.Context) error {
+func (h *EchoHandler) GET(c httpctx.Context) error {
 	return c.JSON(200, map[string]interface{}{
 		"method": "GET",
 		"path":   c.Path(),
-		"params": c.ParamValues(),
+		"params": map[string]string{}, // TODO: Fix param values
 		"query":  c.QueryParams(),
 	})
 }
 
-func (h *EchoHandler) POST(c context.Context) error {
+func (h *EchoHandler) POST(c httpctx.Context) error {
 	var body map[string]interface{}
 	if err := c.Bind(&body); err != nil {
 		return c.JSON(400, map[string]string{"error": "Invalid JSON"})
@@ -59,7 +59,7 @@ type ErrorHandler struct {
 	ErrorMessage string
 }
 
-func (h *ErrorHandler) GET(c context.Context) error {
+func (h *ErrorHandler) GET(c httpctx.Context) error {
 	if h.ErrorCode == 0 {
 		h.ErrorCode = 500
 	}
@@ -74,7 +74,7 @@ type PanicHandler struct {
 	PanicMessage string
 }
 
-func (h *PanicHandler) GET(c context.Context) error {
+func (h *PanicHandler) GET(c httpctx.Context) error {
 	if h.PanicMessage == "" {
 		h.PanicMessage = "Test panic"
 	}

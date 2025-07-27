@@ -2,26 +2,25 @@ package router
 
 import (
 	"encoding/json"
-	gortexMiddleware "github.com/yshengliao/gortex/middleware"
-	"github.com/yshengliao/gortex/transport/http"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yshengliao/gortex/transport/http"
+	gortexMiddleware "github.com/yshengliao/gortex/middleware"
+	httpctx "github.com/yshengliao/gortex/transport/http"
 	"go.uber.org/zap"
 )
 
 // Test structs for nested routing
 type NestedUserHandler struct{}
 
-func (h *NestedUserHandler) GET(c context.Context) error {
+func (h *NestedUserHandler) GET(c httpctx.Context) error {
 	return c.String(http.StatusOK, "nested user")
 }
 
-func (h *NestedUserHandler) Profile(c context.Context) error {
+func (h *NestedUserHandler) Profile(c httpctx.Context) error {
 	return c.String(http.StatusOK, "nested user profile")
 }
 
@@ -29,7 +28,7 @@ type V1Group struct {
 	Users *NestedUserHandler `url:"/users"`
 }
 
-func (g *V1Group) GET(c context.Context) error {
+func (g *V1Group) GET(c httpctx.Context) error {
 	return c.String(http.StatusOK, "v1 root")
 }
 
@@ -101,7 +100,7 @@ func TestNestedRouting(t *testing.T) {
 // Test middleware inheritance
 type NestedMiddlewareHandler struct{}
 
-func (h *NestedMiddlewareHandler) GET(c context.Context) error {
+func (h *NestedMiddlewareHandler) GET(c httpctx.Context) error {
 	// Add to middleware chain tracking
 	if chain, ok := c.Get("middlewareChain").([]string); ok {
 		chain = append(chain, "handler")
@@ -132,7 +131,7 @@ func TestNestedMiddlewareInheritance(t *testing.T) {
 
 	// Register test middleware
 	testRecoverMiddleware := func(next gortexMiddleware.HandlerFunc) gortexMiddleware.HandlerFunc {
-		return func(c context.Context) error {
+		return func(c httpctx.Context) error {
 			chain := []string{"recover"}
 			c.Set("middlewareChain", chain)
 			return next(c)
@@ -140,7 +139,7 @@ func TestNestedMiddlewareInheritance(t *testing.T) {
 	}
 
 	testLoggerMiddleware := func(next gortexMiddleware.HandlerFunc) gortexMiddleware.HandlerFunc {
-		return func(c context.Context) error {
+		return func(c httpctx.Context) error {
 			if chain, ok := c.Get("middlewareChain").([]string); ok {
 				chain = append(chain, "logger")
 				c.Set("middlewareChain", chain)

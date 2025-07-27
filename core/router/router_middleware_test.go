@@ -2,22 +2,21 @@ package router
 
 import (
 	"encoding/json"
-	gortexMiddleware "github.com/yshengliao/gortex/middleware"
-	"github.com/yshengliao/gortex/transport/http"
 	"net/http"
 	"net/http/httptest"
 	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/yshengliao/gortex/transport/http"
+	gortexMiddleware "github.com/yshengliao/gortex/middleware"
+	httpctx "github.com/yshengliao/gortex/transport/http"
 	"go.uber.org/zap"
 )
 
 // Test middleware that adds a header
 func testMiddleware(name, value string) gortexMiddleware.MiddlewareFunc {
 	return func(next gortexMiddleware.HandlerFunc) gortexMiddleware.HandlerFunc {
-		return func(c context.Context) error {
+		return func(c httpctx.Context) error {
 			c.Response().Header().Set(name, value)
 			return next(c)
 		}
@@ -30,7 +29,7 @@ var middlewareMu sync.Mutex
 
 func orderMiddleware(name string) gortexMiddleware.MiddlewareFunc {
 	return func(next gortexMiddleware.HandlerFunc) gortexMiddleware.HandlerFunc {
-		return func(c context.Context) error {
+		return func(c httpctx.Context) error {
 			middlewareMu.Lock()
 			middlewareOrder = append(middlewareOrder, name)
 			middlewareMu.Unlock()
@@ -44,7 +43,7 @@ type AuthenticatedHandler struct {
 	Logger *zap.Logger
 }
 
-func (h *AuthenticatedHandler) GET(c context.Context) error {
+func (h *AuthenticatedHandler) GET(c httpctx.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{"status": "authenticated"})
 }
 
@@ -62,7 +61,7 @@ type PublicHandler struct {
 	Logger *zap.Logger
 }
 
-func (h *PublicHandler) GET(c context.Context) error {
+func (h *PublicHandler) GET(c httpctx.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{"status": "public"})
 }
 
@@ -117,7 +116,7 @@ type OrderTestHandler struct {
 	Logger *zap.Logger
 }
 
-func (h *OrderTestHandler) GET(c context.Context) error {
+func (h *OrderTestHandler) GET(c httpctx.Context) error {
 	middlewareMu.Lock()
 	middlewareOrder = append(middlewareOrder, "handler")
 	middlewareMu.Unlock()
@@ -135,7 +134,7 @@ type MultiLevelHandler struct {
 	Logger *zap.Logger
 }
 
-func (h *MultiLevelHandler) GET(c context.Context) error {
+func (h *MultiLevelHandler) GET(c httpctx.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{"level": "multi"})
 }
 

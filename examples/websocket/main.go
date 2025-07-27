@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gorilla/websocket"
+	gorillaws "github.com/gorilla/websocket"
 	"github.com/yshengliao/gortex/core/app"
 	gortexContext "github.com/yshengliao/gortex/transport/http"
 	"github.com/yshengliao/gortex/transport/websocket"
@@ -100,7 +100,7 @@ func (h *HomeHandler) GET(c gortexContext.Context) error {
 
 // StatusHandler shows WebSocket hub status
 type StatusHandler struct {
-	hub *hub.Hub
+	hub *websocket.Hub
 }
 
 func (h *StatusHandler) GET(c gortexContext.Context) error {
@@ -122,8 +122,8 @@ func (h *StatusHandler) GET(c gortexContext.Context) error {
 
 // WSHandler handles WebSocket connections
 type WSHandler struct {
-	hub      *hub.Hub
-	upgrader websocket.Upgrader
+	hub      *websocket.Hub
+	upgrader gorillaws.Upgrader
 	logger   *zap.Logger
 }
 
@@ -137,7 +137,7 @@ func (h *WSHandler) HandleConnection(c gortexContext.Context) error {
 	
 	// Create client with unique ID
 	clientID := "client-" + time.Now().Format("20060102150405")
-	client := hub.NewClient(h.hub, conn, clientID, h.logger)
+	client := websocket.NewClient(h.hub, conn, clientID, h.logger)
 	
 	// Register with hub
 	h.hub.RegisterClient(client)
@@ -159,7 +159,7 @@ func (h *WSHandler) HandleConnection(c gortexContext.Context) error {
 
 // APIHandler provides HTTP API to interact with WebSocket
 type APIHandler struct {
-	hub *hub.Hub
+	hub *websocket.Hub
 }
 
 // Broadcast sends message to all connected clients

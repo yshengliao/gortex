@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yshengliao/gortex/core/types"
+	httpctx "github.com/yshengliao/gortex/transport/http"
 	"github.com/yshengliao/gortex/pkg/validation"
 )
 
@@ -144,12 +145,12 @@ func TestBindAndValidate(t *testing.T) {
 	t.Run("ValidRequest", func(t *testing.T) {
 		body := `{"username":"testuser","password":"password123"}`
 		req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(body))
-		req.Header.Set(context.HeaderContentType, context.MIMEApplicationJSON)
+		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
-		c := context.NewContext(req, rec)
+		c := httpctx.NewDefaultContext(req, rec)
 		err := handler(c)
 		if err != nil {
-			if httpErr, ok := err.(*context.HTTPError); ok {
+			if httpErr, ok := err.(*httpctx.HTTPError); ok {
 				rec.WriteHeader(httpErr.Code)
 				if msg, ok := httpErr.Message.(string); ok {
 					rec.Write([]byte(msg))
@@ -164,12 +165,12 @@ func TestBindAndValidate(t *testing.T) {
 	t.Run("InvalidJSON", func(t *testing.T) {
 		body := `{"username":"testuser","password":}`
 		req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(body))
-		req.Header.Set(context.HeaderContentType, context.MIMEApplicationJSON)
+		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
-		c := context.NewContext(req, rec)
+		c := httpctx.NewDefaultContext(req, rec)
 		err := handler(c)
 		if err != nil {
-			if httpErr, ok := err.(*context.HTTPError); ok {
+			if httpErr, ok := err.(*httpctx.HTTPError); ok {
 				rec.WriteHeader(httpErr.Code)
 				if msg, ok := httpErr.Message.(string); ok {
 					rec.Write([]byte(msg))
@@ -184,12 +185,12 @@ func TestBindAndValidate(t *testing.T) {
 	t.Run("ValidationErrors", func(t *testing.T) {
 		body := `{"username":"ab","password":"123"}`
 		req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(body))
-		req.Header.Set(context.HeaderContentType, context.MIMEApplicationJSON)
+		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
-		c := context.NewContext(req, rec)
+		c := httpctx.NewDefaultContext(req, rec)
 		err := handler(c)
 		if err != nil {
-			if httpErr, ok := err.(*context.HTTPError); ok {
+			if httpErr, ok := err.(*httpctx.HTTPError); ok {
 				rec.WriteHeader(httpErr.Code)
 				if msg, ok := httpErr.Message.(string); ok {
 					rec.Write([]byte(msg))

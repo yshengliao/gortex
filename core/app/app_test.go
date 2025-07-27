@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yshengliao/gortex/core/app"
-	"github.com/yshengliao/gortex/transport/http"
+	httpctx "github.com/yshengliao/gortex/transport/http"
 	"go.uber.org/zap"
 )
 
@@ -20,17 +20,17 @@ type TestHandlers struct {
 
 type HelloHandler struct{}
 
-func (h *HelloHandler) GET(c context.Context) error {
+func (h *HelloHandler) GET(c httpctx.Context) error {
 	return c.JSON(200, map[string]string{"message": "Hello, World!"})
 }
 
 type UserHandler struct{}
 
-func (h *UserHandler) GET(c context.Context) error {
+func (h *UserHandler) GET(c httpctx.Context) error {
 	return c.JSON(200, map[string]string{"endpoint": "list users"})
 }
 
-func (h *UserHandler) Create(c context.Context) error {
+func (h *UserHandler) Create(c httpctx.Context) error {
 	return c.JSON(201, map[string]string{"endpoint": "create user"})
 }
 
@@ -147,7 +147,7 @@ func TestDependencyInjection(t *testing.T) {
 
 type ErrorHandler struct{}
 
-func (h *ErrorHandler) GET(c context.Context) error {
+func (h *ErrorHandler) GET(c httpctx.Context) error {
 	return context.NewHTTPError(http.StatusTeapot, "I'm a teapot")
 }
 

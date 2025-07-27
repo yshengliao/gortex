@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/yshengliao/gortex/core/app"
 	"github.com/yshengliao/gortex/pkg/config"
 	gcontext "github.com/yshengliao/gortex/transport/http"
 	"github.com/yshengliao/gortex/middleware"
@@ -116,10 +117,10 @@ func TestContextCancellationPropagation(t *testing.T) {
 		Long: &LongHandler{wg: &wg},
 	}
 
-	app, err := NewApp(
-		WithConfig(cfg),
-		WithLogger(logger),
-		WithHandlers(handlers),
+	app, err := app.NewApp(
+		app.WithConfig(cfg),
+		app.WithLogger(logger),
+		app.WithHandlers(handlers),
 	)
 	if err != nil {
 		t.Fatalf("Failed to create app: %v", err)
@@ -160,10 +161,10 @@ func TestContextWithTimeout(t *testing.T) {
 		Timeout: &TimeoutHandler{},
 	}
 
-	app, err := NewApp(
-		WithConfig(cfg),
-		WithLogger(logger),
-		WithHandlers(handlers),
+	app, err := app.NewApp(
+		app.WithConfig(cfg),
+		app.WithLogger(logger),
+		app.WithHandlers(handlers),
 	)
 	if err != nil {
 		t.Fatalf("Failed to create app: %v", err)
@@ -191,10 +192,10 @@ func TestContextCancellationInLoop(t *testing.T) {
 		Loop: &LoopHandler{},
 	}
 
-	app, err := NewApp(
-		WithConfig(cfg),
-		WithLogger(logger),
-		WithHandlers(handlers),
+	app, err := app.NewApp(
+		app.WithConfig(cfg),
+		app.WithLogger(logger),
+		app.WithHandlers(handlers),
 	)
 	if err != nil {
 		t.Fatalf("Failed to create app: %v", err)
@@ -297,7 +298,7 @@ func TestContextPropagationInMiddleware(t *testing.T) {
 		Protected: &ProtectedHandler{},
 	}
 
-	app, err := NewApp(
+	app, err := app.NewApp(
 		WithConfig(cfg),
 		WithLogger(logger),
 	)
@@ -428,10 +429,10 @@ func TestParentContextCancellation(t *testing.T) {
 		Parent: &ParentHandler{},
 	}
 
-	app, err := NewApp(
-		WithConfig(cfg),
-		WithLogger(logger),
-		WithHandlers(handlers),
+	app, err := app.NewApp(
+		app.WithConfig(cfg),
+		app.WithLogger(logger),
+		app.WithHandlers(handlers),
 	)
 	if err != nil {
 		t.Fatalf("Failed to create app: %v", err)

@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -10,7 +9,6 @@ import (
 
 	"github.com/yshengliao/gortex/pkg/auth"
 	"github.com/yshengliao/gortex/core/types"
-	httpctx "github.com/yshengliao/gortex/transport/http"
 )
 
 func TestJWTAuth(t *testing.T) {

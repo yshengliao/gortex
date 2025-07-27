@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yshengliao/gortex/transport/http"
+	httpctx "github.com/yshengliao/gortex/transport/http"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -22,21 +22,21 @@ type RoutesLogHandlersManager struct {
 
 type RoutesLogHomeHandler struct{}
 
-func (h *RoutesLogHomeHandler) GET(c context.Context) error {
+func (h *RoutesLogHomeHandler) GET(c httpctx.Context) error {
 	return c.JSON(200, map[string]string{"message": "Home"})
 }
 
 type RoutesLogUserHandler struct{}
 
-func (h *RoutesLogUserHandler) GET(c context.Context) error {
+func (h *RoutesLogUserHandler) GET(c httpctx.Context) error {
 	return c.JSON(200, map[string]string{"user": c.Param("id")})
 }
 
-func (h *RoutesLogUserHandler) POST(c context.Context) error {
+func (h *RoutesLogUserHandler) POST(c httpctx.Context) error {
 	return c.JSON(201, map[string]string{"created": "user"})
 }
 
-func (h *RoutesLogUserHandler) Profile(c context.Context) error {
+func (h *RoutesLogUserHandler) Profile(c httpctx.Context) error {
 	return c.JSON(200, map[string]string{"profile": "data"})
 }
 
@@ -47,13 +47,13 @@ type RoutesLogAdminGroup struct {
 
 type RoutesLogDashboardHandler struct{}
 
-func (h *RoutesLogDashboardHandler) GET(c context.Context) error {
+func (h *RoutesLogDashboardHandler) GET(c httpctx.Context) error {
 	return c.JSON(200, map[string]string{"message": "Dashboard"})
 }
 
 type RoutesLogUsersHandler struct{}
 
-func (h *RoutesLogUsersHandler) GET(c context.Context) error {
+func (h *RoutesLogUsersHandler) GET(c httpctx.Context) error {
 	return c.JSON(200, map[string]string{"message": "Admin Users"})
 }
 
@@ -67,7 +67,7 @@ type RoutesLogAPIv1Group struct {
 
 type RoutesLogProductsHandler struct{}
 
-func (h *RoutesLogProductsHandler) GET(c context.Context) error {
+func (h *RoutesLogProductsHandler) GET(c httpctx.Context) error {
 	return c.JSON(200, map[string]string{"product": c.Param("id")})
 }
 

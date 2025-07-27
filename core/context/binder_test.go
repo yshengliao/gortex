@@ -554,7 +554,7 @@ func TestParameterBinderAllSources(t *testing.T) {
 		bytes.NewReader(jsonBytes))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer token123")
-	ctx = context.NewContext(req, rec)
+	ctx = httpctx.NewDefaultContext(req, rec)
 	ctx.SetParamNames("id")
 	ctx.SetParamValues("456")
 	ctx.Set("user", token)
@@ -586,7 +586,7 @@ func TestParameterBinderEdgeCasesExtended(t *testing.T) {
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		rec := httptest.NewRecorder()
-		_ = context.NewContext(req, rec)
+		_ = httpctx.NewDefaultContext(req, rec)
 
 		// Try to bind a service that's not registered
 		paramType := reflect.TypeOf((*UserService)(nil))

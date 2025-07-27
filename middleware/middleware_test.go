@@ -13,7 +13,6 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"github.com/yshengliao/gortex/pkg/errors"
-	httpctx "github.com/yshengliao/gortex/transport/http"
 )
 
 // Use testContext instead of mockContext

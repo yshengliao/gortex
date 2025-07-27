@@ -35,24 +35,24 @@ type GameBetRequest struct {
 }
 
 // Traditional Gortex handler for comparison
-func (h *AutoBindHandler) TraditionalGET(c context.Context) error {
+func (h *AutoBindHandler) TraditionalGET(c httpctx.Context) error {
 	id := c.Param("id")
 	return c.JSON(200, map[string]string{"id": id, "method": "traditional"})
 }
 
 // New auto-binding handler - simple case
-func (h *AutoBindHandler) GET(c context.Context, id int) error {
+func (h *AutoBindHandler) GET(c httpctx.Context, id int) error {
 	return c.JSON(200, map[string]any{"id": id, "method": "auto-bind"})
 }
 
 // New auto-binding handler - struct binding
-func (h *AutoBindHandler) POST(c context.Context, req *UserRequest) error {
+func (h *AutoBindHandler) POST(c httpctx.Context, req *UserRequest) error {
 	h.Logger.Info("Auto-bound request", zap.Any("request", req))
 	return c.JSON(200, req)
 }
 
 // New auto-binding handler - complex binding
-func (h *AutoBindHandler) PlaceBet(c context.Context, req *GameBetRequest) error {
+func (h *AutoBindHandler) PlaceBet(c httpctx.Context, req *GameBetRequest) error {
 	h.Logger.Info("Placing bet",
 		zap.String("game_id", req.GameID),
 		zap.Int("user_id", req.UserID),
@@ -74,7 +74,7 @@ type AutoGameHandler struct {
 	Logger *zap.Logger
 }
 
-func (h *AutoGameHandler) Users(c context.Context, req *GameBetRequest) error {
+func (h *AutoGameHandler) Users(c httpctx.Context, req *GameBetRequest) error {
 	return c.JSON(200, req)
 }
 

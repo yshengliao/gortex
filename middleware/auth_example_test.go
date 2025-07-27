@@ -37,7 +37,7 @@ func ExampleJWTAuth() {
 	authMiddleware := middleware.JWTAuth(jwtService)
 
 	// Create a protected handler
-	protectedHandler := func(c Context) error {
+	protectedHandler := func(c httpctx.Context) error {
 		claims := middleware.GetClaims(c)
 		if claims == nil {
 			return fmt.Errorf("no claims found")

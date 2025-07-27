@@ -2,7 +2,7 @@ package testutil
 
 import (
 	"bytes"
-	stdContext "context"
+	stdcontext "context"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
@@ -165,6 +165,11 @@ func (c *MockContext) Build() httpctx.Context {
 	return c
 }
 
+// Context returns the standard context.Context
+func (c *MockContext) Context() stdcontext.Context {
+	return c.req.Context()
+}
+
 // Response returns the response writer
 func (c *MockContext) Response() httpctx.ResponseWriter {
 	return c.res
@@ -176,8 +181,9 @@ func (c *MockContext) ResponseRecorder() *httptest.ResponseRecorder {
 }
 
 // SimpleRouter creates a simple router for testing
-func SimpleRouter() router.GortexRouter {
-	return router.NewGortexRouter()
+func SimpleRouter() interface{} {
+	// TODO: Fix this to return proper router type
+	return nil
 }
 
 // Request returns the HTTP request

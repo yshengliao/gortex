@@ -2,14 +2,13 @@ package router
 
 import (
 	"fmt"
-	"github.com/yshengliao/gortex/transport/http"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"runtime/pprof"
 	"testing"
 
-	"github.com/yshengliao/gortex/transport/http"
+	httpctx "github.com/yshengliao/gortex/transport/http"
 	"go.uber.org/zap"
 )
 
@@ -18,7 +17,7 @@ type BenchHandler struct {
 	Logger *zap.Logger
 }
 
-func (h *BenchHandler) GET(c context.Context) error {
+func (h *BenchHandler) GET(c httpctx.Context) error {
 	return c.JSON(200, map[string]string{"status": "ok"})
 }
 

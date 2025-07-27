@@ -7,7 +7,7 @@ import (
 
 	"github.com/yshengliao/gortex/core/app"
 	"github.com/yshengliao/gortex/pkg/auth"
-	"github.com/yshengliao/gortex/transport/http"
+	httpctx "github.com/yshengliao/gortex/transport/http"
 	"github.com/yshengliao/gortex/middleware"
 	"github.com/yshengliao/gortex/pkg/errors"
 	"go.uber.org/zap"
@@ -33,7 +33,7 @@ type AdminGroup struct {
 // HomeHandler - public endpoint
 type HomeHandler struct{}
 
-func (h *HomeHandler) GET(c context.Context) error {
+func (h *HomeHandler) GET(c httpctx.Context) error {
 	return c.JSON(200, map[string]string{
 		"message": "Welcome to Gortex Auth Example",
 		"login":   "POST /auth/login",
@@ -47,14 +47,14 @@ type AuthHandler struct {
 }
 
 // Login endpoint: POST /auth/login
-func (h *AuthHandler) Login(c context.Context) error {
+func (h *AuthHandler) Login(c httpctx.Context) error {
 	var req struct {
 		Username string `json:"username" validate:"required"`
 		Password string `json:"password" validate:"required"`
 	}
 	
 	if err := c.Bind(&req); err != nil {
-		return errors.ValidationError(c, "Invalid request", nil)
+		return c.JSON(400, map[string]string{"error": "Invalid request"})
 	}
 	
 	// Simple authentication (in real app, check database)
@@ -88,7 +88,7 @@ func (h *AuthHandler) Login(c context.Context) error {
 type UserHandler struct{}
 
 // Profile endpoint: GET /user/profile
-func (h *UserHandler) Profile(c context.Context) error {
+func (h *UserHandler) Profile(c httpctx.Context) error {
 	// Get user claims from JWT (set by auth middleware)
 	claims := auth.GetClaims(c)
 	if claims != nil {
@@ -112,7 +112,7 @@ func (h *UserHandler) Profile(c context.Context) error {
 // DashboardHandler - admin only
 type DashboardHandler struct{}
 
-func (h *DashboardHandler) GET(c context.Context) error {
+func (h *DashboardHandler) GET(c httpctx.Context) error {
 	return c.JSON(200, map[string]string{
 		"message": "Admin Dashboard",
 		"access":  "admin only",
@@ -122,7 +122,7 @@ func (h *DashboardHandler) GET(c context.Context) error {
 // UsersHandler - admin only
 type UsersHandler struct{}
 
-func (h *UsersHandler) GET(c context.Context) error {
+func (h *UsersHandler) GET(c httpctx.Context) error {
 	id := c.Param("id")
 	return c.JSON(200, map[string]string{
 		"message": "Admin viewing user",
@@ -204,7 +204,7 @@ func main() {
 // AdminMiddleware checks if user has admin role
 func AdminMiddleware() middleware.MiddlewareFunc {
 	return func(next middleware.HandlerFunc) middleware.HandlerFunc {
-		return func(c context.Context) error {
+		return func(c httpctx.Context) error {
 			// Check if user has admin role
 			claims := auth.GetClaims(c)
 			if claims == nil || claims.Role != "admin" {

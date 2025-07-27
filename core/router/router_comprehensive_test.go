@@ -18,7 +18,7 @@ type CompUserHandler struct {
 	Logger *zap.Logger
 }
 
-func (h *CompUserHandler) GET(c context.Context) error {
+func (h *CompUserHandler) GET(c httpctx.Context) error {
 	userID := c.Param("id")
 	if userID == "" {
 		// List all users
@@ -32,13 +32,13 @@ func (h *CompUserHandler) GET(c context.Context) error {
 	})
 }
 
-func (h *CompUserHandler) POST(c context.Context) error {
+func (h *CompUserHandler) POST(c httpctx.Context) error {
 	return c.JSON(http.StatusCreated, map[string]string{
 		"message": "User created",
 	})
 }
 
-func (h *CompUserHandler) Profile(c context.Context) error {
+func (h *CompUserHandler) Profile(c httpctx.Context) error {
 	userID := c.Param("id")
 	return c.JSON(http.StatusOK, map[string]string{
 		"id":      userID,
@@ -46,7 +46,7 @@ func (h *CompUserHandler) Profile(c context.Context) error {
 	})
 }
 
-func (h *CompUserHandler) Settings(c context.Context) error {
+func (h *CompUserHandler) Settings(c httpctx.Context) error {
 	userID := c.Param("id")
 	return c.JSON(http.StatusOK, map[string]string{
 		"id":       userID,
@@ -58,7 +58,7 @@ type CompGameHandler struct {
 	Logger *zap.Logger
 }
 
-func (h *CompGameHandler) GET(c context.Context) error {
+func (h *CompGameHandler) GET(c httpctx.Context) error {
 	gameID := c.Param("gameid")
 	return c.JSON(http.StatusOK, map[string]string{
 		"gameid": gameID,
@@ -66,7 +66,7 @@ func (h *CompGameHandler) GET(c context.Context) error {
 	})
 }
 
-func (h *CompGameHandler) PlaceBet(c context.Context) error {
+func (h *CompGameHandler) PlaceBet(c httpctx.Context) error {
 	gameID := c.Param("gameid")
 	var bet map[string]interface{}
 	c.Bind(&bet)
@@ -77,7 +77,7 @@ func (h *CompGameHandler) PlaceBet(c context.Context) error {
 	})
 }
 
-func (h *CompGameHandler) GetBets(c context.Context) error {
+func (h *CompGameHandler) GetBets(c httpctx.Context) error {
 	gameID := c.Param("gameid")
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"gameid": gameID,
@@ -89,7 +89,7 @@ type CompStaticHandler struct {
 	Logger *zap.Logger
 }
 
-func (h *CompStaticHandler) GET(c context.Context) error {
+func (h *CompStaticHandler) GET(c httpctx.Context) error {
 	// Try different ways to get the wildcard parameter
 	filepath := c.Param("*")
 	if filepath == "" {
@@ -318,7 +318,7 @@ type MultiParamHandler struct {
 	Logger *zap.Logger
 }
 
-func (h *MultiParamHandler) GET(c context.Context) error {
+func (h *MultiParamHandler) GET(c httpctx.Context) error {
 	category := c.Param("category")
 	id := c.Param("id")
 	return c.JSON(http.StatusOK, map[string]string{
@@ -332,7 +332,7 @@ type EdgeHandler struct {
 	Logger *zap.Logger
 }
 
-func (h *EdgeHandler) GET(c context.Context) error {
+func (h *EdgeHandler) GET(c httpctx.Context) error {
 	id := c.Param("id")
 	return c.JSON(http.StatusOK, map[string]string{"id": id})
 }
