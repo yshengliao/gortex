@@ -4,7 +4,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/yshengliao/gortex/transport/http"
+	httpctx "github.com/yshengliao/gortex/transport/http"
 )
 
 func TestRequestID(t *testing.T) {

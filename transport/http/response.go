@@ -4,8 +4,6 @@ package http
 import (
 	"net/http"
 	"time"
-
-	"github.com/yshengliao/gortex/pkg/errors"
 )
 
 // StandardResponse represents a standard API response
@@ -40,7 +38,7 @@ func SuccessWithMeta(c Context, statusCode int, data any, meta map[string]any) e
 		Data:      data,
 		Meta:      meta,
 		Timestamp: time.Now().UTC(),
-		RequestID: errors.GetRequestID(c),
+		RequestID: c.Request().Header.Get("X-Request-ID"),
 	}
 	return c.JSON(statusCode, resp)
 }

@@ -1,7 +1,7 @@
 //go:build !production
 // +build !production
 
-package router
+package app
 
 import (
 	"fmt"
@@ -10,9 +10,10 @@ import (
 	"strconv"
 	"strings"
 
-	gortexContext "github.com/yshengliao/gortex/transport/http"
-	gortexMiddleware "github.com/yshengliao/gortex/middleware"
-	"github.com/yshengliao/gortex/transport/http"
+	appcontext "github.com/yshengliao/gortex/core/context"
+	"github.com/yshengliao/gortex/core/handler"
+	"github.com/yshengliao/gortex/middleware"
+	httpctx "github.com/yshengliao/gortex/transport/http"
 	"go.uber.org/zap"
 )
 
@@ -28,7 +29,7 @@ func RegisterRoutes(app *App, manager any) error {
 }
 
 // RegisterRoutesFromStruct registers routes from a struct using reflection
-func RegisterRoutesFromStruct(r router.GortexRouter, manager any, ctx *Context, app ...*App) error {
+func RegisterRoutesFromStruct(r httpctx.GortexRouter, manager any, ctx *appcontext.Context, app ...*App) error {
 	var appInstance *App
 	if len(app) > 0 {
 		appInstance = app[0]

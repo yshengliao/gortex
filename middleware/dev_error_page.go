@@ -8,7 +8,6 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/yshengliao/gortex/transport/http"
 )
 
 // GortexDevErrorPageConfig defines the config for development error page middleware

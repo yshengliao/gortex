@@ -8,7 +8,7 @@ import (
 
 	"github.com/yshengliao/gortex/pkg/auth"
 	"github.com/yshengliao/gortex/middleware"
-	"github.com/yshengliao/gortex/transport/http"
+	httpctx "github.com/yshengliao/gortex/transport/http"
 )
 
 // mockContext for examples

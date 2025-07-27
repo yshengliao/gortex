@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"go.uber.org/zap"
-	"github.com/yshengliao/gortex/transport/http"
 )
 
 // RecoveryConfig contains configuration for the recovery middleware
@@ -51,10 +50,7 @@ func RecoveryWithConfig(config *RecoveryConfig) MiddlewareFunc {
 		return func(c Context) error {
 			defer func() {
 				if r := recover(); r != nil {
-					err, ok := r.(error)
-					if !ok {
-						err = fmt.Errorf("%v", r)
-					}
+					err, _ := r.(error)
 
 					// Get stack trace
 					stack := make([]byte, config.StackSize)
@@ -126,8 +122,6 @@ func formatStack(stack []byte) []string {
 
 // getRequestPath safely gets the request path
 func getRequestPath(c Context) string {
-	if req, ok := c.Request().(*http.Request); ok {
-		return req.URL.Path
-	}
-	return "unknown"
+	req := c.Request()
+	return req.URL.Path
 }

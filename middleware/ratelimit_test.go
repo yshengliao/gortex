@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"golang.org/x/time/rate"
-	"github.com/yshengliao/gortex/transport/http"
+	httpctx "github.com/yshengliao/gortex/transport/http"
 )
 
 func TestGortexRateLimit(t *testing.T) {

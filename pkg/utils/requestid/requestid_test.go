@@ -15,7 +15,7 @@ func TestFromGortexContext(t *testing.T) {
 	t.Run("from context value", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		rec := httptest.NewRecorder()
-		c := gortexContext.NewContext(req, rec)
+		c := gortexContext.NewDefaultContext(req, rec)
 		
 		expectedID := "test-request-id"
 		c.Set("request_id", expectedID)
@@ -26,7 +26,7 @@ func TestFromGortexContext(t *testing.T) {
 	t.Run("from response header", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		rec := httptest.NewRecorder()
-		c := gortexContext.NewContext(req, rec)
+		c := gortexContext.NewDefaultContext(req, rec)
 		
 		expectedID := "header-request-id"
 		c.Response().Header().Set(HeaderXRequestID, expectedID)
@@ -39,7 +39,7 @@ func TestFromGortexContext(t *testing.T) {
 		expectedID := "request-header-id"
 		req.Header.Set(HeaderXRequestID, expectedID)
 		rec := httptest.NewRecorder()
-		c := gortexContext.NewContext(req, rec)
+		c := gortexContext.NewDefaultContext(req, rec)
 		
 		assert.Equal(t, expectedID, FromGortexContext(c))
 	})
@@ -48,7 +48,7 @@ func TestFromGortexContext(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		req.Header.Set(HeaderXRequestID, "request-id")
 		rec := httptest.NewRecorder()
-		c := gortexContext.NewContext(req, rec)
+		c := gortexContext.NewDefaultContext(req, rec)
 		
 		c.Response().Header().Set(HeaderXRequestID, "response-id")
 		c.Set("request_id", "context-id")
@@ -60,7 +60,7 @@ func TestFromGortexContext(t *testing.T) {
 	t.Run("no request ID", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		rec := httptest.NewRecorder()
-		c := gortexContext.NewContext(req, rec)
+		c := gortexContext.NewDefaultContext(req, rec)
 		
 		assert.Empty(t, FromGortexContext(c))
 	})
@@ -86,7 +86,7 @@ func TestContextOperations(t *testing.T) {
 	t.Run("WithGortexContext", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		rec := httptest.NewRecorder()
-		c := gortexContext.NewContext(req, rec)
+		c := gortexContext.NewDefaultContext(req, rec)
 		
 		requestID := "echo-request-id"
 		c.Set("request_id", requestID)
@@ -120,7 +120,7 @@ func TestPropagation(t *testing.T) {
 	t.Run("PropagateToRequest", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		rec := httptest.NewRecorder()
-		c := gortexContext.NewContext(req, rec)
+		c := gortexContext.NewDefaultContext(req, rec)
 		
 		requestID := "propagate-123"
 		c.Set("request_id", requestID)
@@ -164,7 +164,7 @@ func TestLoggerIntegration(t *testing.T) {
 	t.Run("LoggerFromGortex", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		rec := httptest.NewRecorder()
-		c := gortexContext.NewContext(req, rec)
+		c := gortexContext.NewDefaultContext(req, rec)
 		
 		requestID := "echo-logger-id"
 		c.Set("request_id", requestID)
@@ -266,7 +266,7 @@ func TestHTTPClient(t *testing.T) {
 func BenchmarkFromGortexContext(b *testing.B) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
-	c := gortexContext.NewContext(req, rec)
+	c := gortexContext.NewDefaultContext(req, rec)
 	c.Set("request_id", "bench-id")
 
 	b.ResetTimer()

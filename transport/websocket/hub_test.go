@@ -11,7 +11,7 @@ import (
 
 func TestHub(t *testing.T) {
 	logger, _ := zap.NewDevelopment()
-	h := hub.NewHub(logger)
+	h := websocket.NewHub(logger)
 	
 	// Start hub in background
 	go h.Run()
@@ -24,7 +24,7 @@ func TestHub(t *testing.T) {
 	})
 
 	t.Run("Broadcast", func(t *testing.T) {
-		msg := &hub.Message{
+		msg := &websocket.Message{
 			Type: "test",
 			Data: map[string]interface{}{
 				"content": "test message",
@@ -38,7 +38,7 @@ func TestHub(t *testing.T) {
 	})
 
 	t.Run("SendToUser", func(t *testing.T) {
-		msg := &hub.Message{
+		msg := &websocket.Message{
 			Type: "private",
 			Data: map[string]interface{}{
 				"content": "private message",
@@ -56,7 +56,7 @@ func TestHub(t *testing.T) {
 
 	t.Run("Shutdown", func(t *testing.T) {
 		// Create a new hub for shutdown test
-		h2 := hub.NewHub(logger)
+		h2 := websocket.NewHub(logger)
 		go h2.Run()
 		time.Sleep(10 * time.Millisecond)
 		

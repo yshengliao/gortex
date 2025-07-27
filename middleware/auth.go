@@ -48,10 +48,7 @@ func JWTAuthWithConfig(config *AuthConfig) MiddlewareFunc {
 
 	return func(next HandlerFunc) HandlerFunc {
 		return func(c Context) error {
-			req, ok := c.Request().(*http.Request)
-			if !ok {
-				return next(c)
-			}
+			req := c.Request()
 
 			// Skip if path is in skip list
 			for _, skip := range config.SkipPaths {
@@ -232,8 +229,10 @@ func GetClaimsFromContext(ctx Context, claimsKey ...string) *auth.Claims {
 		key = claimsKey[0]
 	}
 
-	if claims, ok := ctx.Value(key).(*auth.Claims); ok {
-		return claims
+	if val := ctx.Get(key); val != nil {
+		if claims, ok := val.(*auth.Claims); ok {
+			return claims
+		}
 	}
 	return nil
 }
@@ -296,10 +295,7 @@ func SessionAuthWithConfig(config *SessionConfig) MiddlewareFunc {
 
 	return func(next HandlerFunc) HandlerFunc {
 		return func(c Context) error {
-			req, ok := c.Request().(*http.Request)
-			if !ok {
-				return next(c)
-			}
+			req := c.Request()
 
 			// Skip if path is in skip list
 			for _, skip := range config.SkipPaths {

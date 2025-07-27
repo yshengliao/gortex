@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"go.uber.org/zap"
-	"github.com/yshengliao/gortex/transport/http"
 )
 
 // LoggerConfig contains configuration for the logger middleware
@@ -55,10 +54,7 @@ func LoggerWithConfig(config *LoggerConfig) MiddlewareFunc {
 
 	return func(next HandlerFunc) HandlerFunc {
 		return func(c Context) error {
-			req, ok := c.Request().(*http.Request)
-			if !ok {
-				return next(c)
-			}
+			req := c.Request()
 
 			// Skip if path is in skip list
 			for _, skip := range config.SkipPaths {
@@ -87,10 +83,7 @@ func LoggerWithConfig(config *LoggerConfig) MiddlewareFunc {
 			}
 
 			// Create response writer wrapper to capture status code
-			resp, ok := c.Response().(http.ResponseWriter)
-			if !ok {
-				return next(c)
-			}
+			resp := c.Response()
 			
 			rw := &responseWriter{
 				ResponseWriter: resp,

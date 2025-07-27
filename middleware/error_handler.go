@@ -8,7 +8,6 @@ import (
 
 	"go.uber.org/zap"
 	"github.com/yshengliao/gortex/pkg/errors"
-	"github.com/yshengliao/gortex/transport/http"
 )
 
 // ErrorHandlerConfig contains configuration for the error handler middleware
@@ -141,9 +140,7 @@ func writeErrorResponse(c Context, statusCode int, errCode, message string, deta
 
 // getPath safely gets the request path
 func getPath(c Context) string {
-	if req, ok := c.Request().(*http.Request); ok {
-		return req.URL.Path
-	}
-	return "unknown"
+	req := c.Request()
+	return req.URL.Path
 }
 

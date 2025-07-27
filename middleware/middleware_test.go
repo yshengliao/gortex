@@ -13,7 +13,7 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"github.com/yshengliao/gortex/pkg/errors"
-	"github.com/yshengliao/gortex/transport/http"
+	httpctx "github.com/yshengliao/gortex/transport/http"
 )
 
 // mockContext implements Context for testing
@@ -78,7 +78,7 @@ func (m *mockContext) Response() interface{} {
 
 // Tests
 
-func TestErrorHandler(t *testing.T) {
+func TestErrorHandler_Middleware(t *testing.T) {
 	logger, _ := zap.NewDevelopment()
 	middleware := ErrorHandlerWithConfig(&ErrorHandlerConfig{
 		Logger:                         logger,
@@ -156,7 +156,7 @@ func TestErrorHandler(t *testing.T) {
 	}
 }
 
-func TestRequestID(t *testing.T) {
+func TestRequestID_Middleware(t *testing.T) {
 	middleware := RequestID()
 
 	t.Run("generates new ID", func(t *testing.T) {

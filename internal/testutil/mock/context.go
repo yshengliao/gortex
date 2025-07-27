@@ -1,11 +1,12 @@
 package mock
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"sync"
 	
-	"github.com/yshengliao/gortex/transport/http"
+	httpctx "github.com/yshengliao/gortex/transport/http"
 )
 
 // Context is a mock implementation of context.Context for testing

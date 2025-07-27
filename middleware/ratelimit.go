@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"golang.org/x/time/rate"
-	"github.com/yshengliao/gortex/transport/http"
 )
 
 // RateLimiter defines the interface for rate limiting

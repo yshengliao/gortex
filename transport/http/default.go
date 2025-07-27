@@ -28,9 +28,9 @@ type DefaultContext struct {
 	handler     HandlerFunc
 	store       Map
 	lock        sync.RWMutex
-	logger      Logger
+	logger      interface{}
 	echo        interface{} // For compatibility
-	stdContext  Context
+	stdContext  context.Context
 }
 
 // NewDefaultContext creates a new DefaultContext
@@ -122,6 +122,25 @@ func (c *DefaultContext) Param(name string) string {
 		return ""
 	}
 	return c.params.get(name)
+}
+
+// Params returns all path parameters
+func (c *DefaultContext) Params() url.Values {
+	values := make(url.Values)
+	if c.params != nil {
+		// Convert smartParams to url.Values
+		// First, add values from the fixed arrays
+		for i := 0; i < c.params.count && i < 4; i++ {
+			values.Set(c.params.keys[i], c.params.vals[i])
+		}
+		// Then add any overflow values
+		if c.params.overflow != nil {
+			for k, v := range c.params.overflow {
+				values.Set(k, v)
+			}
+		}
+	}
+	return values
 }
 
 // ParamNames returns all path parameter names
@@ -258,6 +277,13 @@ func (c *DefaultContext) Validate(i interface{}) error {
 	// This should be implemented with a validator
 	// For now, return nil
 	return nil
+}
+
+// Render renders a template with data
+func (c *DefaultContext) Render(code int, name string, data interface{}) error {
+	// This should be implemented with a template engine
+	// For now, return an error
+	return fmt.Errorf("render not implemented")
 }
 
 // JSON sends a JSON response with status code
@@ -443,12 +469,12 @@ func (c *DefaultContext) SetHandler(h HandlerFunc) {
 }
 
 // Logger returns the logger
-func (c *DefaultContext) Logger() Logger {
+func (c *DefaultContext) Logger() interface{} {
 	return c.logger
 }
 
 // SetLogger sets the logger
-func (c *DefaultContext) SetLogger(l Logger) {
+func (c *DefaultContext) SetLogger(l interface{}) {
 	c.logger = l
 }
 
@@ -480,16 +506,21 @@ func (c *DefaultContext) Reset(r *http.Request, w http.ResponseWriter) {
 	c.stdContext = r.Context()
 }
 
-// StdContext returns the standard Context
-func (c *DefaultContext) StdContext() Context {
+// Context returns the standard context.Context
+func (c *DefaultContext) Context() context.Context {
 	if c.stdContext == nil {
 		c.stdContext = c.request.Context()
 	}
 	return c.stdContext
 }
 
-// SetStdContext sets the standard Context
-func (c *DefaultContext) SetStdContext(ctx Context) {
+// StdContext returns the standard context.Context
+func (c *DefaultContext) StdContext() context.Context {
+	return c.Context()
+}
+
+// SetStdContext sets the standard context.Context
+func (c *DefaultContext) SetStdContext(ctx context.Context) {
 	c.stdContext = ctx
 	c.request = c.request.WithContext(ctx)
 }

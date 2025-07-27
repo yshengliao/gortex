@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/yshengliao/gortex/transport/http"
+	httpctx "github.com/yshengliao/gortex/transport/http"
 )
 
 func TestDevErrorPage(t *testing.T) {

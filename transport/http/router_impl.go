@@ -116,11 +116,10 @@ func (r *router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if root, ok := r.trees[method]; ok {
 		params := make(map[string]string)
 		if handler := root.search(path, params); handler != nil {
-			ctx := &httpContext{
-				request:  req,
-				response: w,
-				params:   params,
-				values:   make(map[string]interface{}),
+			ctx := NewDefaultContext(req, w).(*DefaultContext)
+			// Set parameters
+			for k, v := range params {
+				ctx.params.set(k, v)
 			}
 			if err := handler(ctx); err != nil {
 				// Handle error

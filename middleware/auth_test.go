@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/yshengliao/gortex/pkg/auth"
-	"github.com/yshengliao/gortex/transport/http"
+	httpctx "github.com/yshengliao/gortex/transport/http"
 )
 
 func TestJWTAuth(t *testing.T) {

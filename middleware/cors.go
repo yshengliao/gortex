@@ -5,7 +5,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/yshengliao/gortex/transport/http"
 )
 
 // CORSConfig contains configuration for the CORS middleware
@@ -66,15 +65,9 @@ func CORSWithConfig(config *CORSConfig) MiddlewareFunc {
 
 	return func(next HandlerFunc) HandlerFunc {
 		return func(c Context) error {
-			req, ok := c.Request().(*http.Request)
-			if !ok {
-				return next(c)
-			}
+			req := c.Request()
 
-			resp, ok := c.Response().(http.ResponseWriter)
-			if !ok {
-				return next(c)
-			}
+			resp := c.Response()
 
 			origin := req.Header.Get("Origin")
 

@@ -6,7 +6,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/yshengliao/gortex/pkg/utils/requestid"
-	"github.com/yshengliao/gortex/transport/http"
 )
 
 // RequestIDConfig contains configuration for the request ID middleware
@@ -52,10 +51,7 @@ func RequestIDWithConfig(config *RequestIDConfig) MiddlewareFunc {
 
 	return func(next HandlerFunc) HandlerFunc {
 		return func(c Context) error {
-			req, ok := c.Request().(*http.Request)
-			if !ok {
-				return next(c)
-			}
+			req := c.Request()
 
 			// Skip if path is in skip list
 			for _, skip := range config.SkipPaths {

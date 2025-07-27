@@ -1,9 +1,10 @@
-package router
+package app
 
 import (
 	"reflect"
 	"sync"
 
+	"github.com/yshengliao/gortex/core/handler"
 	"github.com/yshengliao/gortex/transport/http"
 )
 
@@ -122,7 +123,7 @@ func (c *HandlerCache) buildMethodCache(t reflect.Type) map[string]HandlerMethod
 type RouteInfo struct {
 	Method  string
 	Path    string
-	Handler context.HandlerFunc
+	Handler handler.HandlerFunc
 }
 
 // RouteCache caches compiled routes

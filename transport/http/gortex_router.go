@@ -203,12 +203,12 @@ func (r *gortexRouter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if handler, params := r.findRoute(req.Method, req.URL.Path); handler != nil {
 		// Set path parameters efficiently
 		if len(params) > 0 {
-			context.SetParams(ctx, params)
+			SetParams(ctx, params)
 		}
 
 		if err := handler(ctx); err != nil {
 			// Handle error - check if it's an HTTPError
-			if he, ok := err.(*context.HTTPError); ok {
+			if he, ok := err.(*HTTPError); ok {
 				// Write the proper HTTP error response
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(he.Code)

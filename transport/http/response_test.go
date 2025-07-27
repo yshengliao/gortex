@@ -1,4 +1,4 @@
-package http
+package http_test
 
 import (
 	"encoding/json"
@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/yshengliao/gortex/internal/testutil"
+	httpctx "github.com/yshengliao/gortex/transport/http"
 )
 
 func TestSuccess(t *testing.T) {
@@ -13,7 +14,7 @@ func TestSuccess(t *testing.T) {
 	mockCtx := ctx.(*testutil.MockContext)
 
 	data := map[string]string{"message": "success"}
-	err := Success(ctx, http.StatusOK, data)
+	err := httpctx.Success(ctx, http.StatusOK, data)
 
 	if err != nil {
 		t.Errorf("Success() returned error: %v", err)
@@ -24,7 +25,7 @@ func TestSuccess(t *testing.T) {
 		t.Errorf("Expected status code %d, got %d", http.StatusOK, rec.Code)
 	}
 
-	var resp StandardResponse
+	var resp httpctx.StandardResponse
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("Failed to unmarshal response: %v", err)
 	}
@@ -42,7 +43,7 @@ func TestSuccessWithMeta(t *testing.T) {
 	data := map[string]string{"message": "success"}
 	meta := map[string]interface{}{"version": "1.0"}
 
-	err := SuccessWithMeta(ctx, http.StatusOK, data, meta)
+	err := httpctx.SuccessWithMeta(ctx, http.StatusOK, data, meta)
 
 	if err != nil {
 		t.Errorf("SuccessWithMeta() returned error: %v", err)
@@ -53,7 +54,7 @@ func TestSuccessWithMeta(t *testing.T) {
 		t.Errorf("Expected status code %d, got %d", http.StatusOK, rec.Code)
 	}
 
-	var resp SuccessResponse
+	var resp httpctx.SuccessResponse
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("Failed to unmarshal response: %v", err)
 	}
@@ -73,7 +74,7 @@ func TestCreated(t *testing.T) {
 	mockCtx := ctx.(*testutil.MockContext)
 
 	data := map[string]interface{}{"id": 123, "name": "Test"}
-	err := Created(ctx, data)
+	err := httpctx.Created(ctx, data)
 
 	if err != nil {
 		t.Errorf("Created() returned error: %v", err)

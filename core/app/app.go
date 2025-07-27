@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/yshengliao/gortex/pkg/config"
-	gortexContext "github.com/yshengliao/gortex/transport/http"
-	gortexMiddleware "github.com/yshengliao/gortex/middleware"
-	"github.com/yshengliao/gortex/transport/http"
+	appcontext "github.com/yshengliao/gortex/core/context"
+	"github.com/yshengliao/gortex/middleware"
+	httpctx "github.com/yshengliao/gortex/transport/http"
 	"go.uber.org/zap"
 )
 
@@ -43,11 +43,11 @@ func getRuntimeModeName(mode RuntimeMode) string {
 
 // App represents the main application instance
 type App struct {
-	router          router.GortexRouter
+	router          httpctx.GortexRouter
 	server          *http.Server
 	config          *Config
 	logger          *zap.Logger
-	ctx             *Context
+	ctx             *appcontext.Context
 	shutdownHooks   []ShutdownHook
 	shutdownTimeout time.Duration
 	mu              sync.RWMutex
@@ -74,8 +74,8 @@ type Option func(*App) error
 // NewApp creates a new application instance with the given options
 func NewApp(opts ...Option) (*App, error) {
 	app := &App{
-		router:          router.NewGortexRouter(),
-		ctx:             NewContext(),
+		router:          httpctx.NewGortexRouter(),
+		ctx:             appcontext.NewContext(),
 		shutdownHooks:   make([]ShutdownHook, 0),
 		shutdownTimeout: 30 * time.Second, // Default 30 seconds
 		runtimeMode:     ModeGortex,       // Default to Gortex
