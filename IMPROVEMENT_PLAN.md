@@ -95,8 +95,9 @@
 - [x] **任務 3.2**: 評估並優化 Collector 中的鎖定機制，考慮使用 `sync.Map` 或更細粒度的鎖來提升併發效能。
   - **執行提示**：分析當前的鎖競爭熱點，考慮：1) 對讀多寫少的場景使用 `sync.RWMutex` \n    2) 對高併發更新的 metrics 使用 `sync.Map` 3) 實作分片鎖（sharded locks）將不同的 metrics \n    分配到不同的鎖。使用 `go test -bench` 和 `pprof` 分析效能改進。\n  - **完成說明**：經過全面的效能分析和測試，實作了三種優化方案：1) OptimizedCollector (sync.Map) \n    2) ShardedCollector (分片鎖) 3) 基準性能測試。ShardedCollector 在高並發寫入場景下表現最佳，\n    提升60%效能。詳細分析見 `performance_analysis.md`。
 
-- [ ] **任務 3.3**: 建立針對 Metrics 的效能基準測試 (benchmark)，並將其納入 CI 流程以追蹤效能變化。
+- [x] **任務 3.3**: 建立針對 Metrics 的效能基準測試 (benchmark)，並將其納入 CI 流程以追蹤效能變化。
   - **執行提示**：在 `observability/metrics/benchmark_test.go` 中新增基準測試，測試場景包括：1) 高併發寫入 2) 大量不同標籤組合 3) 讀取彙總資料。使用 `benchstat` 比較效能變化。在 CI 中設定效能閾值，當效能退化超過 10% 時觸發警告。
+  - **完成說明**：成功建立了全面的效能基準測試套件，包含 10 種測試場景：高並發寫入、高基數標籤、混合讀寫、HTTP 請求記錄、批量指標記錄、記憶體壓力、時間序列模擬、爭用鍵存取等。實作了完整的 CI 整合（`.github/workflows/benchmarks.yml`），具備自動基準比較、效能回歸檢測（>10% 觸發警告）、PR 評論、基準結果存檔等功能。建立了 `benchmarks/` 目錄存放基準資料和文件。
 
 ### 4. 增強型 Tracing 功能 (基於 OpenTelemetry)
 

@@ -1,0 +1,26 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/yshengliao/gortex/observability/metrics
+cpu: Apple M1
+BenchmarkMetricsCollectors/ImprovedCollector/HighConcurrencyWrites-8         	 1846021	       595.8 ns/op	     440 B/op	       7 allocs/op
+BenchmarkMetricsCollectors/ImprovedCollector/HighCardinalityTags-8           	 2135194	       508.0 ns/op	     447 B/op	      10 allocs/op
+BenchmarkMetricsCollectors/ImprovedCollector/MixedReadWrite-8                	 3937716	       305.4 ns/op	     248 B/op	       3 allocs/op
+BenchmarkMetricsCollectors/ImprovedCollector/HTTPRequestRecording-8          	19684231	        63.34 ns/op	       0 B/op	       0 allocs/op
+BenchmarkMetricsCollectors/ImprovedCollector/BulkMetricsRecording-8          	  862773	      1415 ns/op	     989 B/op	      22 allocs/op
+BenchmarkMetricsCollectors/ImprovedCollector/SingleThreadedBaseline-8        	 9968097	       120.6 ns/op	      15 B/op	       1 allocs/op
+BenchmarkMetricsCollectors/ImprovedCollector/AggregatedDataReads-8           	 3118658	       354.2 ns/op	     912 B/op	      10 allocs/op
+BenchmarkMetricsCollectors/ImprovedCollector/MemoryPressure-8                	 1469864	       819.9 ns/op	     690 B/op	      15 allocs/op
+BenchmarkMetricsCollectors/ImprovedCollector/TimeSeriesSimulation-8          	  878112	      1375 ns/op	     957 B/op	      22 allocs/op
+BenchmarkMetricsCollectors/ImprovedCollector/ContentiousKeyAccess-8          	 5120606	       238.2 ns/op	      16 B/op	       1 allocs/op
+BenchmarkMetricsCollectors/ShardedCollector/HighConcurrencyWrites-8          	 4324012	       266.5 ns/op	     440 B/op	       7 allocs/op
+BenchmarkMetricsCollectors/ShardedCollector/HighCardinalityTags-8            	 2159218	       561.1 ns/op	     447 B/op	      10 allocs/op
+BenchmarkMetricsCollectors/ShardedCollector/MixedReadWrite-8                 	  224004	      5694 ns/op	   13840 B/op	       7 allocs/op
+BenchmarkMetricsCollectors/ShardedCollector/HTTPRequestRecording-8           	19688914	        61.89 ns/op	       0 B/op	       0 allocs/op
+BenchmarkMetricsCollectors/ShardedCollector/BulkMetricsRecording-8           	  711118	      1693 ns/op	    1085 B/op	      22 allocs/op
+BenchmarkMetricsCollectors/ShardedCollector/SingleThreadedBaseline-8         	 8057266	       148.7 ns/op	      15 B/op	       1 allocs/op
+BenchmarkMetricsCollectors/ShardedCollector/AggregatedDataReads-8            	 1476152	       812.2 ns/op	    1168 B/op	      12 allocs/op
+BenchmarkMetricsCollectors/ShardedCollector/MemoryPressure-8                 	 1242610	       963.8 ns/op	     722 B/op	      15 allocs/op
+BenchmarkMetricsCollectors/ShardedCollector/TimeSeriesSimulation-8           	  720543	      1700 ns/op	    1042 B/op	      23 allocs/op
+BenchmarkMetricsCollectors/ShardedCollector/ContentiousKeyAccess-8           	11473275	       108.2 ns/op	      16 B/op	       1 allocs/op
+PASS
+ok  	github.com/yshengliao/gortex/observability/metrics	30.420s
