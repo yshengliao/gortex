@@ -5,8 +5,8 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/yshengliao/gortex/app"
-	"github.com/yshengliao/gortex/http/context"
+	"github.com/yshengliao/gortex/core/app"
+	"github.com/yshengliao/gortex/transport/http"
 	"go.uber.org/zap"
 )
 

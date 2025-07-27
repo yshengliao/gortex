@@ -2,7 +2,7 @@ package fixture
 
 import (
 	"time"
-	"github.com/yshengliao/gortex/config"
+	"github.com/yshengliao/gortex/pkg/config"
 )
 
 // TestConfig returns a test configuration with sensible defaults

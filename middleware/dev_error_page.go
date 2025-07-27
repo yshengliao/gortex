@@ -8,7 +8,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/yshengliao/gortex/http/context"
+	"github.com/yshengliao/gortex/transport/http"
 )
 
 // GortexDevErrorPageConfig defines the config for development error page middleware
@@ -56,7 +56,7 @@ func GortexDevErrorPageWithConfig(config GortexDevErrorPageConfig) MiddlewareFun
 	}
 
 	return func(next HandlerFunc) HandlerFunc {
-		return func(c context.Context) error {
+		return func(c Context) error {
 			// Execute the next handler
 			err := next(c)
 
@@ -84,7 +84,7 @@ func GortexDevErrorPageWithConfig(config GortexDevErrorPageConfig) MiddlewareFun
 }
 
 // extractErrorInfo extracts detailed error information
-func extractErrorInfo(err error, c context.Context, config GortexDevErrorPageConfig) *ErrorInfo {
+func extractErrorInfo(err error, c Context, config GortexDevErrorPageConfig) *ErrorInfo {
 	errorInfo := &ErrorInfo{
 		Status:     http.StatusInternalServerError,
 		StatusText: http.StatusText(http.StatusInternalServerError),
@@ -184,7 +184,7 @@ func getGortexStackTrace(limit int) string {
 }
 
 // renderHTMLErrorPage renders an HTML error page
-func renderHTMLErrorPage(c context.Context, errorInfo *ErrorInfo) error {
+func renderHTMLErrorPage(c Context, errorInfo *ErrorInfo) error {
 	tmpl := `<!DOCTYPE html>
 <html>
 <head>
@@ -491,7 +491,7 @@ func RecoverWithErrorPage() MiddlewareFunc {
 // RecoverWithErrorPageConfig is a recovery middleware with custom config
 func RecoverWithErrorPageConfig(config GortexDevErrorPageConfig) MiddlewareFunc {
 	return func(next HandlerFunc) HandlerFunc {
-		return func(c context.Context) (err error) {
+		return func(c Context) (err error) {
 			defer func() {
 				if r := recover(); r != nil {
 					var recoveredErr error

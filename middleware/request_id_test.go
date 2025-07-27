@@ -4,12 +4,12 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/yshengliao/gortex/http/context"
+	"github.com/yshengliao/gortex/transport/http"
 )
 
 func TestRequestID(t *testing.T) {
 	// Create a test handler
-	handler := func(c context.Context) error {
+	handler := func(c Context) error {
 		// Verify request ID is set
 		rid := GetRequestID(c)
 		if rid == "" {
@@ -43,7 +43,7 @@ func TestRequestIDWithExistingID(t *testing.T) {
 	existingID := "existing-request-id"
 
 	// Create a test handler
-	handler := func(c context.Context) error {
+	handler := func(c Context) error {
 		rid := GetRequestID(c)
 		if rid != existingID {
 			t.Errorf("Expected request ID %s, got %s", existingID, rid)
@@ -84,7 +84,7 @@ func TestRequestIDWithConfig(t *testing.T) {
 	}
 
 	// Create a test handler
-	handler := func(c context.Context) error {
+	handler := func(c Context) error {
 		rid := GetRequestID(c)
 		if rid != "custom-id" {
 			t.Errorf("Expected request ID 'custom-id', got %s", rid)
@@ -115,13 +115,13 @@ func TestRequestIDWithConfig(t *testing.T) {
 
 func TestRequestIDSkipper(t *testing.T) {
 	config := RequestIDConfig{
-		Skipper: func(c context.Context) bool {
+		Skipper: func(c Context) bool {
 			return c.Request().URL.Path == "/skip"
 		},
 	}
 
 	// Create a test handler
-	handler := func(c context.Context) error {
+	handler := func(c Context) error {
 		return c.String(200, "test")
 	}
 

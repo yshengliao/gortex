@@ -5,12 +5,12 @@ import (
 	"testing"
 
 	"golang.org/x/time/rate"
-	"github.com/yshengliao/gortex/http/context"
+	"github.com/yshengliao/gortex/transport/http"
 )
 
 func TestGortexRateLimit(t *testing.T) {
 	// Create a test handler
-	handler := func(c context.Context) error {
+	handler := func(c Context) error {
 		return c.String(200, "success")
 	}
 
@@ -18,7 +18,7 @@ func TestGortexRateLimit(t *testing.T) {
 	config := &GortexRateLimitConfig{
 		Rate:  1, // 1 request per second
 		Burst: 1, // burst of 1
-		KeyFunc: func(c context.Context) string {
+		KeyFunc: func(c Context) string {
 			return "test-key" // Fixed key for testing
 		},
 	}
@@ -57,7 +57,7 @@ func TestGortexRateLimit(t *testing.T) {
 }
 
 func TestGortexRateLimitByIP(t *testing.T) {
-	handler := func(c context.Context) error {
+	handler := func(c Context) error {
 		return c.String(200, "success")
 	}
 
@@ -100,17 +100,17 @@ func TestGortexRateLimitByIP(t *testing.T) {
 }
 
 func TestGortexRateLimitSkip(t *testing.T) {
-	handler := func(c context.Context) error {
+	handler := func(c Context) error {
 		return c.String(200, "success")
 	}
 
 	config := &GortexRateLimitConfig{
 		Rate:  1,
 		Burst: 1,
-		KeyFunc: func(c context.Context) string {
+		KeyFunc: func(c Context) string {
 			return "test-key"
 		},
-		SkipFunc: func(c context.Context) bool {
+		SkipFunc: func(c Context) bool {
 			return c.Request().URL.Path == "/skip"
 		},
 	}

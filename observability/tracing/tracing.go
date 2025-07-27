@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	gortexContext "github.com/yshengliao/gortex/http/context"
+	gortexContext "github.com/yshengliao/gortex/transport/http"
 	"github.com/yshengliao/gortex/middleware"
 )
 

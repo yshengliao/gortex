@@ -73,12 +73,12 @@
 **目標**：改善專案結構，提升程式碼組織的清晰度和可維護性。
 
 - [x] **任務 3.1**: 重組目錄結構以提升清晰度
-  - [x] 將 HTTP 相關套件整合到 `http/` 目錄下（router, middleware, context, response）
-  - [x] 將 WebSocket hub 移至 `websocket/` 目錄
-  - [x] 將工具類套件整合到 `utils/` 目錄下
-  - [x] 移除 `pkg/` 目錄，直接使用頂層套件組織
-  - [x] 將 service interfaces 移至 `app/interfaces/`
-  - **完成說明**：成功重組專案結構，提升了程式碼組織的清晰度和可維護性。
+  - [x] 建立 `core/` 目錄存放核心框架元件（app、handler、router、context、types）
+  - [x] 整合所有 middleware 到統一的 `middleware/` 目錄（auth、cors、logger、ratelimit、recover）
+  - [x] 建立 `transport/` 目錄分離傳輸層（http、websocket）
+  - [x] 保留 `pkg/` 目錄存放公共套件（auth、config、errors、validation、utils）
+  - [x] 解決循環依賴問題，建立 `core/types` 套件存放共享介面定義
+  - **完成說明**：成功重組專案結構為更清晰的分層架構，解決了所有循環依賴問題，通過 `go vet` 和 `go test` 驗證。新結構提供了更好的關注點分離和模組化設計。
 
 ## Phase 2: Observability 增強
 

@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"sync"
 	
-	"github.com/yshengliao/gortex/http/context"
+	"github.com/yshengliao/gortex/transport/http"
 )
 
 // Context is a mock implementation of context.Context for testing

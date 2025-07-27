@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"golang.org/x/time/rate"
-	"github.com/yshengliao/gortex/http/context"
+	"github.com/yshengliao/gortex/transport/http"
 )
 
 // RateLimiter defines the interface for rate limiting
@@ -32,13 +32,13 @@ type GortexRateLimitConfig struct {
 	Burst int
 
 	// KeyFunc extracts the key from the request
-	KeyFunc func(c context.Context) string
+	KeyFunc func(c Context) string
 
 	// ErrorHandler handles rate limit errors
-	ErrorHandler func(c context.Context) error
+	ErrorHandler func(c Context) error
 
 	// SkipFunc determines if rate limiting should be skipped
-	SkipFunc func(c context.Context) bool
+	SkipFunc func(c Context) bool
 
 	// Store is the rate limiter implementation
 	Store RateLimiter
@@ -49,11 +49,11 @@ func DefaultGortexRateLimitConfig() *GortexRateLimitConfig {
 	return &GortexRateLimitConfig{
 		Rate:  10,
 		Burst: 20,
-		KeyFunc: func(c context.Context) string {
+		KeyFunc: func(c Context) string {
 			// Use client IP as default key
 			return c.RealIP()
 		},
-		ErrorHandler: func(c context.Context) error {
+		ErrorHandler: func(c Context) error {
 			return c.JSON(http.StatusTooManyRequests, map[string]string{
 				"error": "rate limit exceeded",
 			})
@@ -138,13 +138,13 @@ func GortexRateLimit() MiddlewareFunc {
 func GortexRateLimitWithConfig(config *GortexRateLimitConfig) MiddlewareFunc {
 	// Set defaults
 	if config.KeyFunc == nil {
-		config.KeyFunc = func(c context.Context) string {
+		config.KeyFunc = func(c Context) string {
 			return c.RealIP()
 		}
 	}
 	
 	if config.ErrorHandler == nil {
-		config.ErrorHandler = func(c context.Context) error {
+		config.ErrorHandler = func(c Context) error {
 			return c.JSON(http.StatusTooManyRequests, map[string]string{
 				"error": "rate limit exceeded",
 			})
@@ -158,7 +158,7 @@ func GortexRateLimitWithConfig(config *GortexRateLimitConfig) MiddlewareFunc {
 	}
 
 	return func(next HandlerFunc) HandlerFunc {
-		return func(c context.Context) error {
+		return func(c Context) error {
 			// Skip if skip function returns true
 			if config.SkipFunc != nil && config.SkipFunc(c) {
 				return next(c)
@@ -178,7 +178,7 @@ func GortexRateLimitWithConfig(config *GortexRateLimitConfig) MiddlewareFunc {
 }
 
 // GetRateLimitKey is a helper function to extract rate limit key from context
-func GetRateLimitKey(c context.Context) string {
+func GetRateLimitKey(c Context) string {
 	if key := c.Get("rate_limit_key"); key != nil {
 		if keyStr, ok := key.(string); ok {
 			return keyStr
@@ -190,15 +190,15 @@ func GetRateLimitKey(c context.Context) string {
 // Common key functions for rate limiting
 
 // RateLimitByIP returns a key function that uses client IP
-func RateLimitByIP() func(context.Context) string {
-	return func(c context.Context) string {
+func RateLimitByIP() func(Context) string {
+	return func(c Context) string {
 		return c.RealIP()
 	}
 }
 
 // RateLimitByUser returns a key function that uses user ID from context
-func RateLimitByUser(userKey string) func(context.Context) string {
-	return func(c context.Context) string {
+func RateLimitByUser(userKey string) func(Context) string {
+	return func(c Context) string {
 		if userID := c.Get(userKey); userID != nil {
 			return fmt.Sprintf("user:%v", userID)
 		}
@@ -207,8 +207,8 @@ func RateLimitByUser(userKey string) func(context.Context) string {
 }
 
 // RateLimitByHeader returns a key function that uses a specific header
-func RateLimitByHeader(headerName string) func(context.Context) string {
-	return func(c context.Context) string {
+func RateLimitByHeader(headerName string) func(Context) string {
+	return func(c Context) string {
 		if value := c.Request().Header.Get(headerName); value != "" {
 			return fmt.Sprintf("header:%s:%s", headerName, value)
 		}

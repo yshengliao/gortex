@@ -3,7 +3,7 @@ package metrics
 import (
 	"time"
 
-	"github.com/yshengliao/gortex/http/context"
+	"github.com/yshengliao/gortex/transport/http"
 	"github.com/yshengliao/gortex/middleware"
 )
 

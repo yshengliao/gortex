@@ -33,8 +33,8 @@ go get github.com/yshengliao/gortex
 package main
 
 import (
-    "github.com/yshengliao/gortex/app"
-    "github.com/yshengliao/gortex/http/context"
+    "github.com/yshengliao/gortex/core/app"
+    "github.com/yshengliao/gortex/core/types"
 )
 
 // Define routes with struct tags
@@ -46,12 +46,12 @@ type HandlersManager struct {
 }
 
 type HomeHandler struct{}
-func (h *HomeHandler) GET(c context.Context) error {
+func (h *HomeHandler) GET(c types.Context) error {
     return c.JSON(200, map[string]string{"message": "Welcome to Gortex!"})
 }
 
 type UserHandler struct{}
-func (h *UserHandler) GET(c context.Context) error {
+func (h *UserHandler) GET(c types.Context) error {
     return c.JSON(200, map[string]string{"id": c.Param("id")})
 }
 
@@ -60,12 +60,12 @@ type AdminGroup struct {
 }
 
 type DashboardHandler struct{}
-func (h *DashboardHandler) GET(c context.Context) error {
+func (h *DashboardHandler) GET(c types.Context) error {
     return c.JSON(200, map[string]string{"data": "admin only"})
 }
 
 type WSHandler struct{}
-func (h *WSHandler) HandleConnection(c context.Context) error {
+func (h *WSHandler) HandleConnection(c types.Context) error {
     // WebSocket upgrade logic
     return nil
 }

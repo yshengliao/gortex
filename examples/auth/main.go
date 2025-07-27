@@ -5,11 +5,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/yshengliao/gortex/app"
-	"github.com/yshengliao/gortex/auth"
-	"github.com/yshengliao/gortex/http/context"
+	"github.com/yshengliao/gortex/core/app"
+	"github.com/yshengliao/gortex/pkg/auth"
+	"github.com/yshengliao/gortex/transport/http"
 	"github.com/yshengliao/gortex/middleware"
-	"github.com/yshengliao/gortex/errors"
+	"github.com/yshengliao/gortex/pkg/errors"
 	"go.uber.org/zap"
 )
 

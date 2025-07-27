@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/yshengliao/gortex/app"
-	gortexContext "github.com/yshengliao/gortex/http/context"
-	"github.com/yshengliao/gortex/websocket/hub"
+	"github.com/yshengliao/gortex/core/app"
+	gortexContext "github.com/yshengliao/gortex/transport/http"
+	"github.com/yshengliao/gortex/transport/websocket"
 	"go.uber.org/zap"
 )
 

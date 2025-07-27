@@ -1,15 +1,18 @@
 // Package middleware provides the core middleware interface and utilities for Gortex framework
 package middleware
 
-import "github.com/yshengliao/gortex/http/context"
+import (
+	"github.com/yshengliao/gortex/core/types"
+)
 
-// MiddlewareFunc defines the middleware function type for Gortex framework.
-// It takes a HandlerFunc and returns a new HandlerFunc, allowing middleware to wrap handlers.
-type MiddlewareFunc func(next HandlerFunc) HandlerFunc
+// MiddlewareFunc is an alias to types.MiddlewareFunc
+type MiddlewareFunc = types.MiddlewareFunc
 
-// HandlerFunc defines a function to serve HTTP requests in Gortex framework.
-// This is the same as app.HandlerFunc to ensure consistency across the framework.
-type HandlerFunc func(c context.Context) error
+// HandlerFunc is an alias to types.HandlerFunc for convenience
+type HandlerFunc = types.HandlerFunc
+
+// Context is an alias to types.Context for convenience
+type Context = types.Context
 
 // Chain represents a middleware chain that can be applied to handlers
 type Chain struct {
@@ -26,7 +29,7 @@ func NewChain(middlewares ...MiddlewareFunc) *Chain {
 // Then chains the middleware and returns the final handler
 func (c *Chain) Then(h HandlerFunc) HandlerFunc {
 	if h == nil {
-		h = func(ctx context.Context) error {
+		h = func(ctx Context) error {
 			return nil
 		}
 	}

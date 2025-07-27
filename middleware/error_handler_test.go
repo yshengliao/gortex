@@ -10,8 +10,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yshengliao/gortex/http/context"
-	"github.com/yshengliao/gortex/errors"
+	"github.com/yshengliao/gortex/transport/http"
+	"github.com/yshengliao/gortex/pkg/errors"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest"
@@ -28,7 +28,7 @@ func TestErrorHandler(t *testing.T) {
 	}{
 		{
 			name: "Success - no error",
-			handler: func(c context.Context) error {
+			handler: func(c Context) error {
 				return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 			},
 			expectedStatus: http.StatusOK,
@@ -38,7 +38,7 @@ func TestErrorHandler(t *testing.T) {
 		},
 		{
 			name: "ErrorResponse - validation error",
-			handler: func(c context.Context) error {
+			handler: func(c Context) error {
 				return errors.NewWithDetails(errors.CodeValidationFailed, "Validation failed", map[string]interface{}{
 					"field": "email",
 					"error": "invalid format",
@@ -62,7 +62,7 @@ func TestErrorHandler(t *testing.T) {
 		},
 		{
 			name: "ErrorResponse - unauthorized",
-			handler: func(c context.Context) error {
+			handler: func(c Context) error {
 				return errors.New(errors.CodeTokenExpired, "Token has expired")
 			},
 			expectedStatus: http.StatusUnauthorized,
@@ -77,7 +77,7 @@ func TestErrorHandler(t *testing.T) {
 		},
 		{
 			name: "Echo HTTPError - 404",
-			handler: func(c context.Context) error {
+			handler: func(c Context) error {
 				return context.NewHTTPError(http.StatusNotFound, "Resource not found")
 			},
 			expectedStatus: http.StatusNotFound,
@@ -92,7 +92,7 @@ func TestErrorHandler(t *testing.T) {
 		},
 		{
 			name: "Echo HTTPError - 500 with internal error",
-			handler: func(c context.Context) error {
+			handler: func(c Context) error {
 				err := context.NewHTTPError(http.StatusInternalServerError, "Something went wrong")
 				err.Internal = fmt.Errorf("database connection failed")
 				return err
@@ -113,7 +113,7 @@ func TestErrorHandler(t *testing.T) {
 		},
 		{
 			name: "Standard Go error - hidden in production",
-			handler: func(c context.Context) error {
+			handler: func(c Context) error {
 				return fmt.Errorf("database connection timeout")
 			},
 			expectedStatus: http.StatusInternalServerError,
@@ -132,7 +132,7 @@ func TestErrorHandler(t *testing.T) {
 		},
 		{
 			name: "Echo HTTPError - rate limit",
-			handler: func(c context.Context) error {
+			handler: func(c Context) error {
 				return context.NewHTTPError(http.StatusTooManyRequests, "Rate limit exceeded")
 			},
 			expectedStatus: http.StatusTooManyRequests,
@@ -158,7 +158,7 @@ func TestErrorHandler(t *testing.T) {
 			c := context.NewContext(req, rec)
 
 			// Add request ID middleware
-			RequestID()(func(c context.Context) error {
+			RequestID()(func(c Context) error {
 				// Apply error handler middleware
 				return ErrorHandler()(tt.handler)(c)
 			})(c)
@@ -204,7 +204,7 @@ func TestErrorHandlerWithConfig(t *testing.T) {
 		rec := httptest.NewRecorder()
 		c := context.NewContext(req, rec)
 
-		handler := func(c context.Context) error {
+		handler := func(c Context) error {
 			return fmt.Errorf("sensitive database error: connection timeout at 192.168.1.1")
 		}
 
@@ -237,7 +237,7 @@ func TestErrorHandlerWithConfig(t *testing.T) {
 		rec := httptest.NewRecorder()
 		c := context.NewContext(req, rec)
 
-		handler := func(c context.Context) error {
+		handler := func(c Context) error {
 			return fmt.Errorf("sensitive database error: connection timeout at 192.168.1.1")
 		}
 
@@ -262,7 +262,7 @@ func TestErrorHandlerWithConfig(t *testing.T) {
 		rec := httptest.NewRecorder()
 		c := context.NewContext(req, rec)
 
-		handler := func(c context.Context) error {
+		handler := func(c Context) error {
 			return fmt.Errorf("test error")
 		}
 
@@ -287,7 +287,7 @@ func TestErrorHandlerCommittedResponse(t *testing.T) {
 	rec := httptest.NewRecorder()
 	c := context.NewContext(req, rec)
 
-	handler := func(c context.Context) error {
+	handler := func(c Context) error {
 		// Write response
 		c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 		// Note: In Gortex, check if response is already written instead
@@ -363,19 +363,19 @@ func TestErrorHandlerLogging(t *testing.T) {
 	}{
 		{
 			name: "Log ErrorResponse",
-			handler: func(c context.Context) error {
+			handler: func(c Context) error {
 				return errors.New(errors.CodeValidationFailed, "Test validation error")
 			},
 		},
 		{
 			name: "Log HTTPError",
-			handler: func(c context.Context) error {
+			handler: func(c Context) error {
 				return context.NewHTTPError(http.StatusNotFound, "Not found")
 			},
 		},
 		{
 			name: "Log standard error",
-			handler: func(c context.Context) error {
+			handler: func(c Context) error {
 				return fmt.Errorf("standard error")
 			},
 		},
