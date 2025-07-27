@@ -11,8 +11,8 @@ func TestRequestID(t *testing.T) {
 	// Create a test handler
 	handler := func(c Context) error {
 		// Verify request ID is set
-		rid := GetRequestID(c)
-		if rid == "" {
+		rid := c.Get("request_id")
+		if rid == nil || rid.(string) == "" {
 			t.Error("Request ID should be set")
 		}
 		return c.String(200, "test")
@@ -25,7 +25,7 @@ func TestRequestID(t *testing.T) {
 	// Create test request
 	req := httptest.NewRequest("GET", "/test", nil)
 	w := httptest.NewRecorder()
-	ctx := context.NewContext(req, w)
+	ctx := httpctx.NewDefaultContext(req, w)
 
 	// Execute
 	err := wrappedHandler(ctx)
@@ -44,9 +44,9 @@ func TestRequestIDWithExistingID(t *testing.T) {
 
 	// Create a test handler
 	handler := func(c Context) error {
-		rid := GetRequestID(c)
-		if rid != existingID {
-			t.Errorf("Expected request ID %s, got %s", existingID, rid)
+		rid := c.Get("request_id")
+		if rid == nil || rid.(string) != existingID {
+			t.Errorf("Expected request ID %s, got %v", existingID, rid)
 		}
 		return c.String(200, "test")
 	}
@@ -59,7 +59,7 @@ func TestRequestIDWithExistingID(t *testing.T) {
 	req := httptest.NewRequest("GET", "/test", nil)
 	req.Header.Set("X-Request-ID", existingID)
 	w := httptest.NewRecorder()
-	ctx := context.NewContext(req, w)
+	ctx := httpctx.NewDefaultContext(req, w)
 
 	// Execute
 	err := wrappedHandler(ctx)
@@ -99,7 +99,7 @@ func TestRequestIDWithConfig(t *testing.T) {
 	// Create test request
 	req := httptest.NewRequest("GET", "/test", nil)
 	w := httptest.NewRecorder()
-	ctx := context.NewContext(req, w)
+	ctx := httpctx.NewDefaultContext(req, w)
 
 	// Execute
 	err := wrappedHandler(ctx)
@@ -132,7 +132,7 @@ func TestRequestIDSkipper(t *testing.T) {
 	// Test skipped request
 	req := httptest.NewRequest("GET", "/skip", nil)
 	w := httptest.NewRecorder()
-	ctx := context.NewContext(req, w)
+	ctx := httpctx.NewDefaultContext(req, w)
 
 	err := wrappedHandler(ctx)
 	if err != nil {

@@ -6,7 +6,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yshengliao/gortex/transport/http"
-	"github.com/yshengliao/gortex/transport/http"
 )
 
 // Test handlers for auto-initialization

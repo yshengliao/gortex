@@ -1,7 +1,6 @@
 package mock
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -9,9 +8,9 @@ import (
 	httpctx "github.com/yshengliao/gortex/transport/http"
 )
 
-// Context is a mock implementation of context.Context for testing
+// Context is a mock implementation of httpctx.Context for testing
 type Context struct {
-	context.Context
+	httpctx.Context
 	request  *http.Request
 	response *httptest.ResponseRecorder
 	params   map[string]string
@@ -25,7 +24,7 @@ func NewContext() *Context {
 	rec := httptest.NewRecorder()
 	
 	return &Context{
-		Context:  context.NewContext(req, rec),
+		Context:  httpctx.NewDefaultContext(req, rec),
 		request:  req,
 		response: rec,
 		params:   make(map[string]string),
@@ -38,7 +37,7 @@ func NewContextWithRequest(req *http.Request) *Context {
 	rec := httptest.NewRecorder()
 	
 	return &Context{
-		Context:  context.NewContext(req, rec),
+		Context:  httpctx.NewDefaultContext(req, rec),
 		request:  req,
 		response: rec,
 		params:   make(map[string]string),

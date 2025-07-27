@@ -190,12 +190,12 @@ func (app *App) setupRouter() {
 	// TODO: Add CORS middleware support for Gortex
 
 	// Request ID middleware
-	app.router.Use(gortexMiddleware.RequestID())
+	app.router.Use(middleware.RequestID())
 
 	// Development mode enhancements
 	if app.IsDevelopment() {
 		// Add development error page middleware
-		app.router.Use(gortexMiddleware.RecoverWithErrorPage())
+		app.router.Use(middleware.RecoverWithErrorPage())
 		// TODO: Add development logger middleware
 	}
 
@@ -203,12 +203,12 @@ func (app *App) setupRouter() {
 }
 
 // Router returns the underlying Gortex router
-func (app *App) Router() router.GortexRouter {
+func (app *App) Router() httpctx.GortexRouter {
 	return app.router
 }
 
 // Context returns the application context
-func (app *App) Context() *Context {
+func (app *App) Context() *appcontext.Context {
 	return app.ctx
 }
 
@@ -401,12 +401,12 @@ func (app *App) registerDevelopmentRoutes() {
 // devHandler provides development endpoints
 type devHandler struct {
 	logger *zap.Logger
-	router router.GortexRouter
+	router httpctx.GortexRouter
 	config *Config
 }
 
 // Routes returns debug information about all registered routes
-func (h *devHandler) Routes(c gortexContext.Context) error {
+func (h *devHandler) Routes(c httpctx.Context) error {
 	// Since GortexRouter doesn't expose routes, we'll return a placeholder
 	// In a real implementation, we'd need to add a Routes() method to the router
 
@@ -423,7 +423,7 @@ func (h *devHandler) Routes(c gortexContext.Context) error {
 }
 
 // Error returns test error pages for development
-func (h *devHandler) Error(c gortexContext.Context) error {
+func (h *devHandler) Error(c httpctx.Context) error {
 	errorType := c.QueryParam("type")
 
 	switch errorType {
@@ -443,7 +443,7 @@ func (h *devHandler) Error(c gortexContext.Context) error {
 }
 
 // Config returns masked configuration for development
-func (h *devHandler) Config(c gortexContext.Context) error {
+func (h *devHandler) Config(c httpctx.Context) error {
 	// In a real implementation, you would get config from context
 	// For now, return a simple response
 	return c.JSON(200, map[string]any{
@@ -453,7 +453,7 @@ func (h *devHandler) Config(c gortexContext.Context) error {
 }
 
 // Monitor returns system monitoring information
-func (h *devHandler) Monitor(c gortexContext.Context) error {
+func (h *devHandler) Monitor(c httpctx.Context) error {
 	// Get memory statistics
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)

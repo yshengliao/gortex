@@ -16,64 +16,11 @@ import (
 	httpctx "github.com/yshengliao/gortex/transport/http"
 )
 
-// mockContext implements Context for testing
-type mockContext struct {
-	request  *http.Request
-	response http.ResponseWriter
-	values   map[string]interface{}
-	params   map[string]string
-}
+// Use testContext instead of mockContext
+type mockContext = testContext
 
 func newMockContext(req *http.Request, resp http.ResponseWriter) *mockContext {
-	return &mockContext{
-		request:  req,
-		response: resp,
-		values:   make(map[string]interface{}),
-		params:   make(map[string]string),
-	}
-}
-
-func (m *mockContext) Param(name string) string {
-	return m.params[name]
-}
-
-func (m *mockContext) QueryParam(name string) string {
-	return m.request.URL.Query().Get(name)
-}
-
-func (m *mockContext) Bind(i interface{}) error {
-	decoder := json.NewDecoder(m.request.Body)
-	return decoder.Decode(i)
-}
-
-func (m *mockContext) JSON(code int, i interface{}) error {
-	m.response.Header().Set("Content-Type", "application/json")
-	m.response.WriteHeader(code)
-	encoder := json.NewEncoder(m.response)
-	return encoder.Encode(i)
-}
-
-func (m *mockContext) String(code int, s string) error {
-	m.response.Header().Set("Content-Type", "text/plain")
-	m.response.WriteHeader(code)
-	_, err := m.response.Write([]byte(s))
-	return err
-}
-
-func (m *mockContext) Get(key string) interface{} {
-	return m.values[key]
-}
-
-func (m *mockContext) Set(key string, val interface{}) {
-	m.values[key] = val
-}
-
-func (m *mockContext) Request() interface{} {
-	return m.request
-}
-
-func (m *mockContext) Response() interface{} {
-	return m.response
+	return newTestContext(req, resp)
 }
 
 // Tests

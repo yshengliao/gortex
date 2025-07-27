@@ -3,8 +3,8 @@ package app
 import (
 	"reflect"
 	"strings"
-
-	"github.com/yshengliao/gortex/transport/http"
+	
+	httpctx "github.com/yshengliao/gortex/transport/http"
 )
 
 // Helper function to check if slice contains string
@@ -39,8 +39,8 @@ func isValidGortexHandler(method reflect.Method) bool {
 		return false
 	}
 
-	// First param is the receiver, second should be context.Context
-	contextType := reflect.TypeOf((*context.Context)(nil)).Elem()
+	// First param is the receiver, second should be httpctx.Context
+	contextType := reflect.TypeOf((*httpctx.Context)(nil)).Elem()
 	if !t.In(1).Implements(contextType) {
 		return false
 	}

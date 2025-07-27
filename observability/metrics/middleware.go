@@ -3,14 +3,13 @@ package metrics
 import (
 	"time"
 
-	"github.com/yshengliao/gortex/transport/http"
 	"github.com/yshengliao/gortex/middleware"
 )
 
 // MetricsMiddleware creates a Gortex middleware for collecting HTTP metrics
 func MetricsMiddleware(collector MetricsCollector) middleware.MiddlewareFunc {
 	return func(next middleware.HandlerFunc) middleware.HandlerFunc {
-		return func(c context.Context) error {
+		return func(c middleware.Context) error {
 			start := time.Now()
 
 			// Record request size if available

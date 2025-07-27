@@ -2,13 +2,12 @@ package router
 
 import (
 	"encoding/json"
-	"github.com/yshengliao/gortex/transport/http"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/yshengliao/gortex/transport/http"
+	httpctx "github.com/yshengliao/gortex/transport/http"
 	"go.uber.org/zap"
 )
 

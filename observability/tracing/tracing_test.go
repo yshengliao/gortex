@@ -89,7 +89,7 @@ func TestTracingMiddleware(t *testing.T) {
 	// Create test context
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
 	rec := httptest.NewRecorder()
-	ctx := gortexContext.NewContext(req, rec)
+	ctx := gortexContext.NewDefaultContext(req, rec)
 	
 	// Execute handler
 	err := wrappedHandler(ctx)

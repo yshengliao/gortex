@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yshengliao/gortex/pkg/config"
-	"github.com/yshengliao/gortex/transport/http"
+	httpctx "github.com/yshengliao/gortex/transport/http"
 	"go.uber.org/zap/zaptest"
 )
 
@@ -157,7 +157,7 @@ func TestDevLoggerMiddleware(t *testing.T) {
 		require.NoError(t, err)
 
 		// Add a test handler
-		app.router.POST("/test", func(c context.Context) error {
+		app.router.POST("/test", func(c httpctx.Context) error {
 			return c.JSON(http.StatusOK, map[string]string{
 				"message": "test response",
 			})
@@ -166,7 +166,7 @@ func TestDevLoggerMiddleware(t *testing.T) {
 		// Send request with body
 		body := `{"test": "data"}`
 		req := httptest.NewRequest(http.MethodPost, "/test", strings.NewReader(body))
-		req.Header.Set(context.HeaderContentType, context.MIMEApplicationJSON)
+		req.Header.Set(httpctx.HeaderContentType, httpctx.MIMEApplicationJSON)
 		rec := httptest.NewRecorder()
 
 		app.router.ServeHTTP(rec, req)
@@ -190,7 +190,7 @@ func TestDevLoggerMiddleware(t *testing.T) {
 		require.NoError(t, err)
 
 		// Add a test handler
-		app.router.GET("/test", func(c context.Context) error {
+		app.router.GET("/test", func(c httpctx.Context) error {
 			return c.String(http.StatusOK, "OK")
 		})
 

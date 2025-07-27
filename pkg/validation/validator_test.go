@@ -9,7 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yshengliao/gortex/transport/http"
+	"github.com/yshengliao/gortex/core/types"
 	"github.com/yshengliao/gortex/pkg/validation"
 )
 
@@ -133,7 +133,7 @@ func TestBindAndValidate(t *testing.T) {
 		Password string `json:"password" validate:"required,min=6"`
 	}
 
-	handler := func(c context.Context) error {
+	handler := func(c types.Context) error {
 		var req LoginRequest
 		if err := validation.BindAndValidate(c, &req); err != nil {
 			return err

@@ -75,7 +75,7 @@ func TestDevErrorPage(t *testing.T) {
 			rec := httptest.NewRecorder()
 
 			// Create Gortex context
-			ctx := context.NewContext(req, rec)
+			ctx := httpctx.NewDefaultContext(req, rec)
 
 			// Create middleware
 			middleware := GortexDevErrorPageWithConfig(tt.config)
@@ -185,7 +185,7 @@ func TestRecoverWithErrorPage(t *testing.T) {
 			rec := httptest.NewRecorder()
 
 			// Create Gortex context
-			ctx := context.NewContext(req, rec)
+			ctx := httpctx.NewDefaultContext(req, rec)
 
 			// Create recovery middleware
 			middleware := RecoverWithErrorPageConfig(tt.config)
@@ -234,7 +234,7 @@ func TestExtractErrorInfo(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer token")
 	rec := httptest.NewRecorder()
 
-	ctx := context.NewContext(req, rec)
+	ctx := httpctx.NewDefaultContext(req, rec)
 	err := errors.New("test error")
 	config := DefaultGortexDevErrorPageConfig
 
@@ -281,7 +281,7 @@ func BenchmarkDevErrorPage(b *testing.B) {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		req.Header.Set("Accept", "text/html")
 		rec := httptest.NewRecorder()
-		ctx := context.NewContext(req, rec)
+		ctx := httpctx.NewDefaultContext(req, rec)
 
 		handler(ctx)
 	}

@@ -5,7 +5,6 @@ import (
 	"sync"
 
 	"github.com/yshengliao/gortex/core/handler"
-	"github.com/yshengliao/gortex/transport/http"
 )
 
 // HandlerCache caches reflection results for handlers

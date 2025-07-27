@@ -45,6 +45,9 @@ type Context interface {
 	// Params returns all path parameters
 	Params() url.Values
 	
+	// ParamNames returns all path parameter names
+	ParamNames() []string
+	
 	// SetParamNames sets the parameter names
 	SetParamNames(names ...string)
 	

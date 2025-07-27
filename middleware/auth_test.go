@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/yshengliao/gortex/pkg/auth"
+	"github.com/yshengliao/gortex/core/types"
 	httpctx "github.com/yshengliao/gortex/transport/http"
 )
 
@@ -72,7 +73,7 @@ func TestJWTAuth(t *testing.T) {
 			ctx := newMockContext(req, rec)
 
 			var capturedClaims *auth.Claims
-			handler := middleware(func(c Context) error {
+			handler := middleware(func(c types.Context) error {
 				capturedClaims = GetClaims(c)
 				if tt.expectClaims && capturedClaims == nil {
 					t.Error("Expected claims to be set")
@@ -144,7 +145,7 @@ func TestJWTAuthSkipPaths(t *testing.T) {
 			ctx := newMockContext(req, rec)
 
 			var called bool
-			handler := middleware(func(c Context) error {
+			handler := middleware(func(c types.Context) error {
 				called = true
 				return c.String(200, "OK")
 			})
@@ -205,7 +206,7 @@ func TestRequireRole(t *testing.T) {
 			ctx := newMockContext(req, rec)
 
 			// Chain auth -> requireRole -> handler
-			handler := authMiddleware(adminMiddleware(func(c Context) error {
+			handler := authMiddleware(adminMiddleware(func(c types.Context) error {
 				return c.String(200, "Admin area")
 			}))
 
@@ -257,7 +258,7 @@ func TestRequireGameID(t *testing.T) {
 			ctx := newMockContext(req, rec)
 
 			// Chain auth -> requireGameID -> handler
-			handler := authMiddleware(gameMiddleware(func(c Context) error {
+			handler := authMiddleware(gameMiddleware(func(c types.Context) error {
 				return c.String(200, "Game action")
 			}))
 
@@ -373,7 +374,7 @@ func TestSessionAuth(t *testing.T) {
 			ctx := newMockContext(req, rec)
 
 			var capturedSession map[string]interface{}
-			handler := middleware(func(c Context) error {
+			handler := middleware(func(c types.Context) error {
 				if session, ok := c.Get("session").(map[string]interface{}); ok {
 					capturedSession = session
 				}
@@ -443,7 +444,10 @@ func TestGetClaimsFromContext(t *testing.T) {
 		Username: "testuser",
 	}
 	
-	ctx := context.WithValue(context.Background(), "jwt-claims", claims)
+	req := httptest.NewRequest("GET", "/test", nil)
+	rec := httptest.NewRecorder()
+	ctx := newMockContext(req, rec)
+	ctx.Set("jwt-claims", claims)
 	
 	retrieved := GetClaimsFromContext(ctx)
 	if retrieved == nil {
@@ -453,7 +457,9 @@ func TestGetClaimsFromContext(t *testing.T) {
 	}
 	
 	// Test with no claims
-	emptyCtx := context.Background()
+	emptyReq := httptest.NewRequest("GET", "/test", nil)
+	emptyRec := httptest.NewRecorder()
+	emptyCtx := newMockContext(emptyReq, emptyRec)
 	if GetClaimsFromContext(emptyCtx) != nil {
 		t.Error("Expected nil claims from empty context")
 	}

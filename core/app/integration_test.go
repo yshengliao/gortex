@@ -7,11 +7,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gorilla/websocket"
+	gorillaWS "github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	gortexContext "github.com/yshengliao/gortex/transport/http"
 	"github.com/yshengliao/gortex/transport/websocket"
+	// Hub is in websocket package, not a subpackage
 	"go.uber.org/zap/zaptest"
 )
 
@@ -27,12 +28,12 @@ func (h *TestHealthHandler) GET(c gortexContext.Context) error {
 }
 
 type TestWebSocketHandler struct {
-	Hub    *hub.Hub
+	Hub    *websocket.Hub
 	Logger *testing.T
 }
 
 func (h *TestWebSocketHandler) HandleConnection(c gortexContext.Context) error {
-	upgrader := websocket.Upgrader{
+	upgrader := gorillaWS.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
 			return true
 		},
@@ -44,7 +45,7 @@ func (h *TestWebSocketHandler) HandleConnection(c gortexContext.Context) error {
 	}
 
 	testLogger := zaptest.NewLogger(h.Logger)
-	client := hub.NewClient(h.Hub, conn, "test-user", testLogger)
+	client := websocket.NewClient(h.Hub, conn, "test-user", testLogger)
 	h.Hub.RegisterClient(client)
 
 	go client.WritePump()
@@ -58,7 +59,7 @@ func TestIntegrationGracefulShutdown(t *testing.T) {
 		logger := zaptest.NewLogger(t)
 
 		// Create WebSocket hub
-		wsHub := hub.NewHub(logger)
+		wsHub := websocket.NewHub(logger)
 		go wsHub.Run()
 
 		// Create config
@@ -120,12 +121,12 @@ func TestIntegrationGracefulShutdown(t *testing.T) {
 
 		// Connect WebSocket client
 		wsURL := "ws" + strings.TrimPrefix(serverURL, "http") + "/ws"
-		conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+		conn, _, err := gorillaWS.DefaultDialer.Dial(wsURL, nil)
 		require.NoError(t, err)
 		defer conn.Close()
 
 		// Read welcome message
-		var msg hub.Message
+		var msg websocket.Message
 		err = conn.ReadJSON(&msg)
 		require.NoError(t, err)
 		assert.Equal(t, "welcome", msg.Type)
@@ -150,7 +151,7 @@ func TestIntegrationGracefulShutdown(t *testing.T) {
 				_, _, err := conn.ReadMessage()
 				if err != nil {
 					// Check if it's a close error
-					if websocket.IsCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
+					if gorillaWS.IsCloseError(err, gorillaWS.CloseGoingAway, gorillaWS.CloseNormalClosure) {
 						closeReceived <- true
 					}
 					return

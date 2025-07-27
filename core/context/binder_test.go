@@ -12,7 +12,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yshengliao/gortex/transport/http"
+	httpctx "github.com/yshengliao/gortex/transport/http"
 	"go.uber.org/zap"
 )
 
@@ -46,19 +46,19 @@ type TestBindingHandler struct {
 	binder *ParameterBinder
 }
 
-func (h *TestBindingHandler) SimpleMethod(c context.Context, params *SimpleParams) error {
+func (h *TestBindingHandler) SimpleMethod(c httpctx.Context, params *SimpleParams) error {
 	return c.JSON(200, params)
 }
 
-func (h *TestBindingHandler) ComplexMethod(c context.Context, params *ComplexParams) error {
+func (h *TestBindingHandler) ComplexMethod(c httpctx.Context, params *ComplexParams) error {
 	return c.JSON(200, params)
 }
 
-func (h *TestBindingHandler) PrimitiveMethod(c context.Context, id int) error {
+func (h *TestBindingHandler) PrimitiveMethod(c httpctx.Context, id int) error {
 	return c.JSON(200, map[string]int{"id": id})
 }
 
-func (h *TestBindingHandler) MultipleParams(c context.Context, id int, params *SimpleParams) error {
+func (h *TestBindingHandler) MultipleParams(c httpctx.Context, id int, params *SimpleParams) error {
 	return c.JSON(200, map[string]any{
 		"id":     id,
 		"params": params,
@@ -72,7 +72,7 @@ func TestParameterBinderSimple(t *testing.T) {
 	// Test simple parameter binding
 	req := httptest.NewRequest(http.MethodGet, "/users/123?name=test", nil)
 	rec := httptest.NewRecorder()
-	ctx := context.NewContext(req, rec)
+	ctx := httpctx.NewDefaultContext(req, rec)
 	ctx.SetParamNames("id")
 	ctx.SetParamValues("123")
 
@@ -108,7 +108,7 @@ func TestParameterBinderComplex(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer token123")
 
 	rec := httptest.NewRecorder()
-	ctx := context.NewContext(req, rec)
+	ctx := httpctx.NewDefaultContext(req, rec)
 	ctx.SetParamNames("user_id", "game_id")
 	ctx.SetParamValues("456", "ABC")
 
@@ -139,7 +139,7 @@ func TestParameterBinderPrimitive(t *testing.T) {
 	// Test primitive parameter binding
 	req := httptest.NewRequest(http.MethodGet, "/items/789", nil)
 	rec := httptest.NewRecorder()
-	ctx := context.NewContext(req, rec)
+	ctx := httpctx.NewDefaultContext(req, rec)
 	ctx.SetParamNames("id")
 	ctx.SetParamValues("789")
 
@@ -168,7 +168,7 @@ func TestParameterBinderAutoDetection(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 
 	rec := httptest.NewRecorder()
-	ctx := context.NewContext(req, rec)
+	ctx := httpctx.NewDefaultContext(req, rec)
 	ctx.SetParamNames("id")
 	ctx.SetParamValues("999")
 
@@ -193,7 +193,7 @@ func TestParameterBinderEdgeCases(t *testing.T) {
 	t.Run("empty request", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		rec := httptest.NewRecorder()
-		ctx := context.NewContext(req, rec)
+		ctx := httpctx.NewDefaultContext(req, rec)
 
 		params := &SimpleParams{}
 		paramValue := reflect.ValueOf(params)
@@ -210,7 +210,7 @@ func TestParameterBinderEdgeCases(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader([]byte("invalid json")))
 		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
-		ctx := context.NewContext(req, rec)
+		ctx := httpctx.NewDefaultContext(req, rec)
 
 		params := &SimpleParams{}
 		paramValue := reflect.ValueOf(params)
@@ -222,7 +222,7 @@ func TestParameterBinderEdgeCases(t *testing.T) {
 	t.Run("type conversion errors", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/users/abc?page_size=xyz", nil)
 		rec := httptest.NewRecorder()
-		ctx := context.NewContext(req, rec)
+		ctx := httpctx.NewDefaultContext(req, rec)
 		ctx.SetParamNames("user_id")
 		ctx.SetParamValues("abc")
 
@@ -274,7 +274,7 @@ func TestParameterBinderTimeFormats(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/"+tc.query, nil)
 			rec := httptest.NewRecorder()
-			ctx := context.NewContext(req, rec)
+			ctx := httpctx.NewDefaultContext(req, rec)
 
 			params := &TimeParams{}
 			paramValue := reflect.ValueOf(params)
@@ -317,7 +317,7 @@ func TestParameterBinderFieldTypes(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/"+query, nil)
 	rec := httptest.NewRecorder()
-	ctx := context.NewContext(req, rec)
+	ctx := httpctx.NewDefaultContext(req, rec)
 
 	params := &AllTypes{}
 	paramValue := reflect.ValueOf(params)
@@ -369,7 +369,7 @@ type ExtendedHandler struct {
 }
 
 // Method with validation
-func (h *ExtendedHandler) Login(c context.Context, req *AuthRequest) error {
+func (h *ExtendedHandler) Login(c httpctx.Context, req *AuthRequest) error {
 	return c.JSON(200, map[string]string{
 		"username": req.Username,
 		"message":  "Login successful",
@@ -377,12 +377,12 @@ func (h *ExtendedHandler) Login(c context.Context, req *AuthRequest) error {
 }
 
 // Method with JWT claims binding
-func (h *ExtendedHandler) Profile(c context.Context, req *ProfileRequest) error {
+func (h *ExtendedHandler) Profile(c httpctx.Context, req *ProfileRequest) error {
 	return c.JSON(200, req)
 }
 
 // Method with DI service injection
-func (h *ExtendedHandler) ServiceMethod(c context.Context, svc *UserService, req *ServiceRequest) error {
+func (h *ExtendedHandler) ServiceMethod(c httpctx.Context, svc *UserService, req *ServiceRequest) error {
 	return c.JSON(200, map[string]string{
 		"service_name": svc.Name,
 		"request_name": req.Name,
@@ -404,7 +404,7 @@ func TestParameterBinderValidation(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewReader(bodyBytes))
 		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
-		ctx := context.NewContext(req, rec)
+		ctx := httpctx.NewDefaultContext(req, rec)
 
 		handlerType := reflect.TypeOf(handler)
 		method, _ := handlerType.MethodByName("Login")
@@ -426,7 +426,7 @@ func TestParameterBinderValidation(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewReader(bodyBytes))
 		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
-		ctx := context.NewContext(req, rec)
+		ctx := httpctx.NewDefaultContext(req, rec)
 
 		handlerType := reflect.TypeOf(handler)
 		method, _ := handlerType.MethodByName("Login")
@@ -451,7 +451,7 @@ func TestParameterBinderJWTClaims(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/profile", nil)
 	rec := httptest.NewRecorder()
-	ctx := context.NewContext(req, rec)
+	ctx := httpctx.NewDefaultContext(req, rec)
 
 	// Set JWT token in context (as JWT middleware would do)
 	ctx.Set("user", token)
@@ -489,7 +489,7 @@ func TestParameterBinderDI(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/service", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
-	ctx := context.NewContext(req, rec)
+	ctx := httpctx.NewDefaultContext(req, rec)
 
 	handlerType := reflect.TypeOf(handler)
 	method, _ := handlerType.MethodByName("ServiceMethod")
@@ -537,7 +537,7 @@ func TestParameterBinderAllSources(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer token123")
 
 	rec := httptest.NewRecorder()
-	ctx := context.NewContext(req, rec)
+	ctx := httpctx.NewDefaultContext(req, rec)
 	ctx.SetParamNames("id")
 	ctx.SetParamValues("456")
 	ctx.Set("user", token)
@@ -601,7 +601,7 @@ func TestParameterBinderEdgeCasesExtended(t *testing.T) {
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		rec := httptest.NewRecorder()
-		ctx := context.NewContext(req, rec)
+		ctx := httpctx.NewDefaultContext(req, rec)
 
 		claims := binder.getJWTClaims(ctx)
 		assert.Nil(t, claims)
@@ -621,7 +621,7 @@ func TestParameterBinderEdgeCasesExtended(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(bodyBytes))
 		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
-		ctx := context.NewContext(req, rec)
+		ctx := httpctx.NewDefaultContext(req, rec)
 
 		authReq := &AuthRequest{}
 		paramValue := reflect.ValueOf(authReq)
