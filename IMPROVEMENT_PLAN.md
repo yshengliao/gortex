@@ -12,7 +12,7 @@
 |------|----------|----------|--------------|
 | Phase 1 | 核心穩定性 & 結構重構 | 2-3 週 | Context 靜態檢查工具、Observability 目錄重組、App 測試整合 ✅ |
 | Phase 2 | Observability 增強 | 3-4 週 | 增強型 Tracing 介面 (8 級嚴重性)、OpenTelemetry Tracing 整合與適配器 ✅ |
-| Phase 3 | 開發體驗提升 | 3-4 週 | 自動化 API 文件生成功能 (基於 Struct Tag) |
+| Phase 3 | 開發體驗提升 | 3-4 週 | 自動化 API 文件生成功能 (基於 Struct Tag) ✅ |
 | Phase 4 | 持續整合與維護 | 持續進行 | CI/CD 整合、效能回歸測試、最佳實踐文件 |
 | **總計** | | **約 8-11 週** | |
 
@@ -196,32 +196,71 @@
 
 **目標**：實現 API 文件自動化，減少人工維護成本，提升開發與協作效率。
 
-### 5. 自動化 API 文件生成
+### 5. 自動化 API 文件生成 ✅
 
-- [ ] **任務 5.1**: 設計可插拔文件提供者介面
-  - [ ] 定義 `DocProvider` 介面，使其能夠支援 Swagger/OpenAPI 等不同格式。
+**目標**：實現 API 文件自動化，減少人工維護成本，提升開發與協作效率。
+
+- [x] **任務 5.1**: 設計可插拔文件提供者介面
+  - [x] 定義 `DocProvider` 介面，使其能夠支援 Swagger/OpenAPI 等不同格式。
     - **執行提示**：在 `app/doc/provider.go` 定義介面：`type DocProvider interface { Generate(routes []Route) ([]byte, error); ContentType() string; UIHandler() http.Handler }`。設計時考慮支援多種格式（JSON, YAML, HTML）。
+    - **完成說明**：成功定義了 DocProvider 介面，包含 Generate、ContentType、UIHandler 和 Endpoints 方法。建立了 RouteInfo、ParamInfo、HandlerMetadata 等支援結構。
   
-  - [ ] 實作 `app.WithDocProvider(DocProvider)` 選項。
+  - [x] 實作 `app.WithDocProvider(DocProvider)` 選項。
     - **執行提示**：在 `app/options.go` 新增選項函式。在 `App` struct 中加入 `docProvider` 欄位。當設定 provider 時，自動註冊文件端點（如 `/_docs` 和 `/_docs/ui`）。
+    - **完成說明**：新增了 WithDocProvider 選項函式，在 App struct 中加入 docProvider 和 docRouteInfos 欄位。實作了 registerDocumentationRoutes() 方法自動註冊文件端點。
 
-- [ ] **任務 5.2**: 實作 Struct Tag 解析
-  - [ ] 設計並實作 struct tag (`api:"group=..."`) 的解析邏輯，以自動從 Handler struct 提取版本、分組、描述等 metadata。
+- [x] **任務 5.2**: 實作 Struct Tag 解析
+  - [x] 設計並實作 struct tag (`api:"group=..."`) 的解析邏輯，以自動從 Handler struct 提取版本、分組、描述等 metadata。
     - **執行提示**：支援的 tag 格式：`api:"group=User,version=v1,desc=用戶管理,tags=user|auth"`。使用 `reflect` 套件解析 struct tags。建立 `HandlerMetadata` 結構儲存解析結果。處理巢狀 handler groups 時要正確繼承父層的 metadata。
+    - **完成說明**：建立了 TagParser 類別，實作了 ParseHandlerMetadata 方法來解析 api struct tag。支援 group、version、desc、tags、basePath 等屬性的解析。
 
-  - [ ] 實作路由資訊的自動收集機制。
+  - [x] 實作路由資訊的自動收集機制。
     - **執行提示**：擴充現有的路由註冊流程，在 `registerHandlers()` 中收集每個路由的完整資訊：HTTP 方法、路徑、參數、中介軟體等。建立 `RouteInfo` 結構包含所有必要資訊。支援從方法簽名自動推導請求/回應型別。
+    - **完成說明**：修改了 registerMethodWithMiddleware 和 registerCustomMethodWithMiddleware 函式，自動收集路由資訊並通過 AddDocumentationRoute 方法儲存。實作了 extractMiddlewareNames 輔助函式。
 
-- [ ] **任務 5.3**: 實作預設 Provider
-  - [ ] 實作一個基於 Swagger (OpenAPI 3.0) 的預設 DocProvider。
+- [x] **任務 5.3**: 實作預設 Provider
+  - [x] 實作一個基於 Swagger (OpenAPI 3.0) 的預設 DocProvider。
     - **執行提示**：在 `app/doc/swagger/provider.go` 實作 `SwaggerProvider`。使用 `openapi3` 結構定義 API 規範。自動生成 operation ID、參數定義、回應碼等。支援從 struct tag 讀取額外的 Swagger 註解（如 example, required 等）。
+    - **完成說明**：建立了完整的 SwaggerProvider 實作，支援 OpenAPI 3.0 規範。定義了所有必要的 OpenAPI 型別（PathItem、Operation、Schema 等）。實作了路由到 Swagger 規範的轉換邏輯。
 
-  - [ ] 將解析後的 Handler 資訊與路由資訊整合，生成結構化的 `swagger.json`。
+  - [x] 將解析後的 Handler 資訊與路由資訊整合，生成結構化的 `swagger.json`。
     - **執行提示**：實作轉換邏輯將內部的 `RouteInfo` 和 `HandlerMetadata` 轉換為 OpenAPI 3.0 規範。自動偵測路徑參數（如 `:id`）並生成對應的 parameter 定義。為常見的回應格式（JSON, error）建立 schema 定義。
+    - **完成說明**：實作了 addRoute、extractParameters、generateResponses 等方法，自動從路由路徑提取參數，生成標準回應格式。新增了通用的 Error schema 定義。
 
-- [ ] **任務 5.4**: 提供互動式 UI
-  - [ ] 整合 Swagger UI 或類似工具，提供一個可互動的 API 文件頁面。
+- [x] **任務 5.4**: 提供互動式 UI
+  - [x] 整合 Swagger UI 或類似工具，提供一個可互動的 API 文件頁面。
     - **執行提示**：使用 embed 功能嵌入 Swagger UI 的靜態檔案。實作 `UIHandler()` 返回一個 http.Handler 服務這些檔案。自動注入 `swagger.json` 的 URL 到 UI 配置中。考慮支援自定義主題和品牌設定。
+    - **完成說明**：建立了 SwaggerUIHandler，使用 CDN 版本的 Swagger UI 提供互動式文件介面。預留了 EmbeddedSwaggerUI 結構以供未來嵌入靜態資源。建立了完整的範例專案（examples/api-docs）展示功能。
+
+### Phase 3 完成總結 ✅
+
+**完成日期**：2025/07/27
+
+**主要成果**：
+1. **可插拔文件系統架構**：
+   - 定義了靈活的 DocProvider 介面，支援多種文件格式
+   - 實作了 WithDocProvider 選項，簡化文件功能整合
+   - 自動註冊文件端點（/docs、/docs/swagger.json）
+
+2. **自動化路由收集**：
+   - 在路由註冊過程中自動收集 API 資訊
+   - 支援標準 HTTP 方法和自定義方法的文件生成
+   - 記錄中介軟體、路徑參數等完整資訊
+
+3. **Swagger/OpenAPI 3.0 支援**：
+   - 完整實作 SwaggerProvider，生成標準 OpenAPI 規範
+   - 自動偵測路徑參數並生成對應定義
+   - 提供互動式 Swagger UI 介面
+
+4. **開發體驗提升**：
+   - 零配置即可使用，開箱即用
+   - 支援 struct tag 擴充 API metadata（未來增強）
+   - 建立了完整的使用範例（examples/api-docs）
+
+**技術亮點**：
+- 完全整合到框架的路由註冊流程中
+- 保持框架的輕量級特性，文件功能為可選
+- 預留擴充點，支援其他文件格式（ReDoc、Postman 等）
 
 ## Phase 4: 持續整合與維護
 

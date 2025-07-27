@@ -1,9 +1,11 @@
 package app
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 	
+	"github.com/yshengliao/gortex/middleware"
 	httpctx "github.com/yshengliao/gortex/transport/http"
 )
 
@@ -62,4 +64,17 @@ func isValidGortexHandler(method reflect.Method) bool {
 // methodNameToPath converts a method name to a URL path
 func methodNameToPath(name string) string {
 	return "/" + camelToKebab(name)
+}
+
+// extractMiddlewareNames extracts middleware names from a slice of middleware functions
+func extractMiddlewareNames(middlewares []middleware.MiddlewareFunc) []string {
+	names := make([]string, 0, len(middlewares))
+	for i, mw := range middlewares {
+		if mw != nil {
+			// Try to extract name from function type
+			// Since Go doesn't provide function names at runtime, we use generic names
+			names = append(names, fmt.Sprintf("middleware_%d", i))
+		}
+	}
+	return names
 }

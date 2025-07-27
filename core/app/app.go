@@ -12,6 +12,7 @@ import (
 
 	"github.com/yshengliao/gortex/pkg/config"
 	appcontext "github.com/yshengliao/gortex/core/context"
+	"github.com/yshengliao/gortex/core/app/doc"
 	"github.com/yshengliao/gortex/middleware"
 	"github.com/yshengliao/gortex/observability/tracing"
 	httpctx "github.com/yshengliao/gortex/transport/http"
@@ -57,6 +58,8 @@ type App struct {
 	enableRoutesLog bool
 	developmentMode bool
 	tracer          tracing.Tracer
+	docProvider     doc.DocProvider
+	docRouteInfos   []doc.RouteInfo  // Stores route info for documentation
 }
 
 // RouteLogInfo stores information about a registered route for logging
@@ -96,6 +99,11 @@ func NewApp(opts ...Option) (*App, error) {
 	// Register development routes if in development mode
 	if app.IsDevelopment() {
 		app.registerDevelopmentRoutes()
+	}
+	
+	// Register documentation endpoints if doc provider is set
+	if app.docProvider != nil {
+		app.registerDocumentationRoutes()
 	}
 
 	return app, nil
@@ -188,6 +196,17 @@ func WithTracer(tracer tracing.Tracer) Option {
 			return fmt.Errorf("tracer cannot be nil")
 		}
 		app.tracer = tracer
+		return nil
+	}
+}
+
+// WithDocProvider sets the documentation provider for API documentation generation
+func WithDocProvider(provider doc.DocProvider) Option {
+	return func(app *App) error {
+		if provider == nil {
+			return fmt.Errorf("doc provider cannot be nil")
+		}
+		app.docProvider = provider
 		return nil
 	}
 }
@@ -413,6 +432,49 @@ func (app *App) registerDevelopmentRoutes() {
 			zap.String("config", "/_config"),
 			zap.String("monitor", "/_monitor"),
 		)
+	}
+}
+
+// registerDocumentationRoutes registers API documentation endpoints
+func (app *App) registerDocumentationRoutes() {
+	// First, generate documentation from collected route info
+	if len(app.docRouteInfos) > 0 {
+		// Generate documentation
+		_, err := app.docProvider.Generate(app.docRouteInfos)
+		if err != nil && app.logger != nil {
+			app.logger.Error("Failed to generate documentation", zap.Error(err))
+		}
+	}
+	
+	// Get endpoints from the doc provider
+	endpoints := app.docProvider.Endpoints()
+	
+	registeredPaths := []string{}
+	for path, handler := range endpoints {
+		// Register each endpoint with the router
+		// Use GET for documentation endpoints
+		app.router.GET(path, func(c httpctx.Context) error {
+			handler.ServeHTTP(c.Response(), c.Request())
+			return nil
+		})
+		registeredPaths = append(registeredPaths, path)
+	}
+	
+	if app.logger != nil && len(registeredPaths) > 0 {
+		app.logger.Info("Documentation routes registered",
+			zap.Strings("paths", registeredPaths),
+			zap.Int("documented_routes", len(app.docRouteInfos)),
+		)
+	}
+}
+
+// AddDocumentationRoute adds a route to the documentation collection
+func (app *App) AddDocumentationRoute(routeInfo doc.RouteInfo) {
+	app.mu.Lock()
+	defer app.mu.Unlock()
+	
+	if app.docProvider != nil {
+		app.docRouteInfos = append(app.docRouteInfos, routeInfo)
 	}
 }
 

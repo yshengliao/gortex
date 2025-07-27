@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	appcontext "github.com/yshengliao/gortex/core/context"
+	"github.com/yshengliao/gortex/core/app/doc"
 	"github.com/yshengliao/gortex/middleware"
 	httpctx "github.com/yshengliao/gortex/transport/http"
 	"go.uber.org/zap"
@@ -218,6 +219,20 @@ func registerMethodWithMiddleware(r httpctx.GortexRouter, httpMethod, path strin
 			Middlewares: middlewareNames,
 		})
 	}
+	
+	// Collect documentation info if app has doc provider
+	if app != nil && app.docProvider != nil {
+		handlerType := reflect.TypeOf(handler).Elem()
+		routeInfo := doc.RouteInfo{
+			Method:      httpMethod,
+			Path:        path,
+			Handler:     handlerType.Name() + "." + method.Name,
+			Middleware:  extractMiddlewareNames(middleware),
+			Description: fmt.Sprintf("%s %s", httpMethod, path),
+			Metadata:    make(map[string]interface{}),
+		}
+		app.AddDocumentationRoute(routeInfo)
+	}
 
 	switch httpMethod {
 	case "GET":
@@ -257,6 +272,20 @@ func registerCustomMethodWithMiddleware(r httpctx.GortexRouter, path string, han
 			Handler:     handlerName + "." + method.Name,
 			Middlewares: middlewareNames,
 		})
+	}
+	
+	// Collect documentation info if app has doc provider
+	if app != nil && app.docProvider != nil {
+		handlerType := reflect.TypeOf(handler).Elem()
+		routeInfo := doc.RouteInfo{
+			Method:      "POST", // Custom methods are registered as POST
+			Path:        path,
+			Handler:     handlerType.Name() + "." + method.Name,
+			Middleware:  extractMiddlewareNames(middleware),
+			Description: fmt.Sprintf("POST %s (custom method: %s)", path, method.Name),
+			Metadata:    make(map[string]interface{}),
+		}
+		app.AddDocumentationRoute(routeInfo)
 	}
 
 	r.POST(path, handlerFunc, middleware...)
