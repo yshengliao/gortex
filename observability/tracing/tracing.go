@@ -10,6 +10,14 @@ import (
 	"github.com/yshengliao/gortex/middleware"
 )
 
+// Event represents an event within a span
+type Event struct {
+	Timestamp time.Time
+	Severity  SpanStatus
+	Message   string
+	Fields    map[string]any
+}
+
 // Span represents a trace span
 type Span struct {
 	TraceID   string
@@ -20,16 +28,152 @@ type Span struct {
 	EndTime   time.Time
 	Tags      map[string]string
 	Status    SpanStatus
+	Events    []Event // New field for events
+	Error     error   // New field for error tracking
 }
 
-// SpanStatus represents the status of a span
+// SpanStatus represents the status/severity level of a span
 type SpanStatus int
 
 const (
+	// Original statuses for backward compatibility
 	SpanStatusUnset SpanStatus = iota
 	SpanStatusOK
 	SpanStatusError
+	
+	// Extended severity levels (8 levels)
+	SpanStatusDEBUG     SpanStatus = 10
+	SpanStatusINFO      SpanStatus = 20
+	SpanStatusNOTICE    SpanStatus = 30
+	SpanStatusWARN      SpanStatus = 40
+	SpanStatusERROR     SpanStatus = 50
+	SpanStatusCRITICAL  SpanStatus = 60
+	SpanStatusALERT     SpanStatus = 70
+	SpanStatusEMERGENCY SpanStatus = 80
 )
+
+// String returns the string representation of the SpanStatus
+func (s SpanStatus) String() string {
+	switch s {
+	case SpanStatusUnset:
+		return "UNSET"
+	case SpanStatusOK:
+		return "OK"
+	case SpanStatusError:
+		return "ERROR"
+	case SpanStatusDEBUG:
+		return "DEBUG"
+	case SpanStatusINFO:
+		return "INFO"
+	case SpanStatusNOTICE:
+		return "NOTICE"
+	case SpanStatusWARN:
+		return "WARN"
+	case SpanStatusERROR:
+		return "ERROR"
+	case SpanStatusCRITICAL:
+		return "CRITICAL"
+	case SpanStatusALERT:
+		return "ALERT"
+	case SpanStatusEMERGENCY:
+		return "EMERGENCY"
+	default:
+		return fmt.Sprintf("UNKNOWN(%d)", s)
+	}
+}
+
+// IsMoreSevere returns true if this status is more severe than the other
+func (s SpanStatus) IsMoreSevere(other SpanStatus) bool {
+	// Map old statuses to severity levels
+	sSeverity := s.severityLevel()
+	otherSeverity := other.severityLevel()
+	return sSeverity > otherSeverity
+}
+
+// severityLevel returns the numeric severity level for comparison
+func (s SpanStatus) severityLevel() int {
+	switch s {
+	case SpanStatusUnset:
+		return 0
+	case SpanStatusOK:
+		return 5 // Between UNSET and DEBUG
+	case SpanStatusError:
+		return 50 // Same as SpanStatusERROR
+	default:
+		return int(s)
+	}
+}
+
+// SpanInterface represents the basic span operations
+type SpanInterface interface {
+	// LogEvent logs an event with severity level
+	LogEvent(severity SpanStatus, msg string, fields map[string]any)
+	
+	// SetError sets an error on the span
+	SetError(err error)
+	
+	// AddTags adds tags to the span
+	AddTags(tags map[string]string)
+	
+	// SetStatus sets the status of the span
+	SetStatus(status SpanStatus)
+}
+
+// EnhancedSpan implements SpanInterface with extended functionality
+type EnhancedSpan struct {
+	*Span
+}
+
+// LogEvent logs an event with the specified severity
+func (s *EnhancedSpan) LogEvent(severity SpanStatus, msg string, fields map[string]any) {
+	if s.Span == nil {
+		return
+	}
+	
+	event := Event{
+		Timestamp: time.Now(),
+		Severity:  severity,
+		Message:   msg,
+		Fields:    fields,
+	}
+	
+	s.Events = append(s.Events, event)
+}
+
+// SetError sets an error on the span and updates status
+func (s *EnhancedSpan) SetError(err error) {
+	if s.Span == nil || err == nil {
+		return
+	}
+	
+	s.Error = err
+	s.Status = SpanStatusERROR
+	
+	// Log error as an event
+	s.LogEvent(SpanStatusERROR, "Error occurred", map[string]any{
+		"error": err.Error(),
+	})
+}
+
+// AddTags adds tags to the span
+func (s *EnhancedSpan) AddTags(tags map[string]string) {
+	if s.Span == nil {
+		return
+	}
+	
+	for k, v := range tags {
+		s.Tags[k] = v
+	}
+}
+
+// SetStatus sets the status of the span
+func (s *EnhancedSpan) SetStatus(status SpanStatus) {
+	if s.Span == nil {
+		return
+	}
+	
+	s.Status = status
+}
 
 // Tracer defines the interface for distributed tracing
 type Tracer interface {
@@ -44,6 +188,14 @@ type Tracer interface {
 	
 	// SetStatus sets the status of a span
 	SetStatus(span *Span, status SpanStatus)
+}
+
+// EnhancedTracer extends Tracer with enhanced span support
+type EnhancedTracer interface {
+	Tracer
+	
+	// StartEnhancedSpan starts a new enhanced span
+	StartEnhancedSpan(ctx context.Context, operation string) (context.Context, *EnhancedSpan)
 }
 
 // NoOpTracer is a no-op implementation of Tracer
@@ -79,6 +231,7 @@ func (t *SimpleTracer) StartSpan(ctx context.Context, operation string) (context
 		StartTime: time.Now(),
 		Tags:      make(map[string]string),
 		Status:    SpanStatusUnset,
+		Events:    make([]Event, 0),
 	}
 	
 	if parentSpan != nil {
@@ -92,6 +245,17 @@ func (t *SimpleTracer) StartSpan(ctx context.Context, operation string) (context
 	ctx = ContextWithSpan(ctx, span)
 	
 	return ctx, span
+}
+
+// StartEnhancedSpan starts a new enhanced span
+func (t *SimpleTracer) StartEnhancedSpan(ctx context.Context, operation string) (context.Context, *EnhancedSpan) {
+	ctx, span := t.StartSpan(ctx, operation)
+	enhancedSpan := &EnhancedSpan{Span: span}
+	
+	// Update context with enhanced span
+	ctx = ContextWithEnhancedSpan(ctx, enhancedSpan)
+	
+	return ctx, enhancedSpan
 }
 
 func (t *SimpleTracer) FinishSpan(span *Span) {
@@ -125,7 +289,8 @@ func (t *SimpleTracer) SetStatus(span *Span, status SpanStatus) {
 type contextKey string
 
 const (
-	spanContextKey contextKey = "span"
+	spanContextKey         contextKey = "span"
+	enhancedSpanContextKey contextKey = "enhanced_span"
 )
 
 // ContextWithSpan returns a new context with the span
@@ -136,6 +301,21 @@ func ContextWithSpan(ctx context.Context, span *Span) context.Context {
 // SpanFromContext returns the span from the context
 func SpanFromContext(ctx context.Context) *Span {
 	if span, ok := ctx.Value(spanContextKey).(*Span); ok {
+		return span
+	}
+	return nil
+}
+
+// ContextWithEnhancedSpan returns a new context with the enhanced span
+func ContextWithEnhancedSpan(ctx context.Context, span *EnhancedSpan) context.Context {
+	// Also store as regular span for backward compatibility
+	ctx = ContextWithSpan(ctx, span.Span)
+	return context.WithValue(ctx, enhancedSpanContextKey, span)
+}
+
+// EnhancedSpanFromContext returns the enhanced span from the context
+func EnhancedSpanFromContext(ctx context.Context) *EnhancedSpan {
+	if span, ok := ctx.Value(enhancedSpanContextKey).(*EnhancedSpan); ok {
 		return span
 	}
 	return nil

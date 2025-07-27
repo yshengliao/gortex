@@ -1,4 +1,4 @@
-package router
+package router_test
 
 import (
 	"encoding/json"
@@ -7,6 +7,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/yshengliao/gortex/core/app"
+	"github.com/yshengliao/gortex/core/context"
+	"github.com/yshengliao/gortex/core/router"
 	httpctx "github.com/yshengliao/gortex/transport/http"
 	"go.uber.org/zap"
 )
@@ -16,14 +19,14 @@ type DynamicParamHandler struct {
 	Logger *zap.Logger
 }
 
-func (h *DynamicParamHandler) GET(c context.Context) error {
+func (h *DynamicParamHandler) GET(c httpctx.Context) error {
 	id := c.Param("id")
 	return c.JSON(http.StatusOK, map[string]string{
 		"id": id,
 	})
 }
 
-func (h *DynamicParamHandler) GetProfile(c context.Context) error {
+func (h *DynamicParamHandler) GetProfile(c httpctx.Context) error {
 	id := c.Param("id")
 	return c.JSON(http.StatusOK, map[string]string{
 		"id":     id,
@@ -36,14 +39,14 @@ type GameHandler struct {
 	Logger *zap.Logger
 }
 
-func (h *GameHandler) GET(c context.Context) error {
+func (h *GameHandler) GET(c httpctx.Context) error {
 	gameID := c.Param("gameid")
 	return c.JSON(http.StatusOK, map[string]string{
 		"gameid": gameID,
 	})
 }
 
-func (h *GameHandler) PlaceBet(c context.Context) error {
+func (h *GameHandler) PlaceBet(c httpctx.Context) error {
 	gameID := c.Param("gameid")
 	betID := c.Param("betid")
 	return c.JSON(http.StatusOK, map[string]string{
@@ -97,16 +100,16 @@ func TestDynamicRouteParameters(t *testing.T) {
 	}
 
 	r := router.NewGortexRouter()
-	ctx := NewContext()
+	ctx := context.NewContext()
 	logger := zap.NewNop()
-	Register(ctx, logger)
+	context.Register(ctx, logger)
 
 	handlersManager := &DynamicHandlersManager{
 		User: &DynamicParamHandler{Logger: logger},
 		Game: &GameHandler{Logger: logger},
 	}
 
-	err := RegisterRoutes(&App{router: r, ctx: ctx}, handlersManager)
+	err := app.RegisterRoutes(&app.App{router: r, ctx: ctx}, handlersManager)
 	assert.NoError(t, err)
 
 	for _, tt := range tests {
@@ -141,9 +144,9 @@ type NestedHandlersManager struct {
 
 func TestNestedGroupsWithDynamicParams(t *testing.T) {
 	r := router.NewGortexRouter()
-	ctx := NewContext()
+	ctx := context.NewContext()
 	logger := zap.NewNop()
-	Register(ctx, logger)
+	context.Register(ctx, logger)
 
 	handlersManager := &NestedHandlersManager{
 		APIv1: &APIv1Group{
@@ -151,7 +154,7 @@ func TestNestedGroupsWithDynamicParams(t *testing.T) {
 		},
 	}
 
-	err := RegisterRoutes(&App{router: r, ctx: ctx}, handlersManager)
+	err := app.RegisterRoutes(&app.App{router: r, ctx: ctx}, handlersManager)
 	assert.NoError(t, err)
 
 	// Debug: print registered routes info
@@ -207,7 +210,7 @@ type StaticHandler struct {
 	Logger *zap.Logger
 }
 
-func (h *StaticHandler) GET(c context.Context) error {
+func (h *StaticHandler) GET(c httpctx.Context) error {
 	filepath := c.Param("*")
 	return c.JSON(http.StatusOK, map[string]string{
 		"filepath": filepath,
@@ -220,15 +223,15 @@ type WildcardHandlersManager struct {
 
 func TestWildcardRoutes(t *testing.T) {
 	r := router.NewGortexRouter()
-	ctx := NewContext()
+	ctx := context.NewContext()
 	logger := zap.NewNop()
-	Register(ctx, logger)
+	context.Register(ctx, logger)
 
 	handlersManager := &WildcardHandlersManager{
 		Static: &StaticHandler{Logger: logger},
 	}
 
-	err := RegisterRoutes(&App{router: r, ctx: ctx}, handlersManager)
+	err := app.RegisterRoutes(&app.App{router: r, ctx: ctx}, handlersManager)
 	assert.NoError(t, err)
 
 	tests := []struct {

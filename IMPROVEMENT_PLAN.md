@@ -130,19 +130,23 @@
 
 **目標**：借鑑業界優秀實踐，在不增加外部依賴的前提下，提供更豐富的 Tracing 功能。
 
-- [ ] **任務 4.1**: 擴充 Tracing 核心介面
-  - [ ] 擴充 `SpanStatus` enum，增加 `DEBUG`, `INFO`, `NOTICE`, `WARN`, `ERROR`, `CRITICAL`, `ALERT`, `EMERGENCY` 共八個嚴重性等級。
+- [x] **任務 4.1**: 擴充 Tracing 核心介面
+  - [x] 擴充 `SpanStatus` enum，增加 `DEBUG`, `INFO`, `NOTICE`, `WARN`, `ERROR`, `CRITICAL`, `ALERT`, `EMERGENCY` 共八個嚴重性等級。
     - **執行提示**：在 `observability/tracing/span.go` 中擴充 `SpanStatus` 常數定義。保持向後相容，原有的 `Unset`, `OK`, `Error` 對應到新的等級。加入 `String()` 方法和嚴重性比較方法 `IsMoreSevere(other SpanStatus) bool`。
+    - **完成說明**：成功擴充了 SpanStatus，新增 8 個嚴重性等級（DEBUG 到 EMERGENCY），實作了 String() 方法和 IsMoreSevere() 比較方法。保持了向後相容性，將舊的 Error 狀態映射到新的 ERROR 等級。
   
-  - [ ] 擴充 `Span` 介面，新增 `LogEvent(severity SpanStatus, msg string, fields map[string]any)` 和 `SetError(err error)` 方法。
+  - [x] 擴充 `Span` 介面，新增 `LogEvent(severity SpanStatus, msg string, fields map[string]any)` 和 `SetError(err error)` 方法。
     - **執行提示**：建立 `EnhancedSpan` 介面繼承現有 `Span`。實作時將事件儲存在 span 內部的事件列表中。`SetError()` 應自動設定 span 狀態為 ERROR 並記錄錯誤詳情。確保與現有 tracer 實作相容。
+    - **完成說明**：建立了 EnhancedSpan 結構體和 SpanInterface 介面，實作了 LogEvent() 和 SetError() 方法。新增了 Event 結構體來儲存事件資訊。SimpleTracer 也擴充支援 EnhancedTracer 介面。完整的測試覆蓋確保功能正確。
 
-- [ ] **任務 4.2**: 實作 OpenTelemetry 適配器
-  - [ ] 在 `observability/otel/tracing.go` 中實作適配器，將增強後的 Span 介面與標準 OpenTelemetry API 對接。
+- [x] **任務 4.2**: 實作 OpenTelemetry 適配器
+  - [x] 在 `observability/otel/tracing.go` 中實作適配器，將增強後的 Span 介面與標準 OpenTelemetry API 對接。
     - **執行提示**：實作 `OTelTracerAdapter` 將內部 `EnhancedSpan` 轉換為 OpenTelemetry span。使用 `trace.WithAttributes()` 將自定義欄位轉換為 OTLP attributes。實作雙向轉換，支援從 OTel span 建立內部 span。
+    - **完成說明**：建立了 observability/otel/adapter.go，實作了 OTelTracerAdapter 和 SpanAdapter。支援雙向操作，同時維護 Gortex 和 OpenTelemetry spans。所有操作（LogEvent、SetError、AddTags、SetStatus）都會同步到兩個 span 系統。
 
-  - [ ] 實作嚴重性等級到 OTLP attributes 的標準化映射。
+  - [x] 實作嚴重性等級到 OTLP attributes 的標準化映射。
     - **執行提示**：定義映射表將內部嚴重性等級對應到 OpenTelemetry 的 `level` 屬性。使用 semantic conventions，例如 `level=DEBUG` 對應 `severity.number=5`。參考 OpenTelemetry Log Data Model 規範。
+    - **完成說明**：實作了完整的嚴重性映射，包含 severityMap 和 severityToNumber() 函式。遵循 OpenTelemetry 規範，DEBUG=5、INFO=9、WARN=13、ERROR=17、CRITICAL=21 等。所有嚴重性等級都作為屬性同步到 OpenTelemetry。
 
 - [ ] **任務 4.3**: 整合 Tracing Middleware
   - [ ] 於 `setupRouter()` 函式中自動注入 TracingMiddleware。
