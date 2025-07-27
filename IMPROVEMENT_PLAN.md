@@ -157,12 +157,14 @@
     - **執行提示**：在 `Context` 實作中加入 `Span()` 方法取得當前 span。使用 `context.WithValue()` 在請求 context 中儲存 span。支援 W3C Trace Context 標準的 header 傳播（`traceparent`, `tracestate`）。
     - **完成說明**：在 types.Context 介面新增了 Span() 方法，並在 DefaultContext 實作中從 context values 中取得 span。TracingMiddleware 會將 span 儲存在 Gortex context 中（"span" 和 "enhanced_span" keys）。span 會透過標準 context 傳播，並在 response header 設定 X-Trace-ID。
 
-- [ ] **任務 4.4**: 撰寫文件與範例
-  - [ ] 提供完整的 Tracing 配置範例，涵蓋 OTLP Exporter 和 Jaeger。
+- [x] **任務 4.4**: 撰寫文件與範例
+  - [x] 提供完整的 Tracing 配置範例，涵蓋 OTLP Exporter 和 Jaeger。
     - **執行提示**：在 `examples/tracing/` 建立範例專案，展示：1) YAML 配置檔設定 2) 程式碼中建立 child spans 3) 記錄自定義事件 4) 錯誤追蹤。提供 docker-compose.yml 啟動 Jaeger 進行本地測試。
+    - **完成說明**：建立了完整的 tracing 範例，包含 main.go 展示所有 8 個嚴重性等級、child spans、錯誤處理等功能。提供了 config.yaml、docker-compose.yml 和完整的 README.md。另外建立了 OpenTelemetry 整合範例。
 
-  - [ ] 撰寫遷移指南，說明如何從舊有 Tracing 遷移至新的增強型介面。
+  - [x] 撰寫遷移指南，說明如何從舊有 Tracing 遷移至新的增強型介面。
     - **執行提示**：在 `docs/migration/tracing.md` 中說明：1) API 變更對照表 2) 配置檔更新方式 3) 程式碼遷移範例 4) 相容性說明。強調零破壞性變更，舊程式碼可繼續運作。
+    - **完成說明**：建立了詳細的遷移指南，包含 API 變更對照表、完整的程式碼範例、配置更新說明，以及零破壞性變更的保證。文件涵蓋了從基礎用法到進階整合的所有場景。
 
 ## Phase 3: 開發體驗提升
 

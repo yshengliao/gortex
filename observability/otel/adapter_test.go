@@ -39,20 +39,17 @@ func TestOTelTracerAdapter_StartSpan(t *testing.T) {
 	adapter, recorder := setupTest(t)
 	ctx := context.Background()
 	
-	// Start a span
-	ctx, span := adapter.StartSpan(ctx, "test-operation")
-	require.NotNil(t, span)
+	// Test with enhanced span for full functionality
+	ctx, enhancedSpan := adapter.StartEnhancedSpan(ctx, "test-operation")
+	require.NotNil(t, enhancedSpan)
+	assert.Equal(t, "test-operation", enhancedSpan.Span.Operation)
 	
-	// Verify both spans were created
-	assert.NotNil(t, span.gortexSpan)
-	assert.NotNil(t, span.otelSpan)
-	assert.Equal(t, "test-operation", span.gortexSpan.Operation)
+	// Get the span adapter from context
+	spanAdapter := SpanAdapterFromContext(ctx)
+	require.NotNil(t, spanAdapter)
 	
-	// Verify context contains the adapter
-	assert.Equal(t, span, SpanAdapterFromContext(ctx))
-	
-	// End the span
-	span.End()
+	// End the span properly
+	spanAdapter.End()
 	
 	// Verify OpenTelemetry span was recorded
 	spans := recorder.Ended()
@@ -64,24 +61,25 @@ func TestSpanAdapter_LogEvent(t *testing.T) {
 	adapter, recorder := setupTest(t)
 	ctx := context.Background()
 	
-	ctx, span := adapter.StartSpan(ctx, "test-operation")
+	// Use StartSpanWithOptions to get SpanAdapter
+	ctx, spanAdapter := adapter.StartSpanWithOptions(ctx, "test-operation")
 	
 	// Log events with different severities
-	span.LogEvent(tracing.SpanStatusDEBUG, "Debug message", map[string]any{
+	spanAdapter.LogEvent(tracing.SpanStatusDEBUG, "Debug message", map[string]any{
 		"key": "value",
 		"count": 10,
 	})
 	
-	span.LogEvent(tracing.SpanStatusERROR, "Error message", map[string]any{
+	spanAdapter.LogEvent(tracing.SpanStatusERROR, "Error message", map[string]any{
 		"error_code": "E001",
 	})
 	
-	span.End()
+	spanAdapter.End()
 	
 	// Verify Gortex span has events
-	assert.Len(t, span.gortexSpan.Events, 2)
-	assert.Equal(t, tracing.SpanStatusDEBUG, span.gortexSpan.Events[0].Severity)
-	assert.Equal(t, "Debug message", span.gortexSpan.Events[0].Message)
+	assert.Len(t, spanAdapter.gortexSpan.Events, 2)
+	assert.Equal(t, tracing.SpanStatusDEBUG, spanAdapter.gortexSpan.Events[0].Severity)
+	assert.Equal(t, "Debug message", spanAdapter.gortexSpan.Events[0].Message)
 	
 	// Verify OpenTelemetry span has events
 	spans := recorder.Ended()
@@ -105,17 +103,17 @@ func TestSpanAdapter_SetError(t *testing.T) {
 	adapter, recorder := setupTest(t)
 	ctx := context.Background()
 	
-	ctx, span := adapter.StartSpan(ctx, "test-operation")
+	ctx, spanAdapter := adapter.StartSpanWithOptions(ctx, "test-operation")
 	
 	// Set an error
 	testErr := errors.New("test error")
-	span.SetError(testErr)
+	spanAdapter.SetError(testErr)
 	
-	span.End()
+	spanAdapter.End()
 	
 	// Verify Gortex span has error
-	assert.Equal(t, testErr, span.gortexSpan.Error)
-	assert.Equal(t, tracing.SpanStatusERROR, span.gortexSpan.Status)
+	assert.Equal(t, testErr, spanAdapter.gortexSpan.Error)
+	assert.Equal(t, tracing.SpanStatusERROR, spanAdapter.gortexSpan.Status)
 	
 	// Verify OpenTelemetry span has error
 	spans := recorder.Ended()
@@ -144,7 +142,7 @@ func TestSpanAdapter_AddTags(t *testing.T) {
 	adapter, recorder := setupTest(t)
 	ctx := context.Background()
 	
-	ctx, span := adapter.StartSpan(ctx, "test-operation")
+	ctx, spanAdapter := adapter.StartSpanWithOptions(ctx, "test-operation")
 	
 	// Add tags
 	tags := map[string]string{
@@ -152,13 +150,13 @@ func TestSpanAdapter_AddTags(t *testing.T) {
 		"version":     "1.0",
 		"environment": "test",
 	}
-	span.AddTags(tags)
+	spanAdapter.AddTags(tags)
 	
-	span.End()
+	spanAdapter.End()
 	
 	// Verify Gortex span has tags
 	for k, v := range tags {
-		assert.Equal(t, v, span.gortexSpan.Tags[k])
+		assert.Equal(t, v, spanAdapter.gortexSpan.Tags[k])
 	}
 	
 	// Verify OpenTelemetry span has attributes
@@ -191,13 +189,13 @@ func TestSpanAdapter_SetStatus(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			ctx, span := adapter.StartSpan(ctx, "test-operation")
+			ctx, spanAdapter := adapter.StartSpanWithOptions(ctx, "test-operation")
 			
-			span.SetStatus(tt.status)
-			span.End()
+			spanAdapter.SetStatus(tt.status)
+			spanAdapter.End()
 			
 			// Verify Gortex span status
-			assert.Equal(t, tt.status, span.gortexSpan.Status)
+			assert.Equal(t, tt.status, spanAdapter.gortexSpan.Status)
 			
 			// Verify OpenTelemetry span status
 			spans := recorder.Ended()

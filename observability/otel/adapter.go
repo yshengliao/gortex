@@ -67,26 +67,6 @@ func severityToNumber(status tracing.SpanStatus) int {
 	return 0
 }
 
-// StartSpan starts a new span using both Gortex and OpenTelemetry
-func (a *OTelTracerAdapter) StartSpan(ctx context.Context, operation string, opts ...oteltrace.SpanStartOption) (context.Context, *SpanAdapter) {
-	// Start Gortex enhanced span
-	ctx, gortexSpan := a.tracer.StartEnhancedSpan(ctx, operation)
-	
-	// Start OpenTelemetry span
-	ctx, otelSpan := a.otelTracer.Start(ctx, operation, opts...)
-	
-	// Create adapter
-	adapter := &SpanAdapter{
-		gortexSpan: gortexSpan,
-		otelSpan:   otelSpan,
-		adapter:    a,
-	}
-	
-	// Store adapter in context
-	ctx = ContextWithSpanAdapter(ctx, adapter)
-	
-	return ctx, adapter
-}
 
 // SpanAdapter bridges Gortex enhanced span and OpenTelemetry span
 type SpanAdapter struct {
@@ -217,6 +197,83 @@ func SpanAdapterFromContext(ctx context.Context) *SpanAdapter {
 	return nil
 }
 
+// StartSpan implements tracing.Tracer interface
+func (a *OTelTracerAdapter) StartSpan(ctx context.Context, operation string) (context.Context, *tracing.Span) {
+	// Start Gortex span
+	ctx, span := a.tracer.StartSpan(ctx, operation)
+	
+	// Start OpenTelemetry span
+	ctx, otelSpan := a.otelTracer.Start(ctx, operation)
+	
+	// For simple integration, we just start both spans
+	// The OTel span should be ended manually or via defer in the caller
+	// This maintains backward compatibility with the Tracer interface
+	_ = otelSpan
+	
+	return ctx, span
+}
+
+// StartEnhancedSpan implements tracing.EnhancedTracer interface
+func (a *OTelTracerAdapter) StartEnhancedSpan(ctx context.Context, operation string) (context.Context, *tracing.EnhancedSpan) {
+	// Start Gortex enhanced span
+	ctx, gortexSpan := a.tracer.StartEnhancedSpan(ctx, operation)
+	
+	// Start OpenTelemetry span
+	ctx, otelSpan := a.otelTracer.Start(ctx, operation)
+	
+	// Create adapter
+	adapter := &SpanAdapter{
+		gortexSpan: gortexSpan,
+		otelSpan:   otelSpan,
+		adapter:    a,
+	}
+	
+	// Store adapter in context
+	ctx = ContextWithSpanAdapter(ctx, adapter)
+	
+	return ctx, gortexSpan
+}
+
+// FinishSpan implements tracing.Tracer interface
+func (a *OTelTracerAdapter) FinishSpan(span *tracing.Span) {
+	a.tracer.FinishSpan(span)
+	// Note: OTel span should be ended separately via defer span.End()
+	// This is a limitation of the simple Tracer interface
+}
+
+// AddTags implements tracing.Tracer interface
+func (a *OTelTracerAdapter) AddTags(span *tracing.Span, tags map[string]string) {
+	a.tracer.AddTags(span, tags)
+	// Note: For OTel integration, use SpanAdapter.AddTags() instead
+}
+
+// SetStatus implements tracing.Tracer interface
+func (a *OTelTracerAdapter) SetStatus(span *tracing.Span, status tracing.SpanStatus) {
+	a.tracer.SetStatus(span, status)
+	// Note: For OTel integration, use SpanAdapter.SetStatus() instead
+}
+
+// StartSpanWithOptions starts a new span using both Gortex and OpenTelemetry
+func (a *OTelTracerAdapter) StartSpanWithOptions(ctx context.Context, operation string, opts ...oteltrace.SpanStartOption) (context.Context, *SpanAdapter) {
+	// Start Gortex enhanced span
+	ctx, gortexSpan := a.tracer.StartEnhancedSpan(ctx, operation)
+	
+	// Start OpenTelemetry span
+	ctx, otelSpan := a.otelTracer.Start(ctx, operation, opts...)
+	
+	// Create adapter
+	adapter := &SpanAdapter{
+		gortexSpan: gortexSpan,
+		otelSpan:   otelSpan,
+		adapter:    a,
+	}
+	
+	// Store adapter in context
+	ctx = ContextWithSpanAdapter(ctx, adapter)
+	
+	return ctx, adapter
+}
+
 // HTTPMiddleware creates a middleware that integrates with OpenTelemetry
 func (a *OTelTracerAdapter) HTTPMiddleware(next func(context.Context) error) func(context.Context) error {
 	return func(ctx context.Context) error {
@@ -224,7 +281,7 @@ func (a *OTelTracerAdapter) HTTPMiddleware(next func(context.Context) error) fun
 		// This would typically use the propagator from OpenTelemetry
 		
 		operation := "HTTP Request" // This should be extracted from the request
-		ctx, span := a.StartSpan(ctx, operation,
+		ctx, span := a.StartSpanWithOptions(ctx, operation,
 			oteltrace.WithSpanKind(oteltrace.SpanKindServer),
 		)
 		defer span.End()
