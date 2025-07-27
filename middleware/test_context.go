@@ -348,6 +348,17 @@ func (c *testContext) Context() context.Context {
 	return c.request.Context()
 }
 
+// Span returns the current trace span from context
+func (c *testContext) Span() interface{} {
+	if span, ok := c.values["enhanced_span"]; ok {
+		return span
+	}
+	if span, ok := c.values["span"]; ok {
+		return span
+	}
+	return nil
+}
+
 // testResponseWriter is a minimal implementation of types.ResponseWriter
 type testResponseWriter struct {
 	http.ResponseWriter

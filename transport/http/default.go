@@ -525,6 +525,19 @@ func (c *DefaultContext) SetStdContext(ctx context.Context) {
 	c.request = c.request.WithContext(ctx)
 }
 
+// Span returns the current trace span from context
+func (c *DefaultContext) Span() interface{} {
+	// Try to get enhanced span first
+	if span := c.Get("enhanced_span"); span != nil {
+		return span
+	}
+	// Fall back to regular span
+	if span := c.Get("span"); span != nil {
+		return span
+	}
+	return nil
+}
+
 // writeContentType writes the content type header
 func (c *DefaultContext) writeContentType(value string) {
 	header := c.response.Header()

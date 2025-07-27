@@ -13,6 +13,7 @@ import (
 	"github.com/yshengliao/gortex/pkg/config"
 	appcontext "github.com/yshengliao/gortex/core/context"
 	"github.com/yshengliao/gortex/middleware"
+	"github.com/yshengliao/gortex/observability/tracing"
 	httpctx "github.com/yshengliao/gortex/transport/http"
 	"go.uber.org/zap"
 )
@@ -55,6 +56,7 @@ type App struct {
 	routeInfos      []RouteLogInfo
 	enableRoutesLog bool
 	developmentMode bool
+	tracer          tracing.Tracer
 }
 
 // RouteLogInfo stores information about a registered route for logging
@@ -179,8 +181,24 @@ func WithRoutesLogger() Option {
 	}
 }
 
+// WithTracer sets the tracer for distributed tracing
+func WithTracer(tracer tracing.Tracer) Option {
+	return func(app *App) error {
+		if tracer == nil {
+			return fmt.Errorf("tracer cannot be nil")
+		}
+		app.tracer = tracer
+		return nil
+	}
+}
+
 // setupRouter configures the Gortex router with middleware
 func (app *App) setupRouter() {
+	// Tracing middleware - should be first to capture all requests
+	if app.tracer != nil {
+		app.router.Use(tracing.TracingMiddleware(app.tracer))
+	}
+
 	// Apply middleware based on configuration
 	if app.config == nil || app.config.Server.Recovery {
 		// TODO: Add recovery middleware for Gortex

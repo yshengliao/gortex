@@ -176,6 +176,9 @@ type Context interface {
 	
 	// Context returns the standard context
 	Context() context.Context
+	
+	// Span returns the current trace span from context
+	Span() interface{}
 }
 
 // ResponseWriter wraps http.ResponseWriter

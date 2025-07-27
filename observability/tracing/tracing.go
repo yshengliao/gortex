@@ -331,17 +331,37 @@ func TracingMiddleware(tracer Tracer) middleware.MiddlewareFunc {
 				traceID = uuid.New().String()
 			}
 			
-			// Start span
-			ctx, span := tracer.StartSpan(c.Request().Context(), fmt.Sprintf("%s %s", c.Request().Method, c.Path()))
+			// Start span - use EnhancedTracer if available
+			var ctx context.Context
+			var span *Span
+			var enhancedSpan *EnhancedSpan
+			
+			if enhancedTracer, ok := tracer.(EnhancedTracer); ok {
+				ctx, enhancedSpan = enhancedTracer.StartEnhancedSpan(c.Request().Context(), fmt.Sprintf("%s %s", c.Request().Method, c.Path()))
+				span = enhancedSpan.Span
+				// Store enhanced span in Gortex context
+				c.Set("enhanced_span", enhancedSpan)
+			} else {
+				ctx, span = tracer.StartSpan(c.Request().Context(), fmt.Sprintf("%s %s", c.Request().Method, c.Path()))
+			}
+			
+			// Store span in Gortex context for easy access
+			c.Set("span", span)
 			
 			// Add tags
-			tracer.AddTags(span, map[string]string{
+			tags := map[string]string{
 				"http.method":     c.Request().Method,
 				"http.path":       c.Path(),
 				"http.url":        c.Request().URL.String(),
 				"http.user_agent": c.Request().UserAgent(),
 				"peer.address":    c.RealIP(),
-			})
+			}
+			
+			if enhancedSpan != nil {
+				enhancedSpan.AddTags(tags)
+			} else {
+				tracer.AddTags(span, tags)
+			}
 			
 			// Set trace ID in response header
 			c.Response().Header().Set("X-Trace-ID", span.TraceID)
@@ -352,20 +372,34 @@ func TracingMiddleware(tracer Tracer) middleware.MiddlewareFunc {
 			// Process request
 			err := next(c)
 			
-			// Set span status
+			// Set span status and handle errors
 			if err != nil {
-				tracer.SetStatus(span, SpanStatusError)
-				tracer.AddTags(span, map[string]string{
-					"error": err.Error(),
-				})
+				if enhancedSpan != nil {
+					enhancedSpan.SetError(err)
+				} else {
+					tracer.SetStatus(span, SpanStatusError)
+					tracer.AddTags(span, map[string]string{
+						"error": err.Error(),
+					})
+				}
 			} else {
-				tracer.SetStatus(span, SpanStatusOK)
+				if enhancedSpan != nil {
+					enhancedSpan.SetStatus(SpanStatusOK)
+				} else {
+					tracer.SetStatus(span, SpanStatusOK)
+				}
 			}
 			
 			// Add response tags
-			tracer.AddTags(span, map[string]string{
+			responseTags := map[string]string{
 				"http.status_code": fmt.Sprintf("%d", c.Response().Status()),
-			})
+			}
+			
+			if enhancedSpan != nil {
+				enhancedSpan.AddTags(responseTags)
+			} else {
+				tracer.AddTags(span, responseTags)
+			}
 			
 			// Finish span
 			tracer.FinishSpan(span)

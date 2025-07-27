@@ -148,12 +148,14 @@
     - **執行提示**：定義映射表將內部嚴重性等級對應到 OpenTelemetry 的 `level` 屬性。使用 semantic conventions，例如 `level=DEBUG` 對應 `severity.number=5`。參考 OpenTelemetry Log Data Model 規範。
     - **完成說明**：實作了完整的嚴重性映射，包含 severityMap 和 severityToNumber() 函式。遵循 OpenTelemetry 規範，DEBUG=5、INFO=9、WARN=13、ERROR=17、CRITICAL=21 等。所有嚴重性等級都作為屬性同步到 OpenTelemetry。
 
-- [ ] **任務 4.3**: 整合 Tracing Middleware
-  - [ ] 於 `setupRouter()` 函式中自動注入 TracingMiddleware。
+- [x] **任務 4.3**: 整合 Tracing Middleware
+  - [x] 於 `setupRouter()` 函式中自動注入 TracingMiddleware。
     - **執行提示**：在 `app/app.go` 的 `setupRouter()` 中，檢查 tracer 是否啟用，若啟用則自動加入 `TracingMiddleware` 作為第一個 middleware。確保 middleware 建立 root span 並設定必要的 HTTP 屬性（method, path, status code 等）。
+    - **完成說明**：成功在 setupRouter() 中實作了條件式注入 TracingMiddleware。當 app.tracer 不為 nil 時，自動注入為第一個 middleware。新增了 WithTracer() 選項函式來設定 tracer。TracingMiddleware 會自動處理 EnhancedTracer，並在 context 中儲存 span。
 
-  - [ ] 確保 Trace Context 能自動在所有 Handlers 中傳播。
+  - [x] 確保 Trace Context 能自動在所有 Handlers 中傳播。
     - **執行提示**：在 `Context` 實作中加入 `Span()` 方法取得當前 span。使用 `context.WithValue()` 在請求 context 中儲存 span。支援 W3C Trace Context 標準的 header 傳播（`traceparent`, `tracestate`）。
+    - **完成說明**：在 types.Context 介面新增了 Span() 方法，並在 DefaultContext 實作中從 context values 中取得 span。TracingMiddleware 會將 span 儲存在 Gortex context 中（"span" 和 "enhanced_span" keys）。span 會透過標準 context 傳播，並在 response header 設定 X-Trace-ID。
 
 - [ ] **任務 4.4**: 撰寫文件與範例
   - [ ] 提供完整的 Tracing 配置範例，涵蓋 OTLP Exporter 和 Jaeger。
