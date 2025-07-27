@@ -40,6 +40,38 @@ Main continuous integration workflow that:
 - **Cross-platform**: Builds for Linux, macOS, Windows (amd64 and arm64)
 - **Integration Tests**: Runs with PostgreSQL service container
 
+### benchmark.yml
+
+Performance regression testing for pull requests:
+
+- **Automated Comparison**: Compares PR performance against base branch
+- **Statistical Analysis**: Uses benchstat for reliable comparisons
+- **PR Comments**: Posts detailed performance reports on PRs
+- **Regression Detection**: Fails if performance degrades >10%
+- **Memory Tracking**: Monitors allocation changes
+
+Features:
+- Runs 10 iterations for statistical significance
+- Uploads benchmark artifacts for analysis
+- Provides clear performance impact visualization
+- Configurable thresholds via benchmark-thresholds.yml
+
+### benchmark-continuous.yml
+
+Continuous performance monitoring on main branch:
+
+- **Scheduled Runs**: Weekly performance baseline updates
+- **Historical Tracking**: Stores results in gh-pages branch
+- **Visualization**: Generates performance trend graphs
+- **Profiling**: Optional CPU and memory profiling
+- **Alerts**: Notifies on performance regressions
+
+Features:
+- Integration with github-action-benchmark
+- Custom metrics extraction for key operations
+- Profile generation for deep performance analysis
+- Automatic performance dashboards
+
 ## Configuration Files
 
 ### .golangci.yml
@@ -48,6 +80,35 @@ Configuration for golangci-lint with:
 - Comprehensive linter selection
 - Custom rules for the project
 - Exclusions for test files and generated code
+
+## Configuration Files
+
+### benchmark-thresholds.yml
+
+Defines performance regression thresholds:
+- Global defaults for time, memory, and allocations
+- Package-specific overrides for critical paths
+- Individual benchmark customization
+
+## Scripts
+
+### scripts/benchmark.sh
+
+Local benchmark comparison tool:
+
+```bash
+# Compare with main branch
+./scripts/benchmark.sh
+
+# Compare with specific branch
+./scripts/benchmark.sh -b develop
+
+# Run specific benchmarks
+./scripts/benchmark.sh -p Router
+
+# Quick run with fewer iterations
+./scripts/benchmark.sh -c 5 -t 5s
+```
 
 ## Running Locally
 
@@ -75,6 +136,19 @@ golangci-lint run
 
 # Run with specific linters
 golangci-lint run --enable-all
+```
+
+To run benchmarks locally:
+
+```bash
+# Run all benchmarks
+go test -bench=. -benchmem ./...
+
+# Run with benchstat comparison
+./scripts/benchmark.sh
+
+# Run specific package benchmarks
+go test -bench=. -benchmem -count=10 ./http/router
 ```
 
 ## Adding New Checks

@@ -1,0 +1,142 @@
+name: Continuous Benchmark
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - '**.go'
+      - 'go.mod'
+      - 'go.sum'
+  schedule:
+    # Run every Sunday at 00:00 UTC
+    - cron: '0 0 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  deployments: write
+
+jobs:
+  benchmark:
+    name: Performance Benchmarks
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: 'go.mod'
+        cache: true
+
+    - name: Run benchmarks
+      run: |
+        go test -bench=. -benchmem -count=5 -timeout=30m -run=^$ ./... | tee benchmark.txt
+
+    - name: Store benchmark result
+      uses: benchmark-action/github-action-benchmark@v1
+      with:
+        name: Go Benchmark
+        tool: 'go'
+        output-file-path: benchmark.txt
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        auto-push: true
+        # Stores results in gh-pages branch
+        gh-pages-branch: gh-pages
+        benchmark-data-dir-path: benchmarks
+        # Alert when performance regresses by more than 10%
+        alert-threshold: '110%'
+        comment-on-alert: true
+        fail-on-alert: true
+        alert-comment-cc-users: '@yshengliao'
+
+    - name: Generate custom metrics
+      run: |
+        # Extract key metrics for monitoring
+        echo "# Gortex Performance Metrics" > metrics.md
+        echo "Generated at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> metrics.md
+        echo "" >> metrics.md
+        
+        # Router performance
+        echo "## 🚀 Router Performance" >> metrics.md
+        echo '```' >> metrics.md
+        grep -E "BenchmarkRouter|BenchmarkContextPool|BenchmarkParamStore" benchmark.txt | head -10 >> metrics.md
+        echo '```' >> metrics.md
+        echo "" >> metrics.md
+        
+        # Memory allocations
+        echo "## 💾 Memory Efficiency" >> metrics.md
+        echo '```' >> metrics.md
+        grep -E "allocs/op" benchmark.txt | sort -k5 -n | head -10 >> metrics.md
+        echo '```' >> metrics.md
+        echo "" >> metrics.md
+        
+        # Middleware performance
+        echo "## ⚡ Middleware Performance" >> metrics.md
+        echo '```' >> metrics.md
+        grep -E "BenchmarkMiddleware" benchmark.txt | head -10 >> metrics.md
+        echo '```' >> metrics.md
+
+    - name: Upload metrics
+      uses: actions/upload-artifact@v4
+      with:
+        name: performance-metrics
+        path: |
+          benchmark.txt
+          metrics.md
+
+  profile:
+    name: CPU & Memory Profiling
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: 'go.mod'
+        cache: true
+
+    - name: Run CPU profiling
+      run: |
+        mkdir -p profiles
+        # Run benchmarks with CPU profiling
+        go test -bench=BenchmarkRouter -benchtime=10s -cpuprofile=profiles/cpu.prof ./http/router
+        go test -bench=BenchmarkContextPool -benchtime=10s -cpuprofile=profiles/context.prof ./http/context
+        
+    - name: Run Memory profiling  
+      run: |
+        # Run benchmarks with memory profiling
+        go test -bench=BenchmarkRouter -benchtime=10s -memprofile=profiles/mem.prof ./http/router
+        go test -bench=BenchmarkWebSocket -benchtime=10s -memprofile=profiles/websocket.prof ./websocket/hub
+
+    - name: Generate profile reports
+      run: |
+        # Install pprof
+        go install github.com/google/pprof@latest
+        
+        # Generate reports
+        echo "# Profiling Reports" > profiles/README.md
+        echo "Generated at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> profiles/README.md
+        echo "" >> profiles/README.md
+        
+        # Analyze CPU profile
+        echo "## CPU Profile Analysis" >> profiles/README.md
+        echo '```' >> profiles/README.md
+        go tool pprof -top profiles/cpu.prof | head -20 >> profiles/README.md
+        echo '```' >> profiles/README.md
+        
+        # Analyze Memory profile
+        echo "## Memory Profile Analysis" >> profiles/README.md
+        echo '```' >> profiles/README.md
+        go tool pprof -top profiles/mem.prof | head -20 >> profiles/README.md
+        echo '```' >> profiles/README.md
+
+    - name: Upload profiles
+      uses: actions/upload-artifact@v4
+      with:
+        name: performance-profiles
+        path: profiles/
