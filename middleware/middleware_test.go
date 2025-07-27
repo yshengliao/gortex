@@ -52,13 +52,13 @@ func TestErrorHandler_Middleware(t *testing.T) {
 				return &errors.ErrorResponse{
 					Success: false,
 					ErrorDetail: errors.ErrorDetail{
-						Code:    404,
+						Code:    int(errors.CodeResourceNotFound),
 						Message: "User not found",
 					},
 				}
 			},
 			expectedStatus: 404,
-			expectedCode:   "ERR_404",
+			expectedCode:   fmt.Sprintf("ERR_%d", errors.CodeResourceNotFound),
 			expectedMsg:    "User not found",
 		},
 		{

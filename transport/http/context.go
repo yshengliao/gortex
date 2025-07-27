@@ -59,6 +59,11 @@ func (he *HTTPError) WithInternal(err error) *HTTPError {
 	return he
 }
 
+// StatusCode returns the HTTP status code
+func (he *HTTPError) StatusCode() int {
+	return he.Code
+}
+
 // Common errors
 var (
 	ErrUnsupportedMediaType        = NewHTTPError(http.StatusUnsupportedMediaType)

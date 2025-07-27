@@ -8,6 +8,7 @@ import (
 
 	"go.uber.org/zap"
 	"github.com/yshengliao/gortex/pkg/errors"
+	httpctx "github.com/yshengliao/gortex/transport/http"
 )
 
 // ErrorHandlerConfig contains configuration for the error handler middleware
@@ -52,6 +53,12 @@ func ErrorHandlerWithConfig(config *ErrorHandlerConfig) MiddlewareFunc {
 				return nil
 			}
 
+			// Check if response has already been written
+			if rw, ok := c.Response().(interface{ Written() bool }); ok && rw.Written() {
+				// Response already written, return the error as-is
+				return err
+			}
+
 			// Get request ID if available
 			requestID := ""
 			if id := c.Get("request_id"); id != nil {
@@ -67,8 +74,9 @@ func ErrorHandlerWithConfig(config *ErrorHandlerConfig) MiddlewareFunc {
 			switch e := err.(type) {
 			case *errors.ErrorResponse:
 				// Use our custom error type
-				code = e.ErrorDetail.Code
-				errCode = fmt.Sprintf("ERR_%d", code)
+				errorCode := errors.ErrorCode(e.ErrorDetail.Code)
+				code = errors.GetHTTPStatus(errorCode)
+				errCode = fmt.Sprintf("ERR_%d", e.ErrorDetail.Code)
 				message = e.ErrorDetail.Message
 				if e.ErrorDetail.Details != nil {
 					details = make(map[string]interface{})
@@ -80,7 +88,12 @@ func ErrorHandlerWithConfig(config *ErrorHandlerConfig) MiddlewareFunc {
 				// Handle errors with StatusCode method (Echo compatibility)
 				code = e.StatusCode()
 				errCode = fmt.Sprintf("HTTP_%d", code)
-				message = fmt.Sprintf("%v", e)
+				// For HTTPError specifically, get the message field
+				if httpErr, ok := e.(*httpctx.HTTPError); ok && httpErr.Message != nil {
+					message = fmt.Sprintf("%v", httpErr.Message)
+				} else {
+					message = fmt.Sprintf("%v", e)
+				}
 			default:
 				// Generic error - default to 500
 				code = http.StatusInternalServerError
@@ -124,6 +137,13 @@ func writeErrorResponse(c Context, statusCode int, errCode, message string, deta
 	// Add details if available and not hidden
 	if details != nil && (!config.HideInternalServerErrorDetails || statusCode < 500) {
 		response["error"].(map[string]interface{})["details"] = details
+	}
+	
+	// For development mode, add the error to details if it's a standard error
+	if !config.HideInternalServerErrorDetails && statusCode >= 500 && details == nil && message != config.DefaultMessage {
+		response["error"].(map[string]interface{})["details"] = map[string]interface{}{
+			"error": message,
+		}
 	}
 	
 	// Set response header and write JSON

@@ -140,9 +140,10 @@ type APIGroup struct {
 
 ### Production Ready
 - **JWT Auth** - Built-in authentication middleware
-- **WebSocket** - First-class real-time support
+- **WebSocket** - First-class real-time support  
 - **Metrics** - Prometheus-compatible metrics
 - **Graceful Shutdown** - Proper connection cleanup
+- **API Documentation** - Automatic OpenAPI/Swagger generation from struct tags
 
 ## 📦 Middleware
 
@@ -180,6 +181,21 @@ func (h *WSHandler) HandleConnection(c context.Context) error {
     h.hub.RegisterClient(client)
     return nil
 }
+```
+
+### API Documentation
+```go
+// Automatic OpenAPI/Swagger generation
+import "github.com/yshengliao/gortex/core/app/doc/swagger"
+
+app.NewApp(
+    app.WithHandlers(handlers),
+    app.WithDocProvider(swagger.NewProvider()),
+)
+
+// Access at:
+// /_docs      - API documentation JSON
+// /_docs/ui   - Swagger UI interface
 ```
 
 ### Configuration

@@ -236,6 +236,15 @@ func (c *MockContext) Param(name string) string {
 	return c.params[name]
 }
 
+// Params returns all path parameters
+func (c *MockContext) Params() url.Values {
+	values := make(url.Values)
+	for k, v := range c.params {
+		values.Set(k, v)
+	}
+	return values
+}
+
 // ParamNames returns all path parameter names
 func (c *MockContext) ParamNames() []string {
 	return c.paramNames
@@ -488,6 +497,12 @@ func (c *MockContext) NoContent(code int) error {
 	return nil
 }
 
+// Render renders a template
+func (c *MockContext) Render(code int, name string, data interface{}) error {
+	// Simple implementation for testing - just returns JSON
+	return c.JSON(code, data)
+}
+
 // Redirect redirects the request
 func (c *MockContext) Redirect(code int, url string) error {
 	if code < 300 || code > 308 {
@@ -515,13 +530,26 @@ func (c *MockContext) SetHandler(h httpctx.HandlerFunc) {
 }
 
 // Logger returns the logger
-func (c *MockContext) Logger() httpctx.Logger {
+func (c *MockContext) Logger() interface{} {
 	return c.logger
 }
 
 // SetLogger sets the logger
-func (c *MockContext) SetLogger(l httpctx.Logger) {
-	c.logger = l
+func (c *MockContext) SetLogger(l interface{}) {
+	if logger, ok := l.(httpctx.Logger); ok {
+		c.logger = logger
+	}
+}
+
+// Span returns the current trace span from context
+func (c *MockContext) Span() interface{} {
+	if span, ok := c.store["enhanced_span"]; ok {
+		return span
+	}
+	if span, ok := c.store["span"]; ok {
+		return span
+	}
+	return nil
 }
 
 // Echo returns the echo instance (for compatibility)
@@ -543,12 +571,12 @@ func (c *MockContext) Reset(r *http.Request, w http.ResponseWriter) {
 }
 
 // StdContext returns the standard httpctx.Context
-func (c *MockContext) StdContext() stdContext.Context {
+func (c *MockContext) StdContext() stdcontext.Context {
 	return c.req.Context()
 }
 
 // SetStdContext sets the standard httpctx.Context
-func (c *MockContext) SetStdContext(ctx stdContext.Context) {
+func (c *MockContext) SetStdContext(ctx stdcontext.Context) {
 	c.req = c.req.WithContext(ctx)
 }
 

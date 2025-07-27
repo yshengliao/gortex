@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/yshengliao/gortex/core/app"
 	httpctx "github.com/yshengliao/gortex/transport/http"
@@ -81,12 +82,24 @@ type UserHandler struct{}
 
 // GET /users/:id
 func (h *UserHandler) GET(c httpctx.Context) error {
-	// Using the new helper method to get parameter as int
-	id := c.ParamInt("id", 0)
+	// Get parameters manually for now
+	idStr := c.Param("id")
+	id := 0
+	if idStr != "" {
+		if parsed, err := strconv.Atoi(idStr); err == nil {
+			id = parsed
+		}
+	}
 	
-	// Check for query parameters using helper methods
-	page := c.QueryInt("page", 1)
-	active := c.QueryBool("active", true)
+	// Get query parameters manually
+	pageStr := c.QueryParam("page")
+	page := 1
+	if pageStr != "" {
+		if parsed, err := strconv.Atoi(pageStr); err == nil {
+			page = parsed
+		}
+	}
+	active := c.QueryParam("active") != "false"
 	
 	// Using the new OK helper method
 	return c.JSON(200, map[string]interface{}{
@@ -99,10 +112,16 @@ func (h *UserHandler) GET(c httpctx.Context) error {
 
 // POST /users/:id
 func (h *UserHandler) POST(c httpctx.Context) error {
-	id := c.ParamInt("id", 0)
+	idStr := c.Param("id")
+	id := 0
+	if idStr != "" {
+		if parsed, err := strconv.Atoi(idStr); err == nil {
+			id = parsed
+		}
+	}
 	
-	// Using the new Created helper method
-	return c.Created(map[string]interface{}{
+	// Return 201 Created manually
+	return c.JSON(201, map[string]interface{}{
 		"message": "User created",
 		"id":      id,
 	})

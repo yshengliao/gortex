@@ -50,7 +50,15 @@ func RecoveryWithConfig(config *RecoveryConfig) MiddlewareFunc {
 		return func(c Context) error {
 			defer func() {
 				if r := recover(); r != nil {
-					err, _ := r.(error)
+					var err error
+					switch x := r.(type) {
+					case error:
+						err = x
+					case string:
+						err = fmt.Errorf("%s", x)
+					default:
+						err = fmt.Errorf("%v", x)
+					}
 
 					// Get stack trace
 					stack := make([]byte, config.StackSize)

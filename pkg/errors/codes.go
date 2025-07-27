@@ -193,10 +193,12 @@ func GetHTTPStatus(code ErrorCode) int {
 	case CodeThirdPartyServiceError, CodeDependencyFailed:
 		return 503
 		
-	// Business logic errors -> depends on context, default to 400
+	// Business logic errors -> depends on context
 	case CodeBusinessLogicError, CodeInvalidOperation, CodeInvalidState,
-		CodeInsufficientBalance, CodeQuotaExceeded:
+		CodeQuotaExceeded:
 		return 400
+	case CodeInsufficientBalance:
+		return 402 // Payment Required
 		
 	default:
 		return 500

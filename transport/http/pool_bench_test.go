@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/yshengliao/gortex/transport/http"
+	httpctx "github.com/yshengliao/gortex/transport/http"
 )
 
 // BenchmarkContextWithoutPool tests context creation without pooling
@@ -15,7 +15,7 @@ func BenchmarkContextWithoutPool(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		w := httptest.NewRecorder()
-		ctx := context.NewContext(req, w)
+		ctx := httpctx.NewDefaultContext(req, w)
 		ctx.SetPath("/test")
 		ctx.Set("key", "value")
 		_ = ctx.Get("key")
@@ -29,11 +29,11 @@ func BenchmarkContextWithPool(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		w := httptest.NewRecorder()
-		ctx := context.AcquireContext(req, w)
+		ctx := httpctx.AcquireContext(req, w)
 		ctx.SetPath("/test")
 		ctx.Set("key", "value")
 		_ = ctx.Get("key")
-		context.ReleaseContext(ctx)
+		httpctx.ReleaseContext(ctx)
 	}
 }
 
@@ -49,11 +49,11 @@ func BenchmarkSmartParams(b *testing.B) {
 	
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		ctx := context.AcquireContext(req, w)
-		context.SetParams(ctx, params)
+		ctx := httpctx.AcquireContext(req, w)
+		httpctx.SetParams(ctx, params)
 		_ = ctx.Param("userId")
 		_ = ctx.Param("postId")
-		context.ReleaseContext(ctx)
+		httpctx.ReleaseContext(ctx)
 	}
 }
 
@@ -73,11 +73,11 @@ func BenchmarkManyParams(b *testing.B) {
 	
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		ctx := context.AcquireContext(req, w)
-		context.SetParams(ctx, params)
+		ctx := httpctx.AcquireContext(req, w)
+		httpctx.SetParams(ctx, params)
 		for key := range params {
 			_ = ctx.Param(key)
 		}
-		context.ReleaseContext(ctx)
+		httpctx.ReleaseContext(ctx)
 	}
 }

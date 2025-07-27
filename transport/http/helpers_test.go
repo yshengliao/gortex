@@ -26,7 +26,7 @@ func TestParamInt(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/", nil)
 			rec := httptest.NewRecorder()
-			c := httpctx.NewContext(req, rec).(*httpctx.DefaultContext)
+			c := httpctx.NewDefaultContext(req, rec).(*httpctx.DefaultContext)
 			
 			// Set up parameter using httpctx.SetParams
 			params := map[string]string{"id": tt.paramValue}
@@ -56,7 +56,7 @@ func TestQueryInt(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/"+tt.queryString, nil)
 			rec := httptest.NewRecorder()
-			c := httpctx.NewContext(req, rec).(*httpctx.DefaultContext)
+			c := httpctx.NewDefaultContext(req, rec).(*httpctx.DefaultContext)
 			
 			result := c.QueryInt(tt.paramName, tt.defaultValue)
 			assert.Equal(t, tt.expected, result)
@@ -85,7 +85,7 @@ func TestQueryBool(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/"+tt.queryString, nil)
 			rec := httptest.NewRecorder()
-			c := httpctx.NewContext(req, rec).(*httpctx.DefaultContext)
+			c := httpctx.NewDefaultContext(req, rec).(*httpctx.DefaultContext)
 			
 			result := c.QueryBool(tt.paramName, tt.defaultValue)
 			assert.Equal(t, tt.expected, result)
@@ -97,7 +97,7 @@ func TestResponseHelpers(t *testing.T) {
 	t.Run("OK response", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		rec := httptest.NewRecorder()
-		c := httpctx.NewContext(req, rec).(*httpctx.DefaultContext)
+		c := httpctx.NewDefaultContext(req, rec).(*httpctx.DefaultContext)
 		
 		data := httpctx.Map{"message": "success"}
 		err := c.OK(data)
@@ -110,7 +110,7 @@ func TestResponseHelpers(t *testing.T) {
 	t.Run("Created response", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/", nil)
 		rec := httptest.NewRecorder()
-		c := httpctx.NewContext(req, rec).(*httpctx.DefaultContext)
+		c := httpctx.NewDefaultContext(req, rec).(*httpctx.DefaultContext)
 		
 		data := httpctx.Map{"id": 123}
 		err := c.Created(data)
@@ -123,7 +123,7 @@ func TestResponseHelpers(t *testing.T) {
 	t.Run("NoContent204 response", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodDelete, "/", nil)
 		rec := httptest.NewRecorder()
-		c := httpctx.NewContext(req, rec).(*httpctx.DefaultContext)
+		c := httpctx.NewDefaultContext(req, rec).(*httpctx.DefaultContext)
 		
 		err := c.NoContent204()
 		
@@ -135,7 +135,7 @@ func TestResponseHelpers(t *testing.T) {
 	t.Run("BadRequest response", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/", nil)
 		rec := httptest.NewRecorder()
-		c := httpctx.NewContext(req, rec).(*httpctx.DefaultContext)
+		c := httpctx.NewDefaultContext(req, rec).(*httpctx.DefaultContext)
 		
 		err := c.BadRequest("Invalid input")
 		

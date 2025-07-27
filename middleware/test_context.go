@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -215,8 +216,8 @@ func (c *testContext) String(code int, s string) error {
 func (c *testContext) JSON(code int, i interface{}) error {
 	c.response.Header().Set("Content-Type", "application/json")
 	c.response.WriteHeader(code)
-	// Simple implementation for testing
-	return nil
+	encoder := json.NewEncoder(c.response)
+	return encoder.Encode(i)
 }
 
 // JSONPretty sends an HTTP response with pretty JSON
@@ -362,20 +363,24 @@ func (c *testContext) Span() interface{} {
 // testResponseWriter is a minimal implementation of types.ResponseWriter
 type testResponseWriter struct {
 	http.ResponseWriter
-	status int
-	size   int64
+	status  int
+	size    int64
+	written bool
 }
 
 // NewTestResponseWriter creates a new test response writer
 func NewTestResponseWriter(w http.ResponseWriter) types.ResponseWriter {
 	return &testResponseWriter{
 		ResponseWriter: w,
-		status:         http.StatusOK,
+		status:         0, // 0 indicates not written yet
 	}
 }
 
 // Status returns the status code
 func (w *testResponseWriter) Status() int {
+	if w.status == 0 {
+		return http.StatusOK // Default if not written
+	}
 	return w.status
 }
 
@@ -386,20 +391,21 @@ func (w *testResponseWriter) Size() int64 {
 
 // Written returns whether response was written
 func (w *testResponseWriter) Written() bool {
-	return w.status != 0
+	return w.written
 }
 
 // WriteHeader writes the header
 func (w *testResponseWriter) WriteHeader(code int) {
-	if !w.Written() {
+	if !w.written {
 		w.status = code
+		w.written = true
 		w.ResponseWriter.WriteHeader(code)
 	}
 }
 
 // Write writes the data
 func (w *testResponseWriter) Write(b []byte) (int, error) {
-	if !w.Written() {
+	if !w.written {
 		w.WriteHeader(http.StatusOK)
 	}
 	n, err := w.ResponseWriter.Write(b)

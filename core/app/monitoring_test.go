@@ -21,7 +21,7 @@ type MockHandlers struct {
 
 type MockHandler struct{}
 
-func (h *MockHandler) GET(c context.Context) error {
+func (h *MockHandler) GET(c httpctx.Context) error {
 	return c.String(http.StatusOK, "OK")
 }
 
