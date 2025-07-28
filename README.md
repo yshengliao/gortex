@@ -145,7 +145,7 @@ type APIGroup struct {
 - **Graceful Shutdown** - Proper connection cleanup
 - **API Documentation** - Automatic OpenAPI/Swagger generation from struct tags
 
-## 📦 Middleware
+## Middleware
 
 ```go
 // Apply middleware via struct tags
@@ -306,12 +306,32 @@ Check out the [examples](./examples) directory:
 - [Simple](./examples/simple) - Basic routing and groups
 - [Auth](./examples/auth) - JWT authentication
 - [WebSocket](./examples/websocket) - Real-time communication
+- [Advanced Tracing](./examples/advanced-tracing) - Distributed tracing with 8 severity levels
+- [Metrics Dashboard](./examples/metrics-dashboard) - Prometheus + Grafana integration
+- [API Docs Advanced](./examples/api-docs-advanced) - OpenAPI 3.0 documentation
+
+## Recent Improvements (v0.4.0-alpha)
+
+### Enhanced Observability
+- **Advanced Tracing**: 8-level severity system (DEBUG to EMERGENCY)
+- **Performance Tracking**: Built-in benchmarking and bottleneck detection
+- **Metrics Collection**: ShardedCollector for high-performance metrics
+
+### Developer Experience
+- **Context Propagation Checker**: Static analysis tool for proper context usage
+- **Performance Reports**: Weekly automated performance analysis
+- **Best Practices Documentation**: Comprehensive guides for production use
+
+### CI/CD Integration
+- **Static Analysis**: 30+ linters with automatic PR comments
+- **Performance Regression Tests**: Automatic detection of performance degradation
+- **Benchmark Tracking**: Historical performance data with trend analysis
 
 ## Contributing
 
 We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## 📝 License
+## License
 
 MIT License - see [LICENSE](LICENSE) file.
 

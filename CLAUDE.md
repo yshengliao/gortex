@@ -209,21 +209,21 @@ app.Register(ctx, dbConnection)
 ## Framework Development
 
 ### Completed Features (v0.4.0-alpha)
-✅ **Core Features**
+**Core Features**
 - Struct tag routing with 45% performance improvement
 - WebSocket support with hub pattern and metrics
 - JWT authentication with middleware integration
 - Multi-source configuration (YAML, .env, env vars)
 - Development tools (debug endpoints, monitoring)
 
-✅ **Developer Experience**
+**Developer Experience**
 - Auto handler initialization - no more nil pointer panics
 - Route logging system - automatic route documentation
 - Context helper methods - simplified parameter access
 - Development mode enhancements - helpful error pages
 - Friendly error pages with stack traces
 
-✅ **Advanced Features**
+**Advanced Features**
 - Struct tag system for DI, middleware, rate limiting
 - Performance optimizations with context pooling
 - Smart parameter storage for common cases
