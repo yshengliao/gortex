@@ -103,20 +103,41 @@
 - [x] 包含效能優化建議
 - [x] 提供 troubleshooting 章節
 
-### 任務 6.4: 範例專案完善
+### 任務 6.4: 範例專案完善 ✅
+
+**狀態**: 已完成  
+**完成日期**: 2025/01/27
 
 **目標**: 提供生產級別的範例，展示框架的進階功能整合。
 
-**預期交付成果**：
-- 進階 Tracing 範例
-- Metrics 監控儀表板範例
-- API 文件客製化範例
+**完成內容**：
+
+1. **advanced-tracing 範例**
+   - 完整展示所有 8 個追蹤嚴重性等級 (DEBUG 到 EMERGENCY)
+   - 實作跨服務分散式追蹤（PostgreSQL、Redis）
+   - 包含 Docker Compose 環境配置
+   - 提供 load-test.sh 壓力測試腳本
+   - Makefile 支援一鍵部署與測試
+
+2. **metrics-dashboard 範例**
+   - 完整的 Prometheus + Grafana 整合
+   - 實作 ShardedCollector 高效能指標收集
+   - 3 個預建 Grafana 儀表板（HTTP、Business、System）
+   - 7 個預配置的警報規則
+   - 展示高基數標籤管理與驅逐策略
+
+3. **api-docs-advanced 範例**
+   - OpenAPI 3.0 規範自動生成
+   - Swagger UI 和 ReDoc 雙介面支援
+   - API 版本管理與棄用標頭示範
+   - 多重認證方式（Bearer Token、API Key）
+   - 豐富的請求/回應範例
 
 **驗收標準**：
-- [ ] 每個範例可獨立運行（docker-compose up）
-- [ ] 包含完整的 README 與設定說明
-- [ ] 提供自動化測試腳本
-- [ ] 展示至少 3 個進階功能整合
+- [x] 每個範例可獨立運行（docker-compose up）
+- [x] 包含完整的 README 與設定說明
+- [x] 提供自動化測試腳本
+- [x] 展示至少 3 個進階功能整合
 
 **實施內容**：
 
