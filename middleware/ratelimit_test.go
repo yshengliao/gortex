@@ -5,12 +5,12 @@ import (
 	"testing"
 
 	"golang.org/x/time/rate"
-	"github.com/yshengliao/gortex/context"
+	httpctx "github.com/yshengliao/gortex/transport/http"
 )
 
 func TestGortexRateLimit(t *testing.T) {
 	// Create a test handler
-	handler := func(c context.Context) error {
+	handler := func(c Context) error {
 		return c.String(200, "success")
 	}
 
@@ -18,7 +18,7 @@ func TestGortexRateLimit(t *testing.T) {
 	config := &GortexRateLimitConfig{
 		Rate:  1, // 1 request per second
 		Burst: 1, // burst of 1
-		KeyFunc: func(c context.Context) string {
+		KeyFunc: func(c Context) string {
 			return "test-key" // Fixed key for testing
 		},
 	}
@@ -30,7 +30,7 @@ func TestGortexRateLimit(t *testing.T) {
 	// First request should succeed
 	req := httptest.NewRequest("GET", "/test", nil)
 	w := httptest.NewRecorder()
-	ctx := context.NewContext(req, w)
+	ctx := httpctx.NewDefaultContext(req, w)
 
 	err := wrappedHandler(ctx)
 	if err != nil {
@@ -44,7 +44,7 @@ func TestGortexRateLimit(t *testing.T) {
 	// Second request should be rate limited
 	req = httptest.NewRequest("GET", "/test", nil)
 	w = httptest.NewRecorder()
-	ctx = context.NewContext(req, w)
+	ctx = httpctx.NewDefaultContext(req, w)
 
 	err = wrappedHandler(ctx)
 	if err != nil {
@@ -57,7 +57,7 @@ func TestGortexRateLimit(t *testing.T) {
 }
 
 func TestGortexRateLimitByIP(t *testing.T) {
-	handler := func(c context.Context) error {
+	handler := func(c Context) error {
 		return c.String(200, "success")
 	}
 
@@ -74,12 +74,12 @@ func TestGortexRateLimitByIP(t *testing.T) {
 	req1 := httptest.NewRequest("GET", "/test", nil)
 	req1.RemoteAddr = "192.168.1.1:12345"
 	w1 := httptest.NewRecorder()
-	ctx1 := context.NewContext(req1, w1)
+	ctx1 := httpctx.NewDefaultContext(req1, w1)
 
 	req2 := httptest.NewRequest("GET", "/test", nil)
 	req2.RemoteAddr = "192.168.1.2:12346"
 	w2 := httptest.NewRecorder()
-	ctx2 := context.NewContext(req2, w2)
+	ctx2 := httpctx.NewDefaultContext(req2, w2)
 
 	// Both requests should succeed (different IPs)
 	err := wrappedHandler(ctx1)
@@ -100,17 +100,17 @@ func TestGortexRateLimitByIP(t *testing.T) {
 }
 
 func TestGortexRateLimitSkip(t *testing.T) {
-	handler := func(c context.Context) error {
+	handler := func(c Context) error {
 		return c.String(200, "success")
 	}
 
 	config := &GortexRateLimitConfig{
 		Rate:  1,
 		Burst: 1,
-		KeyFunc: func(c context.Context) string {
+		KeyFunc: func(c Context) string {
 			return "test-key"
 		},
-		SkipFunc: func(c context.Context) bool {
+		SkipFunc: func(c Context) bool {
 			return c.Request().URL.Path == "/skip"
 		},
 	}
@@ -121,7 +121,7 @@ func TestGortexRateLimitSkip(t *testing.T) {
 	// First request to non-skipped path should succeed
 	req := httptest.NewRequest("GET", "/test", nil)
 	w := httptest.NewRecorder()
-	ctx := context.NewContext(req, w)
+	ctx := httpctx.NewDefaultContext(req, w)
 
 	err := wrappedHandler(ctx)
 	if err != nil {
@@ -134,7 +134,7 @@ func TestGortexRateLimitSkip(t *testing.T) {
 	// Second request to non-skipped path should be rate limited
 	req = httptest.NewRequest("GET", "/test", nil)
 	w = httptest.NewRecorder()
-	ctx = context.NewContext(req, w)
+	ctx = httpctx.NewDefaultContext(req, w)
 
 	err = wrappedHandler(ctx)
 	if err != nil {
@@ -147,7 +147,7 @@ func TestGortexRateLimitSkip(t *testing.T) {
 	// Request to skipped path should always succeed
 	req = httptest.NewRequest("GET", "/skip", nil)
 	w = httptest.NewRecorder()
-	ctx = context.NewContext(req, w)
+	ctx = httpctx.NewDefaultContext(req, w)
 
 	err = wrappedHandler(ctx)
 	if err != nil {
@@ -190,7 +190,7 @@ func TestRateLimitByUser(t *testing.T) {
 	// Create context with user ID
 	req := httptest.NewRequest("GET", "/test", nil)
 	w := httptest.NewRecorder()
-	ctx := context.NewContext(req, w)
+	ctx := httpctx.NewDefaultContext(req, w)
 	ctx.Set("user_id", "user123")
 
 	key := keyFunc(ctx)
@@ -200,7 +200,7 @@ func TestRateLimitByUser(t *testing.T) {
 	}
 
 	// Test fallback to IP when no user ID
-	ctx2 := context.NewContext(req, w)
+	ctx2 := httpctx.NewDefaultContext(req, w)
 	key2 := keyFunc(ctx2)
 	if key2 == expected {
 		t.Error("Should fallback to IP when no user ID")
@@ -213,7 +213,7 @@ func TestRateLimitByHeader(t *testing.T) {
 	req := httptest.NewRequest("GET", "/test", nil)
 	req.Header.Set("X-API-Key", "api123")
 	w := httptest.NewRecorder()
-	ctx := context.NewContext(req, w)
+	ctx := httpctx.NewDefaultContext(req, w)
 
 	key := keyFunc(ctx)
 	expected := "header:X-API-Key:api123"
@@ -223,7 +223,7 @@ func TestRateLimitByHeader(t *testing.T) {
 
 	// Test fallback when header missing
 	req2 := httptest.NewRequest("GET", "/test", nil)
-	ctx2 := context.NewContext(req2, w)
+	ctx2 := httpctx.NewDefaultContext(req2, w)
 	key2 := keyFunc(ctx2)
 	if key2 == expected {
 		t.Error("Should fallback to IP when header missing")

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/yshengliao/gortex/context"
+	httpctx "github.com/yshengliao/gortex/transport/http"
 )
 
 func TestDevErrorPage(t *testing.T) {
@@ -23,7 +23,7 @@ func TestDevErrorPage(t *testing.T) {
 		{
 			name:   "HTML error page with stack trace",
 			config: DefaultGortexDevErrorPageConfig,
-			handler: func(c context.Context) error {
+			handler: func(c Context) error {
 				return errors.New("test error")
 			},
 			acceptHeader:   "text/html,application/xhtml+xml",
@@ -33,7 +33,7 @@ func TestDevErrorPage(t *testing.T) {
 		{
 			name:   "JSON error response",
 			config: DefaultGortexDevErrorPageConfig,
-			handler: func(c context.Context) error {
+			handler: func(c Context) error {
 				return errors.New("test error")
 			},
 			acceptHeader:   "application/json",
@@ -47,7 +47,7 @@ func TestDevErrorPage(t *testing.T) {
 				ShowRequestDetails: true,
 				StackTraceLimit:    10,
 			},
-			handler: func(c context.Context) error {
+			handler: func(c Context) error {
 				return errors.New("test error")
 			},
 			acceptHeader:   "text/html",
@@ -57,7 +57,7 @@ func TestDevErrorPage(t *testing.T) {
 		{
 			name:   "No error case",
 			config: DefaultGortexDevErrorPageConfig,
-			handler: func(c context.Context) error {
+			handler: func(c Context) error {
 				return c.String(http.StatusOK, "success")
 			},
 			acceptHeader:   "text/html",
@@ -75,7 +75,7 @@ func TestDevErrorPage(t *testing.T) {
 			rec := httptest.NewRecorder()
 
 			// Create Gortex context
-			ctx := context.NewContext(req, rec)
+			ctx := httpctx.NewDefaultContext(req, rec)
 
 			// Create middleware
 			middleware := GortexDevErrorPageWithConfig(tt.config)
@@ -137,7 +137,7 @@ func TestRecoverWithErrorPage(t *testing.T) {
 		{
 			name:   "Panic with HTML response",
 			config: DefaultGortexDevErrorPageConfig,
-			handler: func(c context.Context) error {
+			handler: func(c Context) error {
 				panic("test panic")
 			},
 			acceptHeader:   "text/html",
@@ -147,7 +147,7 @@ func TestRecoverWithErrorPage(t *testing.T) {
 		{
 			name:   "Panic with JSON response",
 			config: DefaultGortexDevErrorPageConfig,
-			handler: func(c context.Context) error {
+			handler: func(c Context) error {
 				panic("test panic")
 			},
 			acceptHeader:   "application/json",
@@ -157,7 +157,7 @@ func TestRecoverWithErrorPage(t *testing.T) {
 		{
 			name:   "Panic with error type",
 			config: DefaultGortexDevErrorPageConfig,
-			handler: func(c context.Context) error {
+			handler: func(c Context) error {
 				panic(errors.New("panic error"))
 			},
 			acceptHeader:   "text/html",
@@ -167,7 +167,7 @@ func TestRecoverWithErrorPage(t *testing.T) {
 		{
 			name:   "No panic case",
 			config: DefaultGortexDevErrorPageConfig,
-			handler: func(c context.Context) error {
+			handler: func(c Context) error {
 				return c.String(http.StatusOK, "success")
 			},
 			acceptHeader:   "text/html",
@@ -185,7 +185,7 @@ func TestRecoverWithErrorPage(t *testing.T) {
 			rec := httptest.NewRecorder()
 
 			// Create Gortex context
-			ctx := context.NewContext(req, rec)
+			ctx := httpctx.NewDefaultContext(req, rec)
 
 			// Create recovery middleware
 			middleware := RecoverWithErrorPageConfig(tt.config)
@@ -234,7 +234,7 @@ func TestExtractErrorInfo(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer token")
 	rec := httptest.NewRecorder()
 
-	ctx := context.NewContext(req, rec)
+	ctx := httpctx.NewDefaultContext(req, rec)
 	err := errors.New("test error")
 	config := DefaultGortexDevErrorPageConfig
 
@@ -271,7 +271,7 @@ func BenchmarkDevErrorPage(b *testing.B) {
 	config := DefaultGortexDevErrorPageConfig
 	middleware := GortexDevErrorPageWithConfig(config)
 
-	handler := middleware(func(c context.Context) error {
+	handler := middleware(func(c Context) error {
 		return errors.New("benchmark error")
 	})
 
@@ -281,7 +281,7 @@ func BenchmarkDevErrorPage(b *testing.B) {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		req.Header.Set("Accept", "text/html")
 		rec := httptest.NewRecorder()
-		ctx := context.NewContext(req, rec)
+		ctx := httpctx.NewDefaultContext(req, rec)
 
 		handler(ctx)
 	}

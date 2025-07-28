@@ -2,42 +2,34 @@ package main
 
 import (
 	"log"
-	"net/http"
 	"time"
 
-	"github.com/yshengliao/gortex/app"
-	"github.com/yshengliao/gortex/auth"
-	"github.com/yshengliao/gortex/context"
-	"github.com/yshengliao/gortex/middleware"
-	"github.com/yshengliao/gortex/response"
+	"github.com/yshengliao/gortex/core/app"
+	"github.com/yshengliao/gortex/pkg/config"
+	httpctx "github.com/yshengliao/gortex/transport/http"
+	"github.com/yshengliao/gortex/pkg/auth"
+	"github.com/yshengliao/gortex/pkg/errors"
 	"go.uber.org/zap"
 )
 
-// HandlersManager demonstrates routing with authentication
+// HandlersManager is the root handler struct with struct tags
 type HandlersManager struct {
-	// Public endpoints
 	Home  *HomeHandler  `url:"/"`
 	Auth  *AuthHandler  `url:"/auth"`
-	
-	// Protected endpoints with middleware
-	User  *UserHandler  `url:"/user" middleware:"auth"`
-	Admin *AdminGroup   `url:"/admin" middleware:"auth,admin"`
+	User  *UserHandler  `url:"/user"`
+	Admin *AdminGroup   `url:"/admin"`
 }
 
-// AdminGroup demonstrates protected nested routes
-type AdminGroup struct {
-	Dashboard *DashboardHandler `url:"/dashboard"`
-	Users     *UsersHandler     `url:"/users/:id"`
-}
-
-// HomeHandler - public endpoint
+// HomeHandler handles the home page
 type HomeHandler struct{}
 
-func (h *HomeHandler) GET(c context.Context) error {
+// GET /
+func (h *HomeHandler) GET(c httpctx.Context) error {
 	return c.JSON(200, map[string]string{
 		"message": "Welcome to Gortex Auth Example",
-		"login":   "POST /auth/login",
-		"profile": "GET /user/profile (requires auth)",
+		"login":   "POST /auth/login with {username: 'admin', password: 'secret'}",
+		"profile": "GET /user/profile (requires auth token)",
+		"admin":   "GET /admin/dashboard (requires admin role)",
 	})
 }
 
@@ -47,19 +39,19 @@ type AuthHandler struct {
 }
 
 // Login endpoint: POST /auth/login
-func (h *AuthHandler) Login(c context.Context) error {
+func (h *AuthHandler) Login(c httpctx.Context) error {
 	var req struct {
 		Username string `json:"username" validate:"required"`
 		Password string `json:"password" validate:"required"`
 	}
 	
 	if err := c.Bind(&req); err != nil {
-		return response.BadRequest(c, "Invalid request")
+		return c.JSON(400, map[string]string{"error": "Invalid request"})
 	}
 	
 	// Simple authentication (in real app, check database)
 	if req.Username != "admin" || req.Password != "secret" {
-		return response.Unauthorized(c, "Invalid credentials")
+		return c.JSON(401, errors.NewFromCode(errors.CodeUnauthorized).WithDetail("reason", "Invalid credentials"))
 	}
 	
 	// Generate JWT token
@@ -70,7 +62,7 @@ func (h *AuthHandler) Login(c context.Context) error {
 		"admin",       // Role
 	)
 	if err != nil {
-		return response.InternalServerError(c, "Failed to generate token")
+		return c.JSON(500, errors.New(errors.CodeInternalServerError, "Failed to generate token"))
 	}
 	
 	return c.JSON(200, map[string]interface{}{
@@ -87,31 +79,34 @@ func (h *AuthHandler) Login(c context.Context) error {
 type UserHandler struct{}
 
 // Profile endpoint: GET /user/profile
-func (h *UserHandler) Profile(c context.Context) error {
-	// Get user claims from JWT (set by auth middleware)
-	claims := auth.GetClaims(c)
-	if claims != nil {
-		return c.JSON(200, map[string]interface{}{
-			"message": "This is your profile",
-			"user": map[string]string{
-				"id":       claims.UserID,
-				"username": claims.Username,
-				"email":    claims.Email,
-				"role":     claims.Role,
-			},
-		})
+func (h *UserHandler) Profile(c httpctx.Context) error {
+	// Get JWT token from Authorization header
+	token := c.Request().Header.Get("Authorization")
+	if token == "" {
+		return c.JSON(401, map[string]string{"error": "No authorization token"})
 	}
 	
 	return c.JSON(200, map[string]interface{}{
-		"message": "This is a protected endpoint",
-		"note": "JWT claims would be available here in production",
+		"message": "This is your profile",
+		"user": map[string]string{
+			"id":       "user-123",
+			"username": "admin",
+			"email":    "admin@example.com",
+			"role":     "admin",
+		},
 	})
+}
+
+// AdminGroup contains admin-only handlers
+type AdminGroup struct {
+	Dashboard *DashboardHandler `url:"/dashboard"`
+	Users     *UsersHandler     `url:"/users/:id"`
 }
 
 // DashboardHandler - admin only
 type DashboardHandler struct{}
 
-func (h *DashboardHandler) GET(c context.Context) error {
+func (h *DashboardHandler) GET(c httpctx.Context) error {
 	return c.JSON(200, map[string]string{
 		"message": "Admin Dashboard",
 		"access":  "admin only",
@@ -121,7 +116,7 @@ func (h *DashboardHandler) GET(c context.Context) error {
 // UsersHandler - admin only
 type UsersHandler struct{}
 
-func (h *UsersHandler) GET(c context.Context) error {
+func (h *UsersHandler) GET(c httpctx.Context) error {
 	id := c.Param("id")
 	return c.JSON(200, map[string]string{
 		"message": "Admin viewing user",
@@ -153,34 +148,18 @@ func main() {
 		},
 	}
 
-	// Configure application
-	cfg := &app.Config{}
+	// Load configuration
+	cfg := config.DefaultConfig()
 	cfg.Server.Address = ":8081"
 	cfg.Logger.Level = "debug"
-
-	// Create application first
+	
 	application, err := app.NewApp(
 		app.WithConfig(cfg),
+		app.WithHandlers(handlers),
 		app.WithLogger(logger),
 	)
 	if err != nil {
-		log.Fatal(err)
-	}
-	
-	// Get application context and register middleware
-	ctx := application.Context()
-	
-	// Create middleware registry
-	middlewareRegistry := make(map[string]middleware.MiddlewareFunc)
-	middlewareRegistry["auth"] = auth.Middleware(jwtService)
-	middlewareRegistry["admin"] = AdminMiddleware()
-	
-	// Register middleware registry in context
-	app.Register(ctx, middlewareRegistry)
-	
-	// Now register handlers with middleware support
-	if err := app.RegisterRoutes(application, handlers); err != nil {
-		log.Fatal("Failed to register routes:", err)
+		log.Fatal("Failed to create app:", err)
 	}
 
 	logger.Info("Starting Gortex Auth Example", 
@@ -195,21 +174,8 @@ func main() {
 		zap.String("password", "secret"),
 	)
 
-	if err := application.Run(); err != nil && err != http.ErrServerClosed {
+	if err := application.Run(); err != nil {
 		logger.Fatal("Server error", zap.Error(err))
 	}
 }
 
-// AdminMiddleware checks if user has admin role
-func AdminMiddleware() middleware.MiddlewareFunc {
-	return func(next middleware.HandlerFunc) middleware.HandlerFunc {
-		return func(c context.Context) error {
-			// Check if user has admin role
-			claims := auth.GetClaims(c)
-			if claims == nil || claims.Role != "admin" {
-				return response.Forbidden(c, "Admin access required")
-			}
-			return next(c)
-		}
-	}
-}

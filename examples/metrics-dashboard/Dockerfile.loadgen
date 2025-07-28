@@ -1,0 +1,11 @@
+FROM golang:1.22-alpine
+
+RUN apk add --no-cache bash curl
+RUN go install github.com/tsenart/vegeta@latest
+
+WORKDIR /app
+
+COPY load-test.sh .
+RUN chmod +x load-test.sh
+
+CMD ["./load-test.sh"]

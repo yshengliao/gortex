@@ -30,10 +30,37 @@ type HandlersManager struct {
 - **Auto-Initialization**: Handlers automatically initialized
 - **Memory Efficient**: Context pooling & smart parameter storage
 
+## Project Structure
+
+```
+gortex/
+├── app/                    # Core application framework
+│   ├── interfaces/         # Service interfaces
+│   └── testutil/           # App-specific test utilities
+├── http/                   # HTTP-related packages
+│   ├── router/             # Routing engine
+│   ├── middleware/         # HTTP middleware
+│   ├── context/            # Request/response context
+│   └── response/           # Response utilities
+├── websocket/              # WebSocket functionality
+│   └── hub/                # Connection management
+├── auth/                   # Authentication
+├── validation/             # Input validation
+├── observability/          # Monitoring & metrics
+├── config/                 # Configuration
+├── errors/                 # Error handling
+├── utils/                  # Utility packages
+├── middleware/             # Framework middleware
+├── internal/               # Internal packages
+└── examples/               # Example applications
+```
+
 ## Quick Start
 
 ### 1. Basic Handler with Struct Tags
 ```go
+import "github.com/yshengliao/gortex/http/context"
+
 type HandlersManager struct {
     Home  *HomeHandler  `url:"/"`
     Users *UserHandler  `url:"/users/:id"`
@@ -182,21 +209,21 @@ app.Register(ctx, dbConnection)
 ## Framework Development
 
 ### Completed Features (v0.4.0-alpha)
-✅ **Core Features**
+**Core Features**
 - Struct tag routing with 45% performance improvement
 - WebSocket support with hub pattern and metrics
 - JWT authentication with middleware integration
 - Multi-source configuration (YAML, .env, env vars)
 - Development tools (debug endpoints, monitoring)
 
-✅ **Developer Experience**
+**Developer Experience**
 - Auto handler initialization - no more nil pointer panics
 - Route logging system - automatic route documentation
 - Context helper methods - simplified parameter access
 - Development mode enhancements - helpful error pages
 - Friendly error pages with stack traces
 
-✅ **Advanced Features**
+**Advanced Features**
 - Struct tag system for DI, middleware, rate limiting
 - Performance optimizations with context pooling
 - Smart parameter storage for common cases

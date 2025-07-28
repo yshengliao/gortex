@@ -1,0 +1,68 @@
+# Performance Regression Thresholds
+# Define acceptable performance degradation limits
+
+global:
+  # Default thresholds for all benchmarks
+  time:
+    warning: 5    # Warn if execution time increases by >5%
+    error: 10     # Fail if execution time increases by >10%
+  
+  memory:
+    warning: 10   # Warn if memory usage increases by >10%
+    error: 20     # Fail if memory usage increases by >20%
+  
+  allocations:
+    warning: 15   # Warn if allocations increase by >15%
+    error: 25     # Fail if allocations increase by >25%
+
+# Package-specific thresholds
+packages:
+  http/router:
+    # Router is performance critical
+    time:
+      warning: 3
+      error: 5
+    allocations:
+      warning: 5
+      error: 10
+  
+  http/context:
+    # Context pool should maintain zero allocations
+    time:
+      warning: 5
+      error: 10
+    allocations:
+      warning: 0
+      error: 1
+  
+  websocket/hub:
+    # WebSocket can tolerate slightly higher variance
+    time:
+      warning: 10
+      error: 20
+    memory:
+      warning: 15
+      error: 30
+
+# Specific benchmark overrides
+benchmarks:
+  BenchmarkRouterSimple:
+    # This should be extremely fast
+    time:
+      warning: 2
+      error: 5
+  
+  BenchmarkContextPool:
+    # Zero allocation is critical
+    allocations:
+      warning: 0
+      error: 0
+  
+  BenchmarkValidation:
+    # Validation can be slower but should be memory efficient
+    time:
+      warning: 15
+      error: 25
+    memory:
+      warning: 5
+      error: 10

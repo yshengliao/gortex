@@ -1,0 +1,194 @@
+name: Performance Benchmarks
+
+on:
+  push:
+    branches: [ main, feat/context-metrics-improvements ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch all history for benchstat comparison
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.24'
+    
+    - name: Install benchstat
+      run: go install golang.org/x/perf/cmd/benchstat@latest
+    
+    - name: Cache benchmark results
+      uses: actions/cache@v3
+      with:
+        path: |
+          benchmarks/
+        key: ${{ runner.os }}-benchmarks-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-benchmarks-
+    
+    - name: Create benchmarks directory
+      run: mkdir -p benchmarks
+    
+    - name: Run metrics benchmarks
+      run: |
+        echo "Running metrics benchmarks..."
+        go test -bench=BenchmarkMetricsCollectors -benchmem -run=^$ \
+          ./observability/metrics/ -count=5 > benchmarks/metrics-$(date +%Y%m%d-%H%M%S).txt
+        
+        go test -bench=BenchmarkScalability -benchmem -run=^$ \
+          ./observability/metrics/ -count=3 >> benchmarks/scalability-$(date +%Y%m%d-%H%M%S).txt
+        
+        go test -bench=BenchmarkCardinalityLimits -benchmem -run=^$ \
+          ./observability/metrics/ -count=3 >> benchmarks/cardinality-$(date +%Y%m%d-%H%M%S).txt
+    
+    - name: Compare with baseline (if available)
+      id: benchmark-comparison
+      run: |
+        if [ -f benchmarks/baseline-metrics.txt ]; then
+          echo "Comparing current benchmarks with baseline..."
+          
+          # Run current benchmarks
+          go test -bench=BenchmarkMetricsCollectors -benchmem -run=^$ \
+            ./observability/metrics/ -count=3 > benchmarks/current-metrics.txt
+          
+          # Compare with baseline using benchstat
+          benchstat benchmarks/baseline-metrics.txt benchmarks/current-metrics.txt > benchmarks/comparison.txt
+          
+          # Check for performance regressions (>10% slower)
+          if grep -q "~" benchmarks/comparison.txt; then
+            echo "Performance changes detected. Checking for regressions..."
+            
+            # Extract performance changes and check if any are >10% regression
+            REGRESSION=$(grep -E "^\w+.*~.*\+" benchmarks/comparison.txt | awk '
+              $NF ~ /\+/ { 
+                gsub(/[%+]/, "", $NF); 
+                if ($NF > 10) print "REGRESSION: " $0 
+              }
+            ')
+            
+            if [ -n "$REGRESSION" ]; then
+              echo "PERFORMANCE_REGRESSION=true" >> $GITHUB_OUTPUT
+              echo "regression-details<<EOF" >> $GITHUB_OUTPUT
+              echo "$REGRESSION" >> $GITHUB_OUTPUT
+              echo "EOF" >> $GITHUB_OUTPUT
+            else
+              echo "PERFORMANCE_REGRESSION=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "PERFORMANCE_REGRESSION=false" >> $GITHUB_OUTPUT
+          fi
+          
+          # Save comparison for PR comment
+          echo "comparison-available=true" >> $GITHUB_OUTPUT
+        else
+          echo "No baseline found. Creating baseline for future comparisons..."
+          go test -bench=BenchmarkMetricsCollectors -benchmem -run=^$ \
+            ./observability/metrics/ -count=5 > benchmarks/baseline-metrics.txt
+          echo "comparison-available=false" >> $GITHUB_OUTPUT
+          echo "PERFORMANCE_REGRESSION=false" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Comment PR with benchmark results
+      if: github.event_name == 'pull_request' && steps.benchmark-comparison.outputs.comparison-available == 'true'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          
+          let comment = '## 📊 Performance Benchmark Results\n\n';
+          
+          if (fs.existsSync('benchmarks/comparison.txt')) {
+            const comparison = fs.readFileSync('benchmarks/comparison.txt', 'utf8');
+            comment += '### Comparison with Baseline\n```\n' + comparison + '\n```\n\n';
+          }
+          
+          if ('${{ steps.benchmark-comparison.outputs.PERFORMANCE_REGRESSION }}' === 'true') {
+            comment += '⚠️ **Performance regression detected!**\n\n';
+            comment += 'The following benchmarks show >10% performance degradation:\n';
+            comment += '```\n${{ steps.benchmark-comparison.outputs.regression-details }}\n```\n\n';
+            comment += 'Please review and optimize the performance impact.\n\n';
+          } else {
+            comment += '✅ No significant performance regressions detected.\n\n';
+          }
+          
+          comment += '---\n';
+          comment += '_Benchmark results are compared against the baseline from main branch._\n';
+          comment += '_Performance threshold: 10% regression triggers a warning._';
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });
+    
+    - name: Fail on performance regression
+      if: steps.benchmark-comparison.outputs.PERFORMANCE_REGRESSION == 'true'
+      run: |
+        echo "❌ Performance regression detected (>10% degradation)"
+        echo "See benchmark comparison above for details"
+        exit 1
+    
+    - name: Upload benchmark artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: benchmark-results
+        path: benchmarks/
+        retention-days: 30
+    
+    - name: Update baseline on main branch
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      run: |
+        echo "Updating baseline benchmarks for main branch..."
+        go test -bench=BenchmarkMetricsCollectors -benchmem -run=^$ \
+          ./observability/metrics/ -count=5 > benchmarks/baseline-metrics.txt
+        
+        # Commit and push baseline (if running on main)
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add benchmarks/baseline-metrics.txt
+        if ! git diff --staged --quiet; then
+          git commit -m "chore: update performance baseline benchmarks"
+          git push
+        fi
+
+  benchmark-memory:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.24'
+    
+    - name: Run memory benchmarks
+      run: |
+        echo "Running memory footprint benchmarks..."
+        go test -bench=BenchmarkMetricsMemoryFootprint -benchmem -run=^$ \
+          ./observability/metrics/ -count=3
+    
+    - name: Memory profiling
+      run: |
+        echo "Generating memory profiles..."
+        go test -bench=BenchmarkMetricsCollectors/.*Collector/HighConcurrencyWrites \
+          -benchmem -memprofile=mem.prof -run=^$ ./observability/metrics/
+        
+        # Generate memory profile report
+        go tool pprof -text mem.prof > memory-profile.txt || echo "Memory profile analysis completed"
+    
+    - name: Upload memory analysis
+      uses: actions/upload-artifact@v3
+      with:
+        name: memory-analysis
+        path: |
+          mem.prof
+          memory-profile.txt
+        retention-days: 7

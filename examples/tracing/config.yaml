@@ -1,0 +1,76 @@
+# Gortex Tracing Configuration Example
+# This configuration demonstrates how to set up tracing with Gortex
+
+server:
+  port: 8084
+  read_timeout: 10s
+  write_timeout: 10s
+  idle_timeout: 120s
+  max_header_bytes: 1048576
+
+logger:
+  level: debug
+  format: json
+  output: stdout
+  # Enable request/response logging in debug mode
+  enable_request_logging: true
+  enable_response_logging: true
+
+# Tracing configuration (when using OpenTelemetry)
+tracing:
+  enabled: true
+  service_name: gortex-tracing-example
+  # Sampling rate (1.0 = 100%)
+  sampling_rate: 1.0
+  
+  # OTLP Exporter configuration for production
+  otlp:
+    endpoint: localhost:4317
+    insecure: true
+    headers:
+      - key: api-key
+        value: your-api-key
+  
+  # Jaeger exporter configuration (alternative)
+  jaeger:
+    endpoint: http://localhost:14268/api/traces
+    
+  # Trace attributes to add to all spans
+  attributes:
+    environment: development
+    service.version: 0.4.0-alpha
+    deployment.region: us-east-1
+
+# Middleware configuration
+middleware:
+  # CORS settings
+  cors:
+    enabled: true
+    allowed_origins:
+      - "*"
+    allowed_methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+    allowed_headers:
+      - "*"
+    
+  # Rate limiting
+  rate_limit:
+    enabled: true
+    requests_per_minute: 100
+    
+  # Recovery middleware
+  recovery:
+    enabled: true
+    print_stack: true
+
+# Development mode features
+development:
+  # Enable debug endpoints
+  debug_endpoints: true
+  # Pretty print JSON responses
+  pretty_json: true
+  # Enable profiling endpoints
+  profiling: true

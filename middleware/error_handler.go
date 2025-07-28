@@ -1,13 +1,14 @@
-// Package middleware provides common middleware for the Gortex framework
+// Package middleware provides standard HTTP middleware for the Gortex framework
 package middleware
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 
 	"go.uber.org/zap"
-	"github.com/yshengliao/gortex/context"
 	"github.com/yshengliao/gortex/pkg/errors"
+	httpctx "github.com/yshengliao/gortex/transport/http"
 )
 
 // ErrorHandlerConfig contains configuration for the error handler middleware
@@ -29,7 +30,7 @@ func DefaultErrorHandlerConfig() *ErrorHandlerConfig {
 	}
 }
 
-// ErrorHandler returns a middleware that handles errors in a consistent format
+// ErrorHandler returns a standard HTTP middleware that handles errors
 func ErrorHandler() MiddlewareFunc {
 	return ErrorHandlerWithConfig(DefaultErrorHandlerConfig())
 }
@@ -45,157 +46,121 @@ func ErrorHandlerWithConfig(config *ErrorHandlerConfig) MiddlewareFunc {
 	}
 
 	return func(next HandlerFunc) HandlerFunc {
-		return func(c context.Context) error {
+		return func(c Context) error {
 			// Call the next handler
 			err := next(c)
 			if err == nil {
 				return nil
 			}
 
-			// If response was already committed, we can't modify it
-			if c.Response().Written() {
+			// Check if response has already been written
+			if rw, ok := c.Response().(interface{ Written() bool }); ok && rw.Written() {
+				// Response already written, return the error as-is
 				return err
 			}
 
-			// Extract request ID for all error responses
-			requestID := errors.GetRequestID(c)
-
-			// Check if it's already an ErrorResponse - if so, just ensure request ID is set
-			if errResp, ok := err.(*errors.ErrorResponse); ok {
-				if errResp.RequestID == "" {
-					errResp.RequestID = requestID
-				}
-				
-				// Log the error
-				if config.Logger != nil {
-					config.Logger.Error("Request failed",
-						zap.Int("code", errResp.ErrorDetail.Code),
-						zap.String("message", errResp.ErrorDetail.Message),
-						zap.String("request_id", errResp.RequestID),
-						zap.String("path", c.Path()),
-						zap.String("method", c.Request().Method),
-						zap.Any("details", errResp.ErrorDetail.Details),
-					)
-				}
-				
-				// Get the appropriate HTTP status
-				httpStatus := errors.GetHTTPStatus(errors.ErrorCode(errResp.ErrorDetail.Code))
-				return c.JSON(httpStatus, errResp)
+			// Get request ID if available
+			requestID := ""
+			if id := c.Get("request_id"); id != nil {
+				requestID, _ = id.(string)
 			}
 
-			// Check if it's a Gortex HTTPError
-			if he, ok := err.(*context.HTTPError); ok {
-				// Map HTTP errors to our error codes
-				code := mapHTTPErrorToCode(he.Code)
-				
-				// Extract message
-				message := fmt.Sprintf("%v", he.Message)
-				if message == "" {
-					message = http.StatusText(he.Code)
-				}
+			// Handle the error
+			var code int
+			var errCode string
+			var message string
+			var details map[string]interface{}
 
-				// Create error response
-				errResp := errors.New(code, message).WithRequestID(requestID)
-				
-				// Add internal details if available
-				if he.Internal != nil {
-					errResp.WithDetail("internal", fmt.Sprintf("%v", he.Internal))
+			switch e := err.(type) {
+			case *errors.ErrorResponse:
+				// Use our custom error type
+				errorCode := errors.ErrorCode(e.ErrorDetail.Code)
+				code = errors.GetHTTPStatus(errorCode)
+				errCode = fmt.Sprintf("ERR_%d", e.ErrorDetail.Code)
+				message = e.ErrorDetail.Message
+				if e.ErrorDetail.Details != nil {
+					details = make(map[string]interface{})
+					for k, v := range e.ErrorDetail.Details {
+						details[k] = v
+					}
 				}
-
-				// Log the error
+			case interface{ StatusCode() int }:
+				// Handle errors with StatusCode method (Echo compatibility)
+				code = e.StatusCode()
+				errCode = fmt.Sprintf("HTTP_%d", code)
+				// For HTTPError specifically, get the message field
+				if httpErr, ok := e.(*httpctx.HTTPError); ok && httpErr.Message != nil {
+					message = fmt.Sprintf("%v", httpErr.Message)
+				} else {
+					message = fmt.Sprintf("%v", e)
+				}
+			default:
+				// Generic error - default to 500
+				code = http.StatusInternalServerError
+				errCode = "INTERNAL_ERROR"
+				message = err.Error()
+				
+				// Hide details in production
+				if config.HideInternalServerErrorDetails {
+					message = config.DefaultMessage
+				}
+				
+				// Log the actual error
 				if config.Logger != nil {
-					config.Logger.Error("HTTP error",
-						zap.Int("http_status", he.Code),
-						zap.Int("error_code", code.Int()),
-						zap.String("message", message),
+					config.Logger.Error("Internal server error",
+						zap.Error(err),
 						zap.String("request_id", requestID),
-						zap.String("path", c.Path()),
-						zap.String("method", c.Request().Method),
-						zap.Error(he.Internal),
-					)
+						zap.String("path", getPath(c)))
 				}
-
-				return errResp.Send(c, he.Code)
 			}
 
-			// Handle standard Go errors
-			// For production, hide internal error details
-			message := err.Error()
-			if config.HideInternalServerErrorDetails {
-				message = config.DefaultMessage
-			}
-
-			// Create error response
-			errResp := errors.New(errors.CodeInternalServerError, message).
-				WithRequestID(requestID)
-
-			// In development mode, add the actual error as a detail
-			if !config.HideInternalServerErrorDetails {
-				errResp.WithDetail("error", err.Error())
-			}
-
-			// Log the actual error
-			if config.Logger != nil {
-				config.Logger.Error("Unhandled error",
-					zap.Error(err),
-					zap.String("request_id", requestID),
-					zap.String("path", c.Path()),
-					zap.String("method", c.Request().Method),
-				)
-			}
-
-			return errResp.Send(c, http.StatusInternalServerError)
+			return writeErrorResponse(c, code, errCode, message, details, requestID, config)
 		}
 	}
 }
 
-// mapHTTPErrorToCode maps HTTP status codes to our error codes
-func mapHTTPErrorToCode(httpStatus int) errors.ErrorCode {
-	switch httpStatus {
-	case http.StatusBadRequest:
-		return errors.CodeInvalidInput
-	case http.StatusUnauthorized:
-		return errors.CodeUnauthorized
-	case http.StatusForbidden:
-		return errors.CodeForbidden
-	case http.StatusNotFound:
-		return errors.CodeResourceNotFound
-	case http.StatusMethodNotAllowed:
-		return errors.CodeInvalidOperation
-	case http.StatusNotAcceptable:
-		return errors.CodeInvalidFormat
-	case http.StatusRequestTimeout:
-		return errors.CodeTimeout
-	case http.StatusConflict:
-		return errors.CodeConflict
-	case http.StatusPreconditionFailed:
-		return errors.CodePreconditionFailed
-	case http.StatusRequestEntityTooLarge:
-		return errors.CodeValueOutOfRange
-	case http.StatusUnprocessableEntity:
-		return errors.CodeValidationFailed
-	case http.StatusTooManyRequests:
-		return errors.CodeRateLimitExceeded
-	case http.StatusInternalServerError:
-		return errors.CodeInternalServerError
-	case http.StatusNotImplemented:
-		return errors.CodeNotImplemented
-	case http.StatusBadGateway:
-		return errors.CodeBadGateway
-	case http.StatusServiceUnavailable:
-		return errors.CodeServiceUnavailable
-	case http.StatusGatewayTimeout:
-		return errors.CodeTimeout
-	default:
-		// For any other 4xx errors, treat as invalid input
-		if httpStatus >= 400 && httpStatus < 500 {
-			return errors.CodeInvalidInput
-		}
-		// For any other 5xx errors, treat as internal server error
-		if httpStatus >= 500 {
-			return errors.CodeInternalServerError
-		}
-		// For anything else, default to internal server error
-		return errors.CodeInternalServerError
+// writeErrorResponse writes the error response in a consistent format
+func writeErrorResponse(c Context, statusCode int, errCode, message string, details map[string]interface{}, requestID string, config *ErrorHandlerConfig) error {
+	// Build error response
+	response := map[string]interface{}{
+		"error": map[string]interface{}{
+			"code":    errCode,
+			"message": message,
+		},
 	}
+	
+	// Add request ID if available
+	if requestID != "" {
+		response["request_id"] = requestID
+	}
+	
+	// Add details if available and not hidden
+	if details != nil && (!config.HideInternalServerErrorDetails || statusCode < 500) {
+		response["error"].(map[string]interface{})["details"] = details
+	}
+	
+	// For development mode, add the error to details if it's a standard error
+	if !config.HideInternalServerErrorDetails && statusCode >= 500 && details == nil && message != config.DefaultMessage {
+		response["error"].(map[string]interface{})["details"] = map[string]interface{}{
+			"error": message,
+		}
+	}
+	
+	// Set response header and write JSON
+	if resp, ok := c.Response().(http.ResponseWriter); ok {
+		resp.Header().Set("Content-Type", "application/json")
+		resp.WriteHeader(statusCode)
+		encoder := json.NewEncoder(resp)
+		return encoder.Encode(response)
+	}
+	
+	// Fallback to context JSON method
+	return c.JSON(statusCode, response)
 }
+
+// getPath safely gets the request path
+func getPath(c Context) string {
+	req := c.Request()
+	return req.URL.Path
+}
+

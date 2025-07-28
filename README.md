@@ -33,8 +33,8 @@ go get github.com/yshengliao/gortex
 package main
 
 import (
-    "github.com/yshengliao/gortex/app"
-    "github.com/yshengliao/gortex/context"
+    "github.com/yshengliao/gortex/core/app"
+    "github.com/yshengliao/gortex/core/types"
 )
 
 // Define routes with struct tags
@@ -46,12 +46,12 @@ type HandlersManager struct {
 }
 
 type HomeHandler struct{}
-func (h *HomeHandler) GET(c context.Context) error {
+func (h *HomeHandler) GET(c types.Context) error {
     return c.JSON(200, map[string]string{"message": "Welcome to Gortex!"})
 }
 
 type UserHandler struct{}
-func (h *UserHandler) GET(c context.Context) error {
+func (h *UserHandler) GET(c types.Context) error {
     return c.JSON(200, map[string]string{"id": c.Param("id")})
 }
 
@@ -60,12 +60,12 @@ type AdminGroup struct {
 }
 
 type DashboardHandler struct{}
-func (h *DashboardHandler) GET(c context.Context) error {
+func (h *DashboardHandler) GET(c types.Context) error {
     return c.JSON(200, map[string]string{"data": "admin only"})
 }
 
 type WSHandler struct{}
-func (h *WSHandler) HandleConnection(c context.Context) error {
+func (h *WSHandler) HandleConnection(c types.Context) error {
     // WebSocket upgrade logic
     return nil
 }
@@ -140,11 +140,12 @@ type APIGroup struct {
 
 ### Production Ready
 - **JWT Auth** - Built-in authentication middleware
-- **WebSocket** - First-class real-time support
+- **WebSocket** - First-class real-time support  
 - **Metrics** - Prometheus-compatible metrics
 - **Graceful Shutdown** - Proper connection cleanup
+- **API Documentation** - Automatic OpenAPI/Swagger generation from struct tags
 
-## 📦 Middleware
+## Middleware
 
 ```go
 // Apply middleware via struct tags
@@ -180,6 +181,21 @@ func (h *WSHandler) HandleConnection(c context.Context) error {
     h.hub.RegisterClient(client)
     return nil
 }
+```
+
+### API Documentation
+```go
+// Automatic OpenAPI/Swagger generation
+import "github.com/yshengliao/gortex/core/app/doc/swagger"
+
+app.NewApp(
+    app.WithHandlers(handlers),
+    app.WithDocProvider(swagger.NewProvider()),
+)
+
+// Access at:
+// /_docs      - API documentation JSON
+// /_docs/ui   - Swagger UI interface
 ```
 
 ### Configuration
@@ -221,6 +237,40 @@ func (h *UserHandler) GET(c context.Context) error {
 | Context Pool | 139 ns/op | N/A | 4 allocs |
 | Smart Params | 99.9 ns/op | N/A | 1 alloc |
 
+## Project Structure
+
+The framework is organized into clear, purpose-driven modules:
+
+```
+gortex/
+├── app/                    # Core application framework
+│   ├── interfaces/         # Service interfaces
+│   └── testutil/           # App-specific test utilities
+├── http/                   # HTTP-related packages
+│   ├── router/             # HTTP routing engine
+│   ├── middleware/         # HTTP middleware
+│   ├── context/            # Request/response context
+│   └── response/           # Response utilities
+├── websocket/              # WebSocket functionality
+│   └── hub/                # WebSocket connection hub
+├── auth/                   # Authentication (JWT, etc.)
+├── validation/             # Input validation
+├── observability/          # Monitoring & metrics
+│   ├── health/             # Health checks
+│   ├── metrics/            # Metrics collection
+│   └── tracing/            # Distributed tracing
+├── config/                 # Configuration management
+├── errors/                 # Error handling
+├── utils/                  # Utility packages
+│   ├── pool/               # Object pools
+│   ├── circuitbreaker/     # Circuit breaker pattern
+│   ├── httpclient/         # HTTP client utilities
+│   └── requestid/          # Request ID generation
+├── middleware/             # Framework middleware
+├── internal/               # Internal packages
+└── examples/               # Example applications
+```
+
 ## Best Practices
 
 ### 1. Structure Your Handlers
@@ -256,12 +306,32 @@ Check out the [examples](./examples) directory:
 - [Simple](./examples/simple) - Basic routing and groups
 - [Auth](./examples/auth) - JWT authentication
 - [WebSocket](./examples/websocket) - Real-time communication
+- [Advanced Tracing](./examples/advanced-tracing) - Distributed tracing with 8 severity levels
+- [Metrics Dashboard](./examples/metrics-dashboard) - Prometheus + Grafana integration
+- [API Docs Advanced](./examples/api-docs-advanced) - OpenAPI 3.0 documentation
+
+## Recent Improvements (v0.4.0-alpha)
+
+### Enhanced Observability
+- **Advanced Tracing**: 8-level severity system (DEBUG to EMERGENCY)
+- **Performance Tracking**: Built-in benchmarking and bottleneck detection
+- **Metrics Collection**: ShardedCollector for high-performance metrics
+
+### Developer Experience
+- **Context Propagation Checker**: Static analysis tool for proper context usage
+- **Performance Reports**: Weekly automated performance analysis
+- **Best Practices Documentation**: Comprehensive guides for production use
+
+### CI/CD Integration
+- **Static Analysis**: 30+ linters with automatic PR comments
+- **Performance Regression Tests**: Automatic detection of performance degradation
+- **Benchmark Tracking**: Historical performance data with trend analysis
 
 ## Contributing
 
 We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## 📝 License
+## License
 
 MIT License - see [LICENSE](LICENSE) file.
 

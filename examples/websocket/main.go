@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gorilla/websocket"
-	"github.com/yshengliao/gortex/app"
-	gortexContext "github.com/yshengliao/gortex/context"
-	"github.com/yshengliao/gortex/hub"
+	gorillaws "github.com/gorilla/websocket"
+	"github.com/yshengliao/gortex/core/app"
+	gortexContext "github.com/yshengliao/gortex/transport/http"
+	"github.com/yshengliao/gortex/transport/websocket"
 	"go.uber.org/zap"
 )
 
@@ -100,7 +100,7 @@ func (h *HomeHandler) GET(c gortexContext.Context) error {
 
 // StatusHandler shows WebSocket hub status
 type StatusHandler struct {
-	hub *hub.Hub
+	hub *websocket.Hub
 }
 
 func (h *StatusHandler) GET(c gortexContext.Context) error {
@@ -122,8 +122,8 @@ func (h *StatusHandler) GET(c gortexContext.Context) error {
 
 // WSHandler handles WebSocket connections
 type WSHandler struct {
-	hub      *hub.Hub
-	upgrader websocket.Upgrader
+	hub      *websocket.Hub
+	upgrader gorillaws.Upgrader
 	logger   *zap.Logger
 }
 
@@ -137,7 +137,7 @@ func (h *WSHandler) HandleConnection(c gortexContext.Context) error {
 	
 	// Create client with unique ID
 	clientID := "client-" + time.Now().Format("20060102150405")
-	client := hub.NewClient(h.hub, conn, clientID, h.logger)
+	client := websocket.NewClient(h.hub, conn, clientID, h.logger)
 	
 	// Register with hub
 	h.hub.RegisterClient(client)
@@ -147,7 +147,7 @@ func (h *WSHandler) HandleConnection(c gortexContext.Context) error {
 	go client.ReadPump()
 	
 	// Send welcome message
-	client.Send(&hub.Message{
+	client.Send(&websocket.Message{
 		Type: "chat",
 		Data: map[string]any{
 			"message": "Welcome to Gortex WebSocket!",
@@ -159,7 +159,7 @@ func (h *WSHandler) HandleConnection(c gortexContext.Context) error {
 
 // APIHandler provides HTTP API to interact with WebSocket
 type APIHandler struct {
-	hub *hub.Hub
+	hub *websocket.Hub
 }
 
 // Broadcast sends message to all connected clients
@@ -173,7 +173,7 @@ func (h *APIHandler) Broadcast(c gortexContext.Context) error {
 	}
 	
 	// Broadcast to all clients
-	h.hub.Broadcast(&hub.Message{
+	h.hub.Broadcast(&websocket.Message{
 		Type: "broadcast",
 		Data: map[string]any{
 			"message": req.Message,
@@ -195,7 +195,7 @@ func main() {
 	defer logger.Sync()
 
 	// Create WebSocket hub
-	wsHub := hub.NewHub(logger)
+	wsHub := websocket.NewHub(logger)
 	go wsHub.Run()
 
 	// Create handlers
@@ -205,7 +205,7 @@ func main() {
 		WS: &WSHandler{
 			hub:    wsHub,
 			logger: logger,
-			upgrader: websocket.Upgrader{
+			upgrader: gorillaws.Upgrader{
 				CheckOrigin: func(r *http.Request) bool {
 					return true // Allow all origins for demo
 				},

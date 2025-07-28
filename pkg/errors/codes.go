@@ -57,6 +57,16 @@ const (
 	CodeQuotaExceeded         ErrorCode = 4007
 	CodeInvalidState          ErrorCode = 4008
 	CodeDependencyFailed      ErrorCode = 4009
+	
+	// Additional error codes
+	CodeInvalidToken          ErrorCode = 2010
+	CodeAccountSuspended      ErrorCode = 2011
+	CodeNetworkError          ErrorCode = 3010
+	CodeUnknownError          ErrorCode = 3011
+	CodeMarshalError          ErrorCode = 3012
+	CodeUnmarshalError        ErrorCode = 3013
+	CodeFileSystemError       ErrorCode = 3014
+	CodeThirdPartyServiceError ErrorCode = 3015
 )
 
 // errorMessages maps error codes to default messages
@@ -108,6 +118,16 @@ var errorMessages = map[ErrorCode]string{
 	CodeQuotaExceeded:          "Quota exceeded",
 	CodeInvalidState:           "Invalid state",
 	CodeDependencyFailed:       "Dependency failed",
+	
+	// Additional error messages
+	CodeInvalidToken:           "Invalid token",
+	CodeAccountSuspended:       "Account suspended",
+	CodeNetworkError:           "Network error",
+	CodeUnknownError:           "Unknown error",
+	CodeMarshalError:           "Data marshaling error",
+	CodeUnmarshalError:         "Data unmarshaling error",
+	CodeFileSystemError:        "File system error",
+	CodeThirdPartyServiceError: "Third party service error",
 }
 
 // Message returns the default message for an error code
@@ -129,4 +149,58 @@ func (e ErrorCode) String() string {
 		return msg
 	}
 	return "Unknown error"
+}
+
+// GetHTTPStatus returns the HTTP status code for an error code
+func GetHTTPStatus(code ErrorCode) int {
+	// Define the mapping from error codes to HTTP status codes
+	switch code {
+	// Validation errors -> 400
+	case CodeValidationFailed, CodeInvalidInput, CodeMissingRequiredField,
+		CodeInvalidFormat, CodeValueOutOfRange, CodeDuplicateValue,
+		CodeInvalidLength, CodeInvalidType:
+		return 400
+		
+	// Auth errors -> 401/403
+	case CodeUnauthorized, CodeTokenExpired, CodeInvalidToken:
+		return 401
+	case CodeForbidden, CodeInsufficientPermissions, CodeAccountSuspended:
+		return 403
+		
+	// Not found -> 404
+	case CodeResourceNotFound:
+		return 404
+		
+	// Conflict -> 409
+	case CodeResourceAlreadyExists, CodeConflict:
+		return 409
+		
+	// Precondition failed -> 412
+	case CodePreconditionFailed:
+		return 412
+		
+	// Rate limit -> 429
+	case CodeRateLimitExceeded:
+		return 429
+		
+	// Server errors -> 500/503
+	case CodeInternalServerError, CodeDatabaseError, CodeNetworkError,
+		CodeUnknownError, CodeMarshalError, CodeUnmarshalError,
+		CodeFileSystemError:
+		return 500
+	case CodeTimeout:
+		return 504
+	case CodeThirdPartyServiceError, CodeDependencyFailed:
+		return 503
+		
+	// Business logic errors -> depends on context
+	case CodeBusinessLogicError, CodeInvalidOperation, CodeInvalidState,
+		CodeQuotaExceeded:
+		return 400
+	case CodeInsufficientBalance:
+		return 402 // Payment Required
+		
+	default:
+		return 500
+	}
 }
