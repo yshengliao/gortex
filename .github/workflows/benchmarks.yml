@@ -24,7 +24,7 @@ jobs:
       run: go install golang.org/x/perf/cmd/benchstat@latest
     
     - name: Cache benchmark results
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           benchmarks/
@@ -96,7 +96,7 @@ jobs:
     
     - name: Comment PR with benchmark results
       if: github.event_name == 'pull_request' && steps.benchmark-comparison.outputs.comparison-available == 'true'
-      uses: actions/github-script@v6
+      uses: actions/github-script@v7
       with:
         script: |
           const fs = require('fs');
@@ -136,7 +136,7 @@ jobs:
         exit 1
     
     - name: Upload benchmark artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: benchmark-results
         path: benchmarks/
@@ -185,7 +185,7 @@ jobs:
         go tool pprof -text mem.prof > memory-profile.txt || echo "Memory profile analysis completed"
     
     - name: Upload memory analysis
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: memory-analysis
         path: |
