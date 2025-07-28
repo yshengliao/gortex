@@ -159,5 +159,51 @@
       "heap_inuse": 835584,
       "stack_inuse": 294912
     }
+  },
+  {
+    "name": "SimpleRoute",
+    "timestamp": "2025-07-28T12:09:36.070892+08:00",
+    "ns_per_op": 0,
+    "allocs_per_op": 0,
+    "bytes_per_op": 0,
+    "iterations": 1,
+    "go_version": "go1.24.5",
+    "os": "darwin",
+    "arch": "arm64",
+    "cpus": 8,
+    "gortex_version": "v0.4.0-alpha",
+    "mem_stats": {
+      "alloc": 211688,
+      "total_alloc": 211688,
+      "sys": 8406280,
+      "num_gc": 0,
+      "heap_alloc": 211688,
+      "heap_sys": 3899392,
+      "heap_inuse": 819200,
+      "stack_inuse": 294912
+    }
+  },
+  {
+    "name": "SimpleRoute",
+    "timestamp": "2025-07-28T12:09:54.145186+08:00",
+    "ns_per_op": 0,
+    "allocs_per_op": 0,
+    "bytes_per_op": 0,
+    "iterations": 1,
+    "go_version": "go1.24.5",
+    "os": "darwin",
+    "arch": "arm64",
+    "cpus": 8,
+    "gortex_version": "v0.4.0-alpha",
+    "mem_stats": {
+      "alloc": 200352,
+      "total_alloc": 200352,
+      "sys": 8144136,
+      "num_gc": 0,
+      "heap_alloc": 200352,
+      "heap_sys": 3932160,
+      "heap_inuse": 688128,
+      "stack_inuse": 262144
+    }
   }
 ]
