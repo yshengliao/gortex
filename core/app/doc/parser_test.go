@@ -105,7 +105,7 @@ func TestCamelToKebab(t *testing.T) {
 		{"CreateUser", "create-user"},
 		{"UpdateUserProfile", "update-user-profile"},
 		{"GET", "get"},
-		{"HTTPSConnection", "h-t-t-p-s-connection"},
+		{"HTTPSConnection", "https-connection"},
 	}
 
 	for _, tt := range tests {

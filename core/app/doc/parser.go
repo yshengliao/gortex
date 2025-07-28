@@ -30,10 +30,23 @@ func (p *TagParser) ParseHandlerMetadata(handler interface{}) (*HandlerMetadata,
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
 		if field.Anonymous {
-			// Check the anonymous field's tag
-			if tag := field.Tag.Get("api"); tag != "" {
-				structTag = tag
-				break
+			// Check fields inside the anonymous struct
+			embeddedType := field.Type
+			if embeddedType.Kind() == reflect.Struct {
+				for j := 0; j < embeddedType.NumField(); j++ {
+					embeddedField := embeddedType.Field(j)
+					if tag := embeddedField.Tag.Get("api"); tag != "" {
+						structTag = tag
+						break
+					}
+				}
+			}
+			// Also check the anonymous field's tag
+			if structTag == "" {
+				if tag := field.Tag.Get("api"); tag != "" {
+					structTag = tag
+					break
+				}
 			}
 		}
 	}
@@ -181,10 +194,19 @@ func (p *TagParser) generateDescription(handlerName, methodName string) string {
 // camelToKebab converts CamelCase to kebab-case
 func camelToKebab(s string) string {
 	var result []rune
-	for i, r := range s {
+	runes := []rune(s)
+	
+	for i, r := range runes {
 		if i > 0 && 'A' <= r && r <= 'Z' {
-			// Don't add hyphen if previous character was also uppercase
-			if i == 0 || (i > 0 && s[i-1] < 'A' || s[i-1] > 'Z') {
+			// Check if this is the start of a new word
+			// Add hyphen if:
+			// 1. Previous char is lowercase (e.g., "userID" -> "user-id")
+			// 2. Previous char is uppercase but next char is lowercase (e.g., "HTTPServer" -> "http-server")
+			prevIsLower := 'a' <= runes[i-1] && runes[i-1] <= 'z'
+			nextIsLower := i+1 < len(runes) && 'a' <= runes[i+1] && runes[i+1] <= 'z'
+			prevIsUpper := 'A' <= runes[i-1] && runes[i-1] <= 'Z'
+			
+			if prevIsLower || (prevIsUpper && nextIsLower) {
 				result = append(result, '-')
 			}
 		}

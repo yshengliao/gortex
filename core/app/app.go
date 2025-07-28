@@ -196,6 +196,10 @@ func WithTracer(tracer tracing.Tracer) Option {
 			return fmt.Errorf("tracer cannot be nil")
 		}
 		app.tracer = tracer
+		// Apply tracing middleware immediately if router is initialized
+		if app.router != nil {
+			app.router.Use(tracing.TracingMiddleware(tracer))
+		}
 		return nil
 	}
 }
@@ -213,11 +217,6 @@ func WithDocProvider(provider doc.DocProvider) Option {
 
 // setupRouter configures the Gortex router with middleware
 func (app *App) setupRouter() {
-	// Tracing middleware - should be first to capture all requests
-	if app.tracer != nil {
-		app.router.Use(tracing.TracingMiddleware(app.tracer))
-	}
-
 	// Apply middleware based on configuration
 	if app.config == nil || app.config.Server.Recovery {
 		// TODO: Add recovery middleware for Gortex
