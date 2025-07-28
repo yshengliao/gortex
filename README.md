@@ -267,8 +267,7 @@ gortex/
 │   ├── httpclient/         # HTTP client utilities
 │   └── requestid/          # Request ID generation
 ├── middleware/             # Framework middleware
-├── internal/               # Internal packages
-└── examples/               # Example applications
+└── internal/               # Internal packages
 ```
 
 ## Best Practices
@@ -299,16 +298,6 @@ func (h *UserHandler) GET(c context.Context) error {
 ```go
 cfg.Logger.Level = "debug" // Enables /_routes, /_monitor, etc.
 ```
-
-## Examples
-
-Check out the [examples](./examples) directory:
-- [Simple](./examples/simple) - Basic routing and groups
-- [Auth](./examples/auth) - JWT authentication
-- [WebSocket](./examples/websocket) - Real-time communication
-- [Advanced Tracing](./examples/advanced-tracing) - Distributed tracing with 8 severity levels
-- [Metrics Dashboard](./examples/metrics-dashboard) - Prometheus + Grafana integration
-- [API Docs Advanced](./examples/api-docs-advanced) - OpenAPI 3.0 documentation
 
 ## Recent Improvements (v0.4.0-alpha)
 

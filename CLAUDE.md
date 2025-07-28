@@ -51,8 +51,7 @@ gortex/
 ├── errors/                 # Error handling
 ├── utils/                  # Utility packages
 ├── middleware/             # Framework middleware
-├── internal/               # Internal packages
-└── examples/               # Example applications
+└── internal/               # Internal packages
 ```
 
 ## Quick Start
@@ -145,16 +144,10 @@ With `cfg.Logger.Level = "debug"`:
 
 ## Testing
 
-### Example Projects
-- **[Simple](./examples/simple)** - Basic routing and groups (port 8080)
-- **[Auth](./examples/auth)** - JWT authentication (port 8081)  
-- **[WebSocket](./examples/websocket)** - Real-time communication (port 8082)
-
 ### Running Tests
 ```bash
 go test ./...           # Run all tests
-go run examples/simple  # Test basic routing
-curl localhost:8080/_routes  # View debug routes
+curl localhost:8080/_routes  # View debug routes (when running in debug mode)
 ```
 
 ## Critical Don'ts
