@@ -13,24 +13,37 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
+    env:
+      GO_VERSION: '1.25.0'
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Install Go ${{ env.GO_VERSION }}
+        run: |
+          set -euo pipefail
+          curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" -o /tmp/go.tgz
+          sudo rm -rf /usr/local/go
+          sudo tar -C /usr/local -xzf /tmp/go.tgz
+          echo "/usr/local/go/bin" >> "$GITHUB_PATH"
+          echo "$HOME/go/bin" >> "$GITHUB_PATH"
 
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.24'
-        cache: true
+      - name: Verify Go
+        run: go version
 
-    - name: Verify dependencies
-      run: |
-        go mod download
-        go mod verify
-        go mod tidy -diff
+      - name: Checkout code
+        run: |
+          set -euo pipefail
+          git init -q .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git -c protocol.version=2 fetch --depth=1 origin "${GITHUB_SHA}"
+          git checkout -q FETCH_HEAD
 
-    - name: Run go vet
-      run: go vet ./...
+      - name: Verify dependencies
+        run: |
+          go mod download
+          go mod verify
+          go mod tidy -diff
 
-    - name: Run tests with race detector
-      run: go test ./... -race -count=1
+      - name: Run go vet
+        run: go vet ./...
+
+      - name: Run tests with race detector
+        run: go test ./... -race -count=1
