@@ -7,6 +7,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
+	"io/fs"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -476,6 +477,12 @@ func (c *MockContext) File(file string) error {
 	}
 
 	http.ServeContent(c.res, c.req, fi.Name(), fi.ModTime(), f)
+	return nil
+}
+
+// FileFS serves a file from the supplied filesystem root.
+func (c *MockContext) FileFS(fsys fs.FS, name string) error {
+	http.ServeFileFS(c.res, c.req, fsys, name)
 	return nil
 }
 

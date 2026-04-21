@@ -4,6 +4,7 @@ package types
 import (
 	"context"
 	"io"
+	"io/fs"
 	"mime/multipart"
 	"net/http"
 	"net/url"
@@ -138,8 +139,16 @@ type Context interface {
 	// Stream sends an HTTP response with stream
 	Stream(code int, contentType string, r io.Reader) error
 	
-	// File sends a file as the response
+	// File sends a file as the response. The path is treated as
+	// server-trusted; any ".." segments are rejected. For user-supplied
+	// filenames, prefer FileFS with an explicit root.
 	File(file string) error
+
+	// FileFS serves a file from the supplied filesystem root. The name
+	// is validated via fs.ValidPath, which rejects absolute paths and
+	// ".." segments, making this the safe choice for serving
+	// user-supplied filenames.
+	FileFS(fsys fs.FS, name string) error
 	
 	// Attachment sends a file as attachment
 	Attachment(file string, name string) error

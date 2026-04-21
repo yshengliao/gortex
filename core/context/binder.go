@@ -2,7 +2,10 @@ package context
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"reflect"
 	"strconv"
 	"strings"
@@ -13,6 +16,13 @@ import (
 	gortexContext "github.com/yshengliao/gortex/transport/http"
 )
 
+// DefaultMaxJSONBodyBytes is the default upper bound on JSON request
+// bodies accepted by the parameter binder. Bodies larger than this
+// are rejected with HTTP 413 before any decoding takes place. The
+// limit exists to protect the server from memory exhaustion via
+// hostile payloads.
+const DefaultMaxJSONBodyBytes int64 = 10 << 20 // 10 MiB
+
 // ParameterBinder handles automatic parameter binding from HTTP requests
 type ParameterBinder struct {
 	// tagName is the struct tag name to use for binding hints
@@ -21,23 +31,38 @@ type ParameterBinder struct {
 	validator *validator.Validate
 	// context for dependency injection
 	diContext *Context
+	// maxJSONBodyBytes caps the size of JSON request bodies accepted by
+	// bindStruct. Bodies larger than this are rejected with HTTP 413.
+	maxJSONBodyBytes int64
 }
 
 // NewParameterBinder creates a new parameter binder
 func NewParameterBinder() *ParameterBinder {
 	return &ParameterBinder{
-		tagName:   "bind",
-		validator: validator.New(),
+		tagName:          "bind",
+		validator:        validator.New(),
+		maxJSONBodyBytes: DefaultMaxJSONBodyBytes,
 	}
 }
 
 // NewParameterBinderWithContext creates a new parameter binder with DI context
 func NewParameterBinderWithContext(ctx *Context) *ParameterBinder {
 	return &ParameterBinder{
-		tagName:   "bind",
-		validator: validator.New(),
-		diContext: ctx,
+		tagName:          "bind",
+		validator:        validator.New(),
+		diContext:        ctx,
+		maxJSONBodyBytes: DefaultMaxJSONBodyBytes,
 	}
+}
+
+// SetMaxJSONBodyBytes overrides the default JSON body size cap. Values
+// <= 0 restore the default.
+func (pb *ParameterBinder) SetMaxJSONBodyBytes(n int64) {
+	if n <= 0 {
+		pb.maxJSONBodyBytes = DefaultMaxJSONBodyBytes
+		return
+	}
+	pb.maxJSONBodyBytes = n
 }
 
 // BindMethodParams binds HTTP request parameters to method parameters
@@ -127,13 +152,22 @@ func (pb *ParameterBinder) bindStruct(c gortexContext.Context, structValue refle
 		structValue = structValue.Elem()
 	}
 
-	// First, try to bind from JSON body if it's a POST/PUT/PATCH request
+	// First, try to bind from JSON body if it's a POST/PUT/PATCH request.
+	// The body is wrapped in http.MaxBytesReader so that an oversized
+	// payload is rejected before exhausting memory. Decode failures
+	// (other than io.EOF on an empty body) are surfaced to the caller
+	// so that malformed or oversized JSON is not silently ignored.
 	if c.Request().Method == "POST" || c.Request().Method == "PUT" || c.Request().Method == "PATCH" {
 		if c.Request().Header.Get("Content-Type") == "application/json" {
-			if err := json.NewDecoder(c.Request().Body).Decode(structValue.Addr().Interface()); err != nil && err.Error() != "EOF" {
-				// If JSON parsing fails, continue to try other binding methods
-			} else {
-				// JSON binding successful, now bind other sources
+			limit := pb.maxJSONBodyBytes
+			if limit <= 0 {
+				limit = DefaultMaxJSONBodyBytes
+			}
+			c.Request().Body = http.MaxBytesReader(c.Response(), c.Request().Body, limit)
+			if err := json.NewDecoder(c.Request().Body).Decode(structValue.Addr().Interface()); err != nil {
+				if !errors.Is(err, io.EOF) {
+					return fmt.Errorf("binder: json decode: %w", err)
+				}
 			}
 		}
 	}

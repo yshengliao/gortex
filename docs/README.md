@@ -1,41 +1,43 @@
 # Gortex Documentation
 
-This directory contains all technical documentation for the Gortex framework.
+Technical documentation for the Gortex framework.
 
-## Documentation Structure
+## Layout
 
 ```
 docs/
-├── API.md                          # API reference documentation
-├── IMPROVEMENT_PLAN.md             # Framework improvement roadmap
-├── benchmarks/                     # Performance benchmarks
-│   ├── README.md                   # Benchmark documentation
-│   └── baseline-metrics.txt        # Baseline performance metrics
-├── best-practices/                 # Development best practices
-│   ├── README.md                   # Best practices overview
-│   ├── api-documentation.md        # API documentation guidelines
-│   ├── context-handling.md         # Context usage patterns
-│   └── observability-setup.md      # Monitoring setup guide
-├── internal-testutil.md            # Internal testing utilities
-├── migration/                      # Migration guides
-│   └── tracing.md                  # Tracing migration guide
-└── performance/                    # Performance documentation
-    ├── OPTIMIZATION_GUIDE.md       # Performance optimization guide
-    ├── README.md                   # Performance overview
-    └── metrics_performance_analysis.md  # Metrics analysis
+├── API.md                          # API reference
+├── security.md                     # Security defaults cheat-sheet
+├── benchmarks/
+│   ├── README.md
+│   └── baseline-metrics.txt
+├── best-practices/
+│   ├── README.md
+│   ├── api-documentation.md
+│   ├── context-handling.md
+│   └── observability-setup.md
+├── migration/
+│   └── tracing.md
+├── performance/
+│   ├── OPTIMIZATION_GUIDE.md
+│   ├── README.md
+│   └── metrics_performance_analysis.md
+└── reviews/
+    ├── 2025-11-20-code-review.md       # Closed — see SECURITY.md
+    └── 2025-11-20-security-audit.md    # Closed — see SECURITY.md
 ```
 
 ## Quick Links
 
 - [API Reference](./API.md)
-- [Best Practices Guide](./best-practices/README.md)
-- [Performance Optimization](./performance/OPTIMIZATION_GUIDE.md)
-- [Development Roadmap](./IMPROVEMENT_PLAN.md)
+- [Security hardening defaults](./security.md) — also see [../SECURITY.md](../SECURITY.md)
+- [Best Practices](./best-practices/README.md)
+- [Performance Optimisation](./performance/OPTIMIZATION_GUIDE.md)
+- [Runnable examples](../examples/README.md)
 
 ## Contributing
 
-When adding new documentation:
-1. Place it in the appropriate subdirectory
-2. Update this README with the new file
-3. Ensure all links are relative and working
-4. Follow the existing documentation style
+1. Place new documentation in the appropriate subdirectory.
+2. Update this index.
+3. Keep links relative and working.
+4. Match the existing style.

@@ -5,10 +5,65 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"net/url"
+	"regexp"
 	"runtime"
 	"strings"
-
 )
+
+const redactedPlaceholder = "***REDACTED***"
+
+var sensitiveHeaderNames = map[string]struct{}{
+	"authorization":       {},
+	"cookie":              {},
+	"set-cookie":          {},
+	"x-api-key":           {},
+	"x-auth-token":        {},
+	"x-csrf-token":        {},
+	"proxy-authorization": {},
+}
+
+var sensitiveParamPattern = regexp.MustCompile(`(?i)(token|password|secret|key|apikey|api_key|auth)`)
+
+// redactHeaders returns a copy of headers with sensitive values masked.
+func redactHeaders(headers http.Header) http.Header {
+	if headers == nil {
+		return nil
+	}
+	out := make(http.Header, len(headers))
+	for name, values := range headers {
+		if _, sensitive := sensitiveHeaderNames[strings.ToLower(name)]; sensitive {
+			out[name] = []string{redactedPlaceholder}
+			continue
+		}
+		cp := make([]string, len(values))
+		copy(cp, values)
+		out[name] = cp
+	}
+	return out
+}
+
+// redactURL masks query-string values whose key matches a sensitive
+// pattern. The path and scheme are preserved.
+func redactURL(u *url.URL) string {
+	if u == nil {
+		return ""
+	}
+	clone := *u
+	if clone.RawQuery != "" {
+		q := clone.Query()
+		for key, values := range q {
+			if sensitiveParamPattern.MatchString(key) {
+				for i := range values {
+					values[i] = redactedPlaceholder
+				}
+				q[key] = values
+			}
+		}
+		clone.RawQuery = q.Encode()
+	}
+	return clone.String()
+}
 
 // GortexDevErrorPageConfig defines the config for development error page middleware
 type GortexDevErrorPageConfig struct {
@@ -96,17 +151,19 @@ func extractErrorInfo(err error, c Context, config GortexDevErrorPageConfig) *Er
 		errorInfo.StackTrace = getGortexStackTrace(config.StackTraceLimit)
 	}
 
-	// Extract request details if enabled
+	// Extract request details if enabled. Sensitive fields are
+	// redacted regardless of mode so the dev error page never leaks
+	// Authorization headers or tokens in query strings.
 	if config.ShowRequestDetails {
 		req := c.Request()
 		errorInfo.RequestDetails = map[string]string{
 			"method":      req.Method,
-			"url":         req.URL.String(),
+			"url":         redactURL(req.URL),
 			"remote_addr": req.RemoteAddr,
 			"user_agent":  req.UserAgent(),
 			"referer":     req.Referer(),
 		}
-		errorInfo.Headers = req.Header
+		errorInfo.Headers = redactHeaders(req.Header)
 	}
 
 	// Generate solution suggestions
@@ -519,12 +576,12 @@ func RecoverWithErrorPageConfig(config GortexDevErrorPageConfig) MiddlewareFunc 
 						req := c.Request()
 						errorInfo.RequestDetails = map[string]string{
 							"method":      req.Method,
-							"url":         req.URL.String(),
+							"url":         redactURL(req.URL),
 							"remote_addr": req.RemoteAddr,
 							"user_agent":  req.UserAgent(),
 							"referer":     req.Referer(),
 						}
-						errorInfo.Headers = req.Header
+						errorInfo.Headers = redactHeaders(req.Header)
 					}
 
 					// Generate solutions for panic

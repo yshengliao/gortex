@@ -2,11 +2,22 @@
 package auth
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 )
+
+// MinJWTSecretBytes is the minimum byte length accepted for an HS256
+// secret. The HMAC construction depends on the secret having at least the
+// output length of the hash (32 bytes for SHA-256); shorter keys reduce
+// the effective search space and make brute-force practical.
+const MinJWTSecretBytes = 32
+
+// ErrJWTSecretTooShort is returned by NewJWTService when the supplied
+// secret is shorter than MinJWTSecretBytes.
+var ErrJWTSecretTooShort = errors.New("auth: JWT secret must be at least 32 bytes")
 
 // JWTService handles JWT token generation and validation
 type JWTService struct {
@@ -26,14 +37,20 @@ type Claims struct {
 	GameID   string `json:"game_id,omitempty"`
 }
 
-// NewJWTService creates a new JWT service instance
-func NewJWTService(secretKey string, accessTTL, refreshTTL time.Duration, issuer string) *JWTService {
+// NewJWTService creates a new JWT service instance. It returns
+// ErrJWTSecretTooShort if secretKey has fewer than MinJWTSecretBytes
+// bytes — rejecting weak keys at construction time is safer than failing
+// silently and discovering the weakness in a breach post-mortem.
+func NewJWTService(secretKey string, accessTTL, refreshTTL time.Duration, issuer string) (*JWTService, error) {
+	if len(secretKey) < MinJWTSecretBytes {
+		return nil, ErrJWTSecretTooShort
+	}
 	return &JWTService{
 		secretKey:       secretKey,
 		accessTokenTTL:  accessTTL,
 		refreshTokenTTL: refreshTTL,
 		issuer:          issuer,
-	}
+	}, nil
 }
 
 // GenerateAccessToken generates a new access token

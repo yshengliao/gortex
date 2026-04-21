@@ -13,7 +13,10 @@ import (
 
 func TestJWTAuth(t *testing.T) {
 	// Create a JWT service for testing
-	jwtService := auth.NewJWTService("test-secret", 1*time.Hour, 24*time.Hour, "test-issuer")
+	jwtService, err := auth.NewJWTService("test-secret-key-at-least-32-chars!!", 1*time.Hour, 24*time.Hour, "test-issuer")
+	if err != nil {
+		t.Fatalf("NewJWTService: %v", err)
+	}
 
 	// Generate a valid token
 	validToken, err := jwtService.GenerateAccessToken("user123", "testuser", "test@example.com", "user")
@@ -105,7 +108,10 @@ func TestJWTAuth(t *testing.T) {
 }
 
 func TestJWTAuthSkipPaths(t *testing.T) {
-	jwtService := auth.NewJWTService("test-secret", 1*time.Hour, 24*time.Hour, "test-issuer")
+	jwtService, err := auth.NewJWTService("test-secret-key-at-least-32-chars!!", 1*time.Hour, 24*time.Hour, "test-issuer")
+	if err != nil {
+		t.Fatalf("NewJWTService: %v", err)
+	}
 	
 	config := &AuthConfig{
 		JWTService: jwtService,
@@ -170,7 +176,10 @@ func TestJWTAuthSkipPaths(t *testing.T) {
 }
 
 func TestRequireRole(t *testing.T) {
-	jwtService := auth.NewJWTService("test-secret", 1*time.Hour, 24*time.Hour, "test-issuer")
+	jwtService, err := auth.NewJWTService("test-secret-key-at-least-32-chars!!", 1*time.Hour, 24*time.Hour, "test-issuer")
+	if err != nil {
+		t.Fatalf("NewJWTService: %v", err)
+	}
 	
 	// Generate tokens with different roles
 	adminToken, _ := jwtService.GenerateAccessToken("admin123", "admin", "admin@example.com", "admin")
@@ -222,7 +231,10 @@ func TestRequireRole(t *testing.T) {
 }
 
 func TestRequireGameID(t *testing.T) {
-	jwtService := auth.NewJWTService("test-secret", 1*time.Hour, 24*time.Hour, "test-issuer")
+	jwtService, err := auth.NewJWTService("test-secret-key-at-least-32-chars!!", 1*time.Hour, 24*time.Hour, "test-issuer")
+	if err != nil {
+		t.Fatalf("NewJWTService: %v", err)
+	}
 	
 	// Generate tokens with and without game ID
 	gameToken, _ := jwtService.GenerateGameToken("user123", "player1", "game456")

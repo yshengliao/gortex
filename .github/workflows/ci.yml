@@ -32,5 +32,5 @@ jobs:
     - name: Run go vet
       run: go vet ./...
 
-    - name: Run tests
-      run: go test ./...
+    - name: Run tests with race detector
+      run: go test ./... -race -count=1

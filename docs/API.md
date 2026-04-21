@@ -1,9 +1,15 @@
 # Gortex API Reference
 
+> Canonical import paths: `core/app`, `core/types`, `core/context`, `transport/http`, `transport/websocket`, `middleware`, `pkg/auth`, `pkg/validation`.
+
 ## Core Interfaces
 
 ### Context Interface
+
+Declared in `core/types`. Reference in handlers as `types.Context`.
+
 ```go
+// core/types.Context
 type Context interface {
     // Request
     Request() *http.Request
@@ -57,7 +63,8 @@ type Context interface {
     String(code int, s string) error
     Blob(code int, contentType string, b []byte) error
     Stream(code int, contentType string, r io.Reader) error
-    File(file string) error
+    File(fsys fs.FS, name string) error      // safe: rooted in fsys, fs.ValidPath
+    FileFS(fsys fs.FS, name string) error     // alias of File, explicit fs.FS
     Attachment(file, name string) error
     Inline(file, name string) error
     NoContent(code int) error
@@ -166,7 +173,7 @@ if err := app.Run(); err != nil {
 ```go
 func MyMiddleware() middleware.MiddlewareFunc {
     return func(next middleware.HandlerFunc) middleware.HandlerFunc {
-        return func(c context.Context) error {
+        return func(c types.Context) error {
             // Before handler
             err := next(c)
             // After handler
@@ -184,7 +191,7 @@ func MyMiddleware() middleware.MiddlewareFunc {
 errors.Register(ErrUserNotFound, 404, "User not found")
 
 // Use in handlers
-func (h *UserHandler) GET(c context.Context) error {
+func (h *UserHandler) GET(c types.Context) error {
     user, err := h.service.GetUser(c.Param("id"))
     if err != nil {
         return err // Framework handles response
@@ -195,25 +202,45 @@ func (h *UserHandler) GET(c context.Context) error {
 
 ### HTTP Errors
 ```go
-return context.NewHTTPError(404, "Not found")
+import httpctx "github.com/yshengliao/gortex/transport/http"
+
+return httpctx.NewHTTPError(404, "Not found")
 ```
 
 ## WebSocket Support
 
 ### WebSocket Handler
 ```go
+import (
+    gortexws "github.com/yshengliao/gortex/transport/websocket"
+    gorillaws "github.com/gorilla/websocket"
+)
+
 type WSHandler struct {
-    hub *hub.Hub
+    hub *gortexws.Hub
 }
 
-func (h *WSHandler) HandleConnection(c context.Context) error {
+func (h *WSHandler) HandleConnection(c types.Context) error {
     conn, err := upgrader.Upgrade(c.Response(), c.Request(), nil)
     if err != nil {
         return err
     }
-    // Handle WebSocket connection
+    client := gortexws.NewClient(h.hub, conn, clientID, logger)
+    h.hub.RegisterClient(client)
+    go client.WritePump()
+    go client.ReadPump()
     return nil
 }
+```
+
+The hub supports size-limited reads, type whitelisting, and a pluggable authoriser:
+
+```go
+hub := gortexws.NewHubWithConfig(logger, gortexws.Config{
+    MaxMessageBytes:     4 << 10,
+    AllowedMessageTypes: []string{"chat", "ping"},
+    Authorizer:          myAuthorizer,
+})
 ```
 
 ### Struct Tag for WebSocket
@@ -245,3 +272,22 @@ response.Forbidden(c, "Access denied")
 response.NotFound(c, "Resource not found")
 response.InternalServerError(c, "Server error")
 ```
+
+## Security Defaults
+
+| Area | Default | Override |
+|------|---------|----------|
+| JSON body size | 10 MiB | `BinderConfig.MaxJSONBodyBytes` |
+| Multipart body | 32 MiB | `ContextConfig.MaxMultipartBytes` |
+| `Context.File` | Rooted in an `fs.FS`, `fs.ValidPath` required | `FileDir(dir, name)` wraps `os.DirFS` |
+| `Context.Redirect` | Only same-origin paths allowed | `RedirectOptions.AllowAbsolute` whitelist |
+| CORS | `*` + `AllowCredentials=true` rejected | `CORSWithConfig` returns `error` |
+| Dev error page | Auth/secret headers and query params redacted | — |
+| Trusted proxies | `X-Forwarded-For` ignored unless peer in `LoggerConfig.TrustedProxies` | — |
+| JWT secret | ≥ 32 bytes enforced at `NewJWTService` | — |
+| Log body | JSON secrets masked by `BodyRedactor` | Custom `func([]byte) []byte` |
+| CSRF | Synchroniser-token middleware in `middleware/csrf.go` | `CSRFConfig` |
+| Rate limit | Emits `X-RateLimit-*` + `Retry-After` | `RateLimitConfig` |
+| WebSocket | `SetReadLimit(MaxMessageBytes)`, type whitelist, authoriser hook | `websocket.Config` |
+
+See [../SECURITY.md](../SECURITY.md) and [security.md](./security.md) for reporting process and full hardening notes.

@@ -2,12 +2,65 @@
 package websocket
 
 import (
+	"errors"
 	"fmt"
 	"sync/atomic"
 	"time"
-	
+
 	"go.uber.org/zap"
 )
+
+// DefaultMaxMessageBytes is the default per-message read cap applied by the
+// hub unless Config.MaxMessageBytes overrides it. Matches the size most
+// chat-style JSON payloads comfortably fit into whilst keeping the
+// per-connection memory footprint bounded against oversize-message DoS.
+const DefaultMaxMessageBytes int64 = 64 << 10 // 64 KiB
+
+// MessageAuthorizer decides whether a client is allowed to publish a
+// particular message. Returning a non-nil error causes the hub to drop the
+// message and log a warning; returning nil lets the message flow as normal.
+type MessageAuthorizer func(client *Client, msg *Message) error
+
+// ErrMessageUnauthorized is the canonical error to return from a
+// MessageAuthorizer when a client's message should be rejected.
+var ErrMessageUnauthorized = errors.New("websocket: message unauthorized")
+
+// Config tunes the hub's runtime behaviour. The zero value is valid and
+// applies the defaults.
+type Config struct {
+	// MaxMessageBytes caps the size of any single WebSocket frame read
+	// from a client. Values <= 0 fall back to DefaultMaxMessageBytes.
+	MaxMessageBytes int64
+
+	// AllowedMessageTypes, when non-empty, gates inbound messages to the
+	// listed Type values. Unknown types are dropped and logged.
+	AllowedMessageTypes []string
+
+	// Authorizer, when non-nil, is consulted for every inbound message.
+	// Returning an error drops the message.
+	Authorizer MessageAuthorizer
+}
+
+// allowedTypeSet returns a lookup set for the configured whitelist, or nil
+// if every type should be allowed.
+func (c *Config) allowedTypeSet() map[string]struct{} {
+	if c == nil || len(c.AllowedMessageTypes) == 0 {
+		return nil
+	}
+	set := make(map[string]struct{}, len(c.AllowedMessageTypes))
+	for _, t := range c.AllowedMessageTypes {
+		set[t] = struct{}{}
+	}
+	return set
+}
+
+// maxMessageBytes resolves the effective per-frame cap.
+func (c *Config) maxMessageBytes() int64 {
+	if c == nil || c.MaxMessageBytes <= 0 {
+		return DefaultMaxMessageBytes
+	}
+	return c.MaxMessageBytes
+}
 
 // Message represents a WebSocket message
 type Message struct {
@@ -25,6 +78,29 @@ type clientRequest struct {
 // metricsRequest represents a request to get hub metrics
 type metricsRequest struct {
 	response chan *Metrics
+}
+
+// registerRequest carries a client to be registered plus an ack channel that
+// is closed once the hub has recorded the registration. Acking removes the
+// need for callers (and tests) to sleep-and-pray after RegisterClient.
+type registerRequest struct {
+	client *Client
+	done   chan struct{}
+}
+
+// unregisterRequest mirrors registerRequest for removals.
+type unregisterRequest struct {
+	client *Client
+	done   chan struct{}
+}
+
+// broadcastOp is what flows through the hub's broadcast channel. The done
+// field is optional: production callers leave it nil and the hub fires and
+// forgets, whilst tests can supply an ack channel to wait for the hub to
+// finish processing the message before checking metrics.
+type broadcastOp struct {
+	msg  *Message
+	done chan struct{}
 }
 
 // Metrics contains WebSocket hub metrics for development monitoring
@@ -48,14 +124,17 @@ type messageRateTracker struct {
 // Hub maintains active WebSocket connections
 type Hub struct {
 	clients      map[*Client]bool
-	broadcast    chan *Message
-	register     chan *Client    // register is now unexported
-	unregister   chan *Client
+	broadcast    chan broadcastOp
+	register     chan registerRequest
+	unregister   chan unregisterRequest
 	clientCount  chan clientRequest
 	metricsReq   chan metricsRequest
 	logger       *zap.Logger
 	shutdown     chan struct{}
 	shutdownDone chan struct{}
+
+	config           Config
+	allowedTypesCache map[string]struct{}
 	
 	// Metrics fields
 	totalConnections atomic.Int64
@@ -66,20 +145,28 @@ type Hub struct {
 	startTime        time.Time
 }
 
-// NewHub creates a new WebSocket hub
+// NewHub creates a new WebSocket hub with default configuration.
 func NewHub(logger *zap.Logger) *Hub {
+	return NewHubWithConfig(logger, Config{})
+}
+
+// NewHubWithConfig creates a hub with the supplied configuration. Zero-value
+// fields fall back to defaults (see DefaultMaxMessageBytes).
+func NewHubWithConfig(logger *zap.Logger, cfg Config) *Hub {
 	return &Hub{
-		clients:      make(map[*Client]bool),
-		broadcast:    make(chan *Message, 256),
-		register:     make(chan *Client),
-		unregister:   make(chan *Client),
-		clientCount:  make(chan clientRequest),
-		metricsReq:   make(chan metricsRequest),
-		logger:       logger,
-		shutdown:     make(chan struct{}),
-		shutdownDone: make(chan struct{}),
-		messageTypes: make(map[string]int64),
-		startTime:    time.Now(),
+		clients:           make(map[*Client]bool),
+		broadcast:         make(chan broadcastOp, 256),
+		register:          make(chan registerRequest),
+		unregister:        make(chan unregisterRequest),
+		clientCount:       make(chan clientRequest),
+		metricsReq:        make(chan metricsRequest),
+		logger:            logger,
+		shutdown:          make(chan struct{}),
+		shutdownDone:      make(chan struct{}),
+		messageTypes:      make(map[string]int64),
+		startTime:         time.Now(),
+		config:            cfg,
+		allowedTypesCache: cfg.allowedTypeSet(),
 	}
 }
 
@@ -89,14 +176,19 @@ func (h *Hub) Run() {
 	
 	for {
 		select {
-		case client := <-h.register:
-			h.registerClient(client)
+		case req := <-h.register:
+			h.registerClient(req.client)
+			close(req.done)
 
-		case client := <-h.unregister:
-			h.unregisterClient(client)
+		case req := <-h.unregister:
+			h.unregisterClient(req.client)
+			close(req.done)
 
-		case message := <-h.broadcast:
-			h.broadcastMessage(message)
+		case op := <-h.broadcast:
+			h.broadcastMessage(op.msg)
+			if op.done != nil {
+				close(op.done)
+			}
 			
 		case req := <-h.clientCount:
 			req.response <- len(h.clients)
@@ -232,21 +324,64 @@ func (h *Hub) broadcastMessage(message *Message) {
 	}
 }
 
-// removeClient safely removes a client
+// removeClient safely removes a client. It is fire-and-forget: callers do
+// not block on the hub acknowledging the removal, so it is safe to invoke
+// from inside the hub's own goroutine (see broadcastMessage).
 func (h *Hub) removeClient(client *Client) {
+	req := unregisterRequest{client: client, done: make(chan struct{})}
 	select {
-	case h.unregister <- client:
+	case h.unregister <- req:
 	case <-h.shutdown:
-		// Hub is shutting down, ignore
 	}
 }
 
-// Broadcast sends a message to all connected clients
+// checkInbound validates an inbound client message against the configured
+// type whitelist and authorizer. It returns an error describing why the
+// message should be dropped, or nil if the message is allowed.
+func (h *Hub) checkInbound(client *Client, msg *Message) error {
+	if h.allowedTypesCache != nil {
+		if _, ok := h.allowedTypesCache[msg.Type]; !ok {
+			return fmt.Errorf("websocket: message type %q not allowed", msg.Type)
+		}
+	}
+	if h.config.Authorizer != nil {
+		if err := h.config.Authorizer(client, msg); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// maxMessageBytes returns the effective per-frame read cap for the hub's
+// connected clients.
+func (h *Hub) maxMessageBytes() int64 {
+	return h.config.maxMessageBytes()
+}
+
+// Broadcast sends a message to all connected clients. The call is
+// fire-and-forget: if the broadcast channel is full the message is dropped
+// and a warning is logged — slow consumers must never block producers.
 func (h *Hub) Broadcast(message *Message) {
 	select {
-	case h.broadcast <- message:
+	case h.broadcast <- broadcastOp{msg: message}:
 	default:
 		h.logger.Warn("Broadcast channel full")
+	}
+}
+
+// broadcastSync sends a message and blocks until the hub has processed it.
+// Intended for tests that need to observe the post-broadcast metrics
+// state; production code should use Broadcast instead.
+func (h *Hub) broadcastSync(message *Message) {
+	op := broadcastOp{msg: message, done: make(chan struct{})}
+	select {
+	case h.broadcast <- op:
+	case <-h.shutdown:
+		return
+	}
+	select {
+	case <-op.done:
+	case <-h.shutdown:
 	}
 }
 
@@ -270,12 +405,37 @@ func (h *Hub) GetConnectedClients() int {
 	}
 }
 
-// RegisterClient registers a new client to the hub
+// RegisterClient registers a new client to the hub. It blocks until the hub
+// has recorded the client (and sent its welcome message) or until the hub is
+// shut down, so tests can observe the post-registration state without
+// time-based waits.
 func (h *Hub) RegisterClient(client *Client) {
+	req := registerRequest{client: client, done: make(chan struct{})}
 	select {
-	case h.register <- client:
-	default:
-		h.logger.Warn("Register channel full")
+	case h.register <- req:
+	case <-h.shutdown:
+		return
+	}
+	select {
+	case <-req.done:
+	case <-h.shutdown:
+	}
+}
+
+// UnregisterClient removes a client from the hub and blocks until the hub
+// has processed the removal. Use this from tests and shutdown paths; the
+// internal removeClient helper stays fire-and-forget for use inside the hub
+// goroutine.
+func (h *Hub) UnregisterClient(client *Client) {
+	req := unregisterRequest{client: client, done: make(chan struct{})}
+	select {
+	case h.unregister <- req:
+	case <-h.shutdown:
+		return
+	}
+	select {
+	case <-req.done:
+	case <-h.shutdown:
 	}
 }
 
@@ -301,7 +461,7 @@ func (h *Hub) ShutdownWithTimeout(timeout time.Duration) error {
 	
 	// Try to broadcast shutdown message
 	select {
-	case h.broadcast <- shutdownMsg:
+	case h.broadcast <- broadcastOp{msg: shutdownMsg}:
 		// Give clients a moment to receive the message
 		time.Sleep(100 * time.Millisecond)
 	default:

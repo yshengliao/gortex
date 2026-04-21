@@ -207,6 +207,9 @@ func TestParameterBinderEdgeCases(t *testing.T) {
 	})
 
 	t.Run("invalid JSON body", func(t *testing.T) {
+		// Malformed JSON on a POST with Content-Type: application/json
+		// should surface an error rather than silently continue — this
+		// was a security finding from the 2025-11-20 audit (item 5).
 		req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader([]byte("invalid json")))
 		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
@@ -216,7 +219,8 @@ func TestParameterBinderEdgeCases(t *testing.T) {
 		paramValue := reflect.ValueOf(params)
 
 		err := binder.bindParameter(ctx, paramValue)
-		require.NoError(t, err) // Should not fail, just skip JSON binding
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "json decode")
 	})
 
 	t.Run("type conversion errors", func(t *testing.T) {

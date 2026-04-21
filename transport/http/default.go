@@ -6,15 +6,52 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
+	"io/fs"
 	"mime/multipart"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 )
+
+// DefaultMaxMultipartBytes is the default memory cap that
+// (*DefaultContext).MultipartForm and FormFile apply when parsing
+// multipart bodies. Bytes beyond this budget spill to tmp files. Larger
+// values let bigger payloads stay in RAM (cheaper to consume) at the
+// cost of higher memory pressure per in-flight request; smaller values
+// are safer but may slow file uploads.
+const DefaultMaxMultipartBytes int64 = 32 << 20 // 32 MiB
+
+// maxMultipartBytesOverride holds a process-wide override set by
+// SetDefaultMaxMultipartBytes. Stored atomically so app startup and
+// request handling can race freely. A value of 0 (the zero-initialised
+// state) means "use DefaultMaxMultipartBytes".
+var maxMultipartBytesOverride atomic.Int64
+
+// SetDefaultMaxMultipartBytes changes the multipart in-memory cap used by
+// every subsequent MultipartForm / FormFile call. Pass a value <= 0 to
+// restore DefaultMaxMultipartBytes. Typical callers wire this from
+// application configuration during startup.
+func SetDefaultMaxMultipartBytes(n int64) {
+	if n <= 0 {
+		maxMultipartBytesOverride.Store(0)
+		return
+	}
+	maxMultipartBytesOverride.Store(n)
+}
+
+// effectiveMaxMultipartBytes resolves the current cap.
+func effectiveMaxMultipartBytes() int64 {
+	if v := maxMultipartBytesOverride.Load(); v > 0 {
+		return v
+	}
+	return DefaultMaxMultipartBytes
+}
 
 // compile time check to ensure DefaultContext implements Context
 var _ Context = (*DefaultContext)(nil)
@@ -215,13 +252,18 @@ func (c *DefaultContext) FormParams() (url.Values, error) {
 
 // FormFile returns multipart form file by name
 func (c *DefaultContext) FormFile(name string) (*multipart.FileHeader, error) {
+	if c.request.MultipartForm == nil {
+		if err := c.request.ParseMultipartForm(effectiveMaxMultipartBytes()); err != nil {
+			return nil, err
+		}
+	}
 	_, fh, err := c.request.FormFile(name)
 	return fh, err
 }
 
 // MultipartForm returns multipart form
 func (c *DefaultContext) MultipartForm() (*multipart.Form, error) {
-	err := c.request.ParseMultipartForm(32 << 20) // 32 MB
+	err := c.request.ParseMultipartForm(effectiveMaxMultipartBytes())
 	return c.request.MultipartForm, err
 }
 
@@ -376,22 +418,32 @@ func (c *DefaultContext) Stream(code int, contentType string, r io.Reader) error
 	return err
 }
 
-// File sends a file as response
+// File sends a file as the response.
+//
+// The supplied path is treated as server-trusted. To defend against
+// accidental path-traversal when callers forward user input, the path
+// is cleaned and any ".." segments are rejected. For user-supplied
+// filenames, prefer FileFS with an explicit root.
 func (c *DefaultContext) File(file string) error {
-	f, err := os.Open(file)
+	cleaned, err := safeServerPath(file)
+	if err != nil {
+		return err
+	}
+
+	f, err := os.Open(cleaned)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
-	
+
 	fi, err := f.Stat()
 	if err != nil {
 		return err
 	}
-	
+
 	if fi.IsDir() {
-		file = filepath.Join(file, "index.html")
-		f, err = os.Open(file)
+		indexPath := filepath.Join(cleaned, "index.html")
+		f, err = os.Open(indexPath)
 		if err != nil {
 			return err
 		}
@@ -401,9 +453,74 @@ func (c *DefaultContext) File(file string) error {
 			return err
 		}
 	}
-	
+
 	http.ServeContent(c.response, c.request, fi.Name(), fi.ModTime(), f)
 	return nil
+}
+
+// FileFS serves a file from the given filesystem root. The name is
+// validated via fs.ValidPath, which rejects absolute paths, ".."
+// segments, and other escapes, making this the safe choice for
+// serving user-supplied filenames.
+func (c *DefaultContext) FileFS(fsys fs.FS, name string) error {
+	if !fs.ValidPath(name) {
+		return ErrUnsafeFilePath
+	}
+
+	f, err := fsys.Open(name)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	fi, err := f.Stat()
+	if err != nil {
+		return err
+	}
+
+	if fi.IsDir() {
+		indexName := path.Join(name, "index.html")
+		if !fs.ValidPath(indexName) {
+			return ErrUnsafeFilePath
+		}
+		f, err = fsys.Open(indexName)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		fi, err = f.Stat()
+		if err != nil {
+			return err
+		}
+	}
+
+	rs, ok := f.(io.ReadSeeker)
+	if !ok {
+		b, err := io.ReadAll(f)
+		if err != nil {
+			return err
+		}
+		c.writeContentType(http.DetectContentType(b))
+		_, err = c.response.Write(b)
+		return err
+	}
+	http.ServeContent(c.response, c.request, fi.Name(), fi.ModTime(), rs)
+	return nil
+}
+
+// safeServerPath cleans a server-trusted file path and rejects it if
+// it contains any ".." traversal segments after cleaning.
+func safeServerPath(file string) (string, error) {
+	if file == "" {
+		return "", ErrUnsafeFilePath
+	}
+	cleaned := filepath.Clean(file)
+	for _, seg := range strings.Split(cleaned, string(filepath.Separator)) {
+		if seg == ".." {
+			return "", ErrUnsafeFilePath
+		}
+	}
+	return cleaned, nil
 }
 
 // Inline sends a file as inline
@@ -437,14 +554,43 @@ func (c *DefaultContext) HTMLBlob(code int, b []byte) error {
 	return c.Blob(code, MIMETextHTMLCharsetUTF8, b)
 }
 
-// Redirect redirects the request
-func (c *DefaultContext) Redirect(code int, url string) error {
+// Redirect redirects the request.
+//
+// For safety, only same-origin paths are accepted by default: the URL
+// must start with "/" and must not start with "//" (protocol-relative).
+// Callers that legitimately need to redirect to an external host
+// should write the Location header and status code directly.
+func (c *DefaultContext) Redirect(code int, target string) error {
 	if code < 300 || code > 308 {
 		return ErrInvalidRedirectCode
 	}
-	c.response.Header().Set(HeaderLocation, url)
+	if !isSafeRedirectTarget(target) {
+		return ErrUnsafeRedirectURL
+	}
+	c.response.Header().Set(HeaderLocation, target)
 	c.response.WriteHeader(code)
 	return nil
+}
+
+// isSafeRedirectTarget returns true when target is a relative path
+// that cannot be coerced into an off-site navigation.
+func isSafeRedirectTarget(target string) bool {
+	if target == "" {
+		return false
+	}
+	if strings.HasPrefix(target, "//") {
+		return false
+	}
+	if !strings.HasPrefix(target, "/") {
+		return false
+	}
+	// Reject control characters that could break out of the Location header.
+	for _, r := range target {
+		if r == '\r' || r == '\n' || r == 0 {
+			return false
+		}
+	}
+	return true
 }
 
 // Error invokes the registered error handler
