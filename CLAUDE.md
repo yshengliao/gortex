@@ -1,8 +1,8 @@
 # Gortex Framework - Development Guide
 
-> **Framework**: Gortex | **Language**: Go 1.24 | **Status**: v0.4.0-alpha | **Updated**: 2025/07/26
+> **Framework**: Gortex | **Language**: Go 1.24 | **Status**: v0.4.0-alpha | **Updated**: 2026-04-21
 
-Development guide for Gortex web framework - a high-performance Go framework with declarative struct tag routing.
+Development guide for Gortex — a high-performance Go web framework with declarative struct-tag routing.
 
 ## Core Concepts
 
@@ -34,31 +34,32 @@ type HandlersManager struct {
 
 ```
 gortex/
-├── app/                    # Core application framework
-│   ├── interfaces/         # Service interfaces
-│   └── testutil/           # App-specific test utilities
-├── http/                   # HTTP-related packages
-│   ├── router/             # Routing engine
-│   ├── middleware/         # HTTP middleware
-│   ├── context/            # Request/response context
-│   └── response/           # Response utilities
-├── websocket/              # WebSocket functionality
-│   └── hub/                # Connection management
-├── auth/                   # Authentication
-├── validation/             # Input validation
-├── observability/          # Monitoring & metrics
-├── config/                 # Configuration
-├── errors/                 # Error handling
-├── utils/                  # Utility packages
-├── middleware/             # Framework middleware
-└── internal/               # Internal packages
+├── core/                   # Framework core
+│   ├── app/                # Application lifecycle, route wiring
+│   ├── context/            # Binder, request/response context
+│   ├── handler/            # Handler cache, reflection helpers
+│   └── types/              # Public interfaces (types.Context, …)
+├── transport/
+│   ├── http/               # HTTP context, router, response helpers
+│   └── websocket/          # Hub, client, message authorisation
+├── middleware/             # CORS, CSRF, rate limit, logger, auth, recover, compression, dev error page
+├── pkg/
+│   ├── auth/               # JWT (≥32-byte secret enforced)
+│   ├── config/             # YAML / .env / env-var
+│   ├── errors/             # Error registry
+│   ├── utils/              # pool, circuitbreaker, httpclient, requestid
+│   └── validation/
+├── observability/          # health, metrics, tracing, otel
+├── performance/            # Benchmark DB, perfcheck CLI
+├── examples/               # basic, websocket, auth
+└── internal/               # Analyser tools, test utilities
 ```
 
 ## Quick Start
 
 ### 1. Basic Handler with Struct Tags
 ```go
-import "github.com/yshengliao/gortex/http/context"
+import "github.com/yshengliao/gortex/core/types"
 
 type HandlersManager struct {
     Home  *HomeHandler  `url:"/"`
@@ -68,7 +69,7 @@ type HandlersManager struct {
 }
 
 type HomeHandler struct{}
-func (h *HomeHandler) GET(c context.Context) error {
+func (h *HomeHandler) GET(c types.Context) error {
     return c.JSON(200, map[string]string{"message": "Hello Gortex!"})
 }
 ```
@@ -108,9 +109,9 @@ type HandlersManager struct {
 ```go
 type UserHandler struct{}
 
-func (h *UserHandler) GET(c context.Context) error    { /* GET /users/:id */ }
-func (h *UserHandler) POST(c context.Context) error   { /* POST /users/:id */ }
-func (h *UserHandler) Profile(c context.Context) error { /* POST /users/:id/profile */ }
+func (h *UserHandler) GET(c types.Context) error    { /* GET /users/:id */ }
+func (h *UserHandler) POST(c types.Context) error   { /* POST /users/:id */ }
+func (h *UserHandler) Profile(c types.Context) error { /* POST /users/:id/profile */ }
 ```
 
 ### 3. Configuration Setup
@@ -146,9 +147,25 @@ With `cfg.Logger.Level = "debug"`:
 
 ### Running Tests
 ```bash
-go test ./...           # Run all tests
-curl localhost:8080/_routes  # View debug routes (when running in debug mode)
+go test ./... -race -count=1      # Full suite with race detector (matches CI)
+go vet ./...
+curl localhost:8080/_routes       # View debug routes (in debug mode)
 ```
+
+## Security Defaults
+
+Hardened as of v0.4.0-alpha. Do not regress:
+
+- `Context.File(fsys fs.FS, name string)` — rejects `../`, absolute paths, symlinks out of root; use `FileDir(dir, name)` for filesystem-rooted serving.
+- `Context.Redirect` — only accepts same-origin paths by default; `RedirectOptions.AllowAbsolute` opts in specific hosts.
+- `middleware/cors.go` — `CORSWithConfig` returns `error` when `AllowOrigins` contains `*` and `AllowCredentials=true`; the `CORS()` convenience panics on the same misconfig.
+- `core/context.Binder` — wraps bodies in `http.MaxBytesReader` (default `10 << 20`); surfaces decode errors rather than swallowing them.
+- `middleware/logger.go` — `TrustedProxies` gates `X-Forwarded-For`/`X-Real-IP`; `BodyRedactor` masks JSON secret keys.
+- `middleware/dev_error_page.go` — redacts `Authorization`, `Cookie`, `Set-Cookie`, `X-Api-Key`, `X-Auth-Token`, `Proxy-Authorization`, plus `(?i)(token|password|secret|key|apikey|auth)` query params.
+- `middleware/csrf.go` — synchroniser-token pattern; `Secure`, `HttpOnly`, `SameSite=Lax`.
+- `middleware/ratelimit.go` — emits `X-RateLimit-Limit/Remaining/Reset` on every response and `Retry-After` on 429.
+- `pkg/auth.NewJWTService` — returns an error for secrets shorter than 32 bytes.
+- `transport/websocket` — `Config.MaxMessageBytes` sets `conn.SetReadLimit`; unknown/unauthorised messages are dropped with a log line.
 
 ## Critical Don'ts
 
@@ -165,7 +182,7 @@ curl localhost:8080/_routes  # View debug routes (when running in debug mode)
 // Register business errors
 errors.Register(ErrUserNotFound, 404, "User not found")
 
-func (h *UserHandler) GET(c context.Context) error {
+func (h *UserHandler) GET(c types.Context) error {
     user, err := h.service.GetUser(c.Param("id"))
     if err != nil {
         return err // Framework handles HTTP response
@@ -176,16 +193,30 @@ func (h *UserHandler) GET(c context.Context) error {
 
 ### WebSocket Setup
 ```go
+import gortexws "github.com/yshengliao/gortex/transport/websocket"
+
 type WSHandler struct {
-    hub *hub.Hub
+    hub *gortexws.Hub
 }
 
-func (h *WSHandler) HandleConnection(c context.Context) error {
+func (h *WSHandler) HandleConnection(c types.Context) error {
     conn, _ := upgrader.Upgrade(c.Response(), c.Request(), nil)
-    client := hub.NewClient(h.hub, conn, clientID, logger)
-    h.hub.RegisterClient(client)
+    client := gortexws.NewClient(h.hub, conn, clientID, logger)
+    h.hub.RegisterClient(client) // synchronous; returns only after hub records client
+    go client.WritePump()
+    go client.ReadPump()
     return nil
 }
+```
+
+Hardening knobs on the hub:
+
+```go
+hub := gortexws.NewHubWithConfig(logger, gortexws.Config{
+    MaxMessageBytes:     4 << 10,
+    AllowedMessageTypes: []string{"chat", "ping"},
+    Authorizer:          myAuthorizer, // func(*Client, *Message) error
+})
 ```
 
 ### Dependency Injection
@@ -255,4 +286,4 @@ app.Register(ctx, dbConnection)
 
 ---
 
-**Last Updated**: 2025/07/26 | **Framework**: Gortex v0.4.0-alpha | **Go**: 1.24+
+**Last Updated**: 2026-04-21 | **Framework**: Gortex v0.4.0-alpha | **Go**: 1.24+

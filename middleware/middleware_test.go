@@ -209,13 +209,16 @@ func TestRecovery(t *testing.T) {
 }
 
 func TestCORS(t *testing.T) {
-	middleware := CORSWithConfig(&CORSConfig{
+	middleware, err := CORSWithConfig(&CORSConfig{
 		AllowOrigins:     []string{"https://example.com"},
 		AllowMethods:     []string{"GET", "POST"},
 		AllowHeaders:     []string{"Content-Type", "Authorization"},
 		AllowCredentials: true,
 		MaxAge:           3600,
 	})
+	if err != nil {
+		t.Fatalf("CORSWithConfig returned error: %v", err)
+	}
 
 	t.Run("simple request", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/test", nil)

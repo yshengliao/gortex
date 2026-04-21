@@ -3,12 +3,32 @@ package middleware
 
 import (
 	"fmt"
+	"math"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
 	"golang.org/x/time/rate"
 )
+
+// Headers emitted by the rate-limit middleware on every pass-through
+// request and on 429 responses. The names follow the de-facto convention
+// used by GitHub, Twitter and others.
+const (
+	HeaderRateLimitLimit     = "X-RateLimit-Limit"
+	HeaderRateLimitRemaining = "X-RateLimit-Remaining"
+	HeaderRateLimitReset     = "X-RateLimit-Reset"
+	HeaderRetryAfter         = "Retry-After"
+)
+
+// RateLimitStatuser is implemented by stores that can report how many
+// requests are left in a bucket without consuming one. It is optional:
+// stores that cannot supply the information simply won't produce the
+// client-facing rate-limit headers.
+type RateLimitStatuser interface {
+	Status(key string) (limit int, remaining int, reset time.Time)
+}
 
 // RateLimiter defines the interface for rate limiting
 type RateLimiter interface {
@@ -118,6 +138,40 @@ func (m *MemoryRateLimiter) Reset(key string) {
 	delete(m.limiters, key)
 }
 
+// Status reports the current bucket state for the given key without
+// consuming a token. limit is the configured burst, remaining is the
+// rounded-down number of tokens currently available, and reset is when
+// the bucket will next be fully refilled.
+func (m *MemoryRateLimiter) Status(key string) (limit int, remaining int, reset time.Time) {
+	limiter := m.getLimiter(key)
+
+	m.mu.RLock()
+	burst := m.burst
+	r := m.rate
+	m.mu.RUnlock()
+
+	now := time.Now()
+	tokens := limiter.TokensAt(now)
+	if tokens < 0 {
+		tokens = 0
+	}
+	if tokens > float64(burst) {
+		tokens = float64(burst)
+	}
+
+	remaining = int(math.Floor(tokens))
+	limit = burst
+
+	if r <= 0 || tokens >= float64(burst) {
+		reset = now
+		return
+	}
+	missing := float64(burst) - tokens
+	seconds := missing / float64(r)
+	reset = now.Add(time.Duration(seconds * float64(time.Second)))
+	return
+}
+
 // Cleanup removes old limiters (should be called periodically)
 func (m *MemoryRateLimiter) Cleanup() {
 	m.mu.Lock()
@@ -165,14 +219,43 @@ func GortexRateLimitWithConfig(config *GortexRateLimitConfig) MiddlewareFunc {
 
 			// Get key for rate limiting
 			key := config.KeyFunc(c)
-			
-			// Check rate limit
-			if !config.Store.Allow(key) {
+			allowed := config.Store.Allow(key)
+			applyRateLimitHeaders(c, config.Store, key, allowed)
+
+			if !allowed {
 				return config.ErrorHandler(c)
 			}
-
 			return next(c)
 		}
+	}
+}
+
+// applyRateLimitHeaders writes the RateLimit-Limit, RateLimit-Remaining,
+// RateLimit-Reset and (on 429) Retry-After headers, provided the store
+// supports status reporting. Called before the handler / error handler
+// runs so clients always see a consistent view regardless of branch.
+func applyRateLimitHeaders(c Context, store RateLimiter, key string, allowed bool) {
+	statuser, ok := store.(RateLimitStatuser)
+	if !ok {
+		return
+	}
+	limit, remaining, reset := statuser.Status(key)
+
+	h := c.Response().Header()
+	h.Set(HeaderRateLimitLimit, strconv.Itoa(limit))
+	h.Set(HeaderRateLimitRemaining, strconv.Itoa(remaining))
+	h.Set(HeaderRateLimitReset, strconv.FormatInt(reset.Unix(), 10))
+
+	if !allowed {
+		// Retry-After is the minimum wait before the client should try
+		// again. Express as whole seconds, rounded up and clamped to a
+		// minimum of one second so clients don't hammer.
+		wait := time.Until(reset)
+		seconds := int64(math.Ceil(wait.Seconds()))
+		if seconds < 1 {
+			seconds = 1
+		}
+		h.Set(HeaderRetryAfter, strconv.FormatInt(seconds, 10))
 	}
 }
 

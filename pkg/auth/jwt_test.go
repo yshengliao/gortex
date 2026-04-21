@@ -9,13 +9,18 @@ import (
 	"github.com/yshengliao/gortex/pkg/auth"
 )
 
+// testSecret is a 32-byte string used to satisfy auth.MinJWTSecretBytes
+// whilst keeping tests readable.
+const testSecret = "test-secret-key-at-least-32-chars!!"
+
 func TestJWTService(t *testing.T) {
-	service := auth.NewJWTService(
-		"test-secret-key",
+	service, err := auth.NewJWTService(
+		testSecret,
 		time.Hour,
 		24*time.Hour,
 		"test-issuer",
 	)
+	require.NoError(t, err)
 
 	t.Run("GenerateAccessToken", func(t *testing.T) {
 		token, err := service.GenerateAccessToken("user123", "testuser", "test@example.com", "player")
@@ -58,12 +63,13 @@ func TestJWTService(t *testing.T) {
 
 	t.Run("ValidateToken_ExpiredToken", func(t *testing.T) {
 		// Create service with very short TTL
-		shortService := auth.NewJWTService(
-			"test-secret-key",
+		shortService, err := auth.NewJWTService(
+			testSecret,
 			1*time.Nanosecond, // Extremely short TTL
 			1*time.Hour,
 			"test-issuer",
 		)
+		require.NoError(t, err)
 
 		token, err := shortService.GenerateAccessToken("user123", "testuser", "test@example.com", "player")
 		require.NoError(t, err)

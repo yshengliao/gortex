@@ -3,7 +3,9 @@ package middleware
 import (
 	"bytes"
 	"io"
+	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -21,6 +23,19 @@ type LoggerConfig struct {
 	LogResponseBody bool
 	// BodyLogLimit is the maximum size of body to log
 	BodyLogLimit int
+	// TrustedProxies lists the CIDR ranges whose requests are allowed to
+	// set X-Real-IP or X-Forwarded-For. If nil or empty the forwarding
+	// headers are ignored entirely and the logger always reports the
+	// direct peer address. This stops attackers from forging client IPs
+	// by sending a proxy header through an internet-facing listener.
+	TrustedProxies []*net.IPNet
+	// BodyRedactor transforms captured request/response bodies before
+	// they reach the log sink. When nil and body logging is enabled, the
+	// middleware falls back to DefaultBodyRedactor so sensitive fields
+	// such as passwords or API keys are not persisted by accident.
+	// Explicitly set to a no-op (func(b []byte) []byte { return b }) to
+	// opt out.
+	BodyRedactor func([]byte) []byte
 }
 
 // DefaultLoggerConfig returns the default configuration
@@ -50,6 +65,9 @@ func LoggerWithConfig(config *LoggerConfig) MiddlewareFunc {
 	}
 	if config.BodyLogLimit == 0 {
 		config.BodyLogLimit = 1024
+	}
+	if config.BodyRedactor == nil {
+		config.BodyRedactor = DefaultBodyRedactor
 	}
 
 	return func(next HandlerFunc) HandlerFunc {
@@ -107,7 +125,7 @@ func LoggerWithConfig(config *LoggerConfig) MiddlewareFunc {
 				zap.String("path", req.URL.Path),
 				zap.Int("status", rw.statusCode),
 				zap.Duration("latency", latency),
-				zap.String("ip", getClientIP(req)),
+				zap.String("ip", clientIPFromRequest(req, config.TrustedProxies)),
 				zap.String("user_agent", req.UserAgent()),
 			}
 
@@ -116,7 +134,7 @@ func LoggerWithConfig(config *LoggerConfig) MiddlewareFunc {
 			}
 
 			if config.LogRequestBody && len(requestBody) > 0 {
-				fields = append(fields, zap.ByteString("request_body", requestBody))
+				fields = append(fields, zap.ByteString("request_body", config.BodyRedactor(requestBody)))
 			}
 
 			if config.LogResponseBody && len(rw.body) > 0 {
@@ -124,7 +142,7 @@ func LoggerWithConfig(config *LoggerConfig) MiddlewareFunc {
 				if len(body) > config.BodyLogLimit {
 					body = body[:config.BodyLogLimit]
 				}
-				fields = append(fields, zap.ByteString("response_body", body))
+				fields = append(fields, zap.ByteString("response_body", config.BodyRedactor(body)))
 			}
 
 			if err != nil {
@@ -165,22 +183,53 @@ func (rw *responseWriter) Write(b []byte) (int, error) {
 	return rw.ResponseWriter.Write(b)
 }
 
-// getClientIP gets the client IP address
-func getClientIP(req *http.Request) string {
-	// Check X-Real-IP header
-	if ip := req.Header.Get("X-Real-IP"); ip != "" {
+// clientIPFromRequest resolves the logical client IP for a request.
+// Forwarding headers are only honoured when req.RemoteAddr is in one of
+// the configured trustedProxies CIDRs; otherwise the direct peer address
+// is returned unchanged, preventing a malicious client from spoofing an
+// IP by simply sending X-Forwarded-For.
+func clientIPFromRequest(req *http.Request, trustedProxies []*net.IPNet) string {
+	remoteAddr := req.RemoteAddr
+	if !peerIsTrusted(remoteAddr, trustedProxies) {
+		return remoteAddr
+	}
+
+	if ip := strings.TrimSpace(req.Header.Get("X-Real-IP")); ip != "" {
 		return ip
 	}
-	
-	// Check X-Forwarded-For header
-	if ip := req.Header.Get("X-Forwarded-For"); ip != "" {
-		// Take the first IP if there are multiple
-		if idx := bytes.IndexByte([]byte(ip), ','); idx >= 0 {
-			return ip[:idx]
+	if fwd := req.Header.Get("X-Forwarded-For"); fwd != "" {
+		// The left-most entry is the originating client; trailing
+		// entries are the proxy chain and should be discarded.
+		if idx := strings.IndexByte(fwd, ','); idx >= 0 {
+			return strings.TrimSpace(fwd[:idx])
 		}
-		return ip
+		return strings.TrimSpace(fwd)
 	}
-	
-	// Fall back to RemoteAddr
-	return req.RemoteAddr
+	return remoteAddr
 }
+
+// peerIsTrusted reports whether the network peer behind remoteAddr falls
+// within one of the trustedProxies CIDRs.
+func peerIsTrusted(remoteAddr string, trustedProxies []*net.IPNet) bool {
+	if len(trustedProxies) == 0 {
+		return false
+	}
+	host := remoteAddr
+	if h, _, err := net.SplitHostPort(remoteAddr); err == nil {
+		host = h
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return false
+	}
+	for _, cidr := range trustedProxies {
+		if cidr == nil {
+			continue
+		}
+		if cidr.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
+

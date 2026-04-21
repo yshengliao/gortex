@@ -105,10 +105,10 @@ type HandlersManager struct {
 ```go
 type UserHandler struct{}
 
-func (h *UserHandler) GET(c context.Context) error    { /* GET /users/:id */ }
-func (h *UserHandler) POST(c context.Context) error   { /* POST /users/:id */ }
-func (h *UserHandler) DELETE(c context.Context) error { /* DELETE /users/:id */ }
-func (h *UserHandler) Profile(c context.Context) error { /* POST /users/:id/profile */ }
+func (h *UserHandler) GET(c types.Context) error    { /* GET /users/:id */ }
+func (h *UserHandler) POST(c types.Context) error   { /* POST /users/:id */ }
+func (h *UserHandler) DELETE(c types.Context) error { /* DELETE /users/:id */ }
+func (h *UserHandler) Profile(c types.Context) error { /* POST /users/:id/profile */ }
 ```
 
 ### 3. Nested Route Groups
@@ -139,11 +139,21 @@ type APIGroup struct {
 - **Built-in Debugging** - `/_routes`, `/_monitor` in dev mode
 
 ### Production Ready
-- **JWT Auth** - Built-in authentication middleware
-- **WebSocket** - First-class real-time support  
+- **JWT Auth** - Built-in authentication middleware with ≥32-byte secret enforcement
+- **WebSocket** - First-class real-time support with read-size limits, type whitelisting and authoriser hooks
 - **Metrics** - Prometheus-compatible metrics
 - **Graceful Shutdown** - Proper connection cleanup
 - **API Documentation** - Automatic OpenAPI/Swagger generation from struct tags
+
+### Security-first defaults
+- `Context.File` only serves from an `fs.FS` (path-traversal-safe)
+- `Context.Redirect` rejects off-origin targets unless explicitly allow-listed
+- CORS refuses `*` + `AllowCredentials=true` misconfigurations
+- JSON body capped at 10 MiB (configurable); multipart capped at 32 MiB
+- Logger redacts common secret headers and JSON keys; `X-Forwarded-For` only trusted for configured proxies
+- Synchroniser-token CSRF middleware + `X-RateLimit-*` / `Retry-After` headers
+
+Reporting process: see [SECURITY.md](SECURITY.md). Full defaults: see [docs/security.md](docs/security.md).
 
 ## Middleware
 
@@ -170,14 +180,16 @@ app.NewApp(
 
 ### WebSocket Support
 ```go
+import gortexws "github.com/yshengliao/gortex/transport/websocket"
+
 type WSHandler struct {
-    hub *hub.Hub
+    hub *gortexws.Hub
 }
 
-func (h *WSHandler) HandleConnection(c context.Context) error {
-    // Auto-upgrades to WebSocket with hijack:"ws" tag
+func (h *WSHandler) HandleConnection(c types.Context) error {
+    // Tag `hijack:"ws"` marks the route for upgrade.
     conn, _ := upgrader.Upgrade(c.Response(), c.Request(), nil)
-    client := hub.NewClient(h.hub, conn, id, logger)
+    client := gortexws.NewClient(h.hub, conn, id, logger)
     h.hub.RegisterClient(client)
     return nil
 }
@@ -219,7 +231,7 @@ errors.Register(ErrUserNotFound, 404, "User not found")
 errors.Register(ErrUnauthorized, 401, "Unauthorized")
 
 // Automatic error responses
-func (h *UserHandler) GET(c context.Context) error {
+func (h *UserHandler) GET(c types.Context) error {
     user, err := h.service.GetUser(c.Param("id"))
     if err != nil {
         return err // Framework handles HTTP response
@@ -239,35 +251,27 @@ func (h *UserHandler) GET(c context.Context) error {
 
 ## Project Structure
 
-The framework is organized into clear, purpose-driven modules:
-
 ```
 gortex/
-├── app/                    # Core application framework
-│   ├── interfaces/         # Service interfaces
-│   └── testutil/           # App-specific test utilities
-├── http/                   # HTTP-related packages
-│   ├── router/             # HTTP routing engine
-│   ├── middleware/         # HTTP middleware
-│   ├── context/            # Request/response context
-│   └── response/           # Response utilities
-├── websocket/              # WebSocket functionality
-│   └── hub/                # WebSocket connection hub
-├── auth/                   # Authentication (JWT, etc.)
-├── validation/             # Input validation
-├── observability/          # Monitoring & metrics
-│   ├── health/             # Health checks
-│   ├── metrics/            # Metrics collection
-│   └── tracing/            # Distributed tracing
-├── config/                 # Configuration management
-├── errors/                 # Error handling
-├── utils/                  # Utility packages
-│   ├── pool/               # Object pools
-│   ├── circuitbreaker/     # Circuit breaker pattern
-│   ├── httpclient/         # HTTP client utilities
-│   └── requestid/          # Request ID generation
-├── middleware/             # Framework middleware
-└── internal/               # Internal packages
+├── core/                   # Framework core
+│   ├── app/                # Application, lifecycle, route wiring
+│   ├── context/            # Binder, request/response context
+│   ├── handler/            # Handler cache & reflection helpers
+│   └── types/              # Public interfaces (types.Context, …)
+├── transport/              # I/O surfaces
+│   ├── http/               # HTTP context, router, response helpers
+│   └── websocket/          # Hub, client, message authorisation
+├── middleware/             # CORS, CSRF, rate limit, logger, auth, recover, …
+├── pkg/                    # Reusable building blocks
+│   ├── auth/               # JWT (≥32-byte secret enforced)
+│   ├── config/             # YAML / .env / env-var config
+│   ├── errors/             # Error registry
+│   ├── utils/              # Pool, circuit breaker, httpclient, requestid
+│   └── validation/         # Input validation
+├── observability/          # health, metrics, tracing, otel
+├── performance/            # Benchmark DB, weekly reports, perfcheck CLI
+├── examples/               # basic, websocket, auth
+└── internal/               # Analyser tools, shared test utilities
 ```
 
 ## Best Practices
@@ -288,7 +292,7 @@ type UserHandler struct {
     service *UserService // Business logic here
 }
 
-func (h *UserHandler) GET(c context.Context) error {
+func (h *UserHandler) GET(c types.Context) error {
     user, err := h.service.GetUser(c.Request().Context(), c.Param("id"))
     // Handle response...
 }
@@ -299,22 +303,32 @@ func (h *UserHandler) GET(c context.Context) error {
 cfg.Logger.Level = "debug" // Enables /_routes, /_monitor, etc.
 ```
 
+## Examples
+
+Runnable references live under [`examples/`](examples/):
+
+- [`examples/basic`](examples/basic) — struct-tag routing + binder + validator.
+- [`examples/websocket`](examples/websocket) — chat demo exercising message-size limits and the authoriser hook.
+- [`examples/auth`](examples/auth) — JWT login / refresh / `/me` flow using the entropy-checked `NewJWTService`.
+
+Each example has its own README with a `curl`/`websocat` transcript covering the golden path and rejection cases.
+
 ## Recent Improvements (v0.4.0-alpha)
 
+### Security hardening
+- Path-traversal-safe `Context.File` and `Context.Redirect`
+- CORS, dev error page, logger and binder hardened against common misuse
+- JWT secret entropy check, trusted-proxy client-IP, WebSocket read limits + authoriser
+- CSRF middleware and rate-limit response headers
+
 ### Enhanced Observability
-- **Advanced Tracing**: 8-level severity system (DEBUG to EMERGENCY)
-- **Performance Tracking**: Built-in benchmarking and bottleneck detection
-- **Metrics Collection**: ShardedCollector for high-performance metrics
+- 8-level severity tracing (DEBUG to EMERGENCY)
+- Built-in benchmarking and bottleneck detection
+- ShardedCollector for high-throughput metrics
 
-### Developer Experience
-- **Context Propagation Checker**: Static analysis tool for proper context usage
-- **Performance Reports**: Weekly automated performance analysis
-- **Best Practices Documentation**: Comprehensive guides for production use
-
-### CI/CD Integration
-- **Static Analysis**: 30+ linters with automatic PR comments
-- **Performance Regression Tests**: Automatic detection of performance degradation
-- **Benchmark Tracking**: Historical performance data with trend analysis
+### CI/CD
+- `go test ./... -race -count=1` on every PR
+- `go vet` + static analysis; benchmark history tracked in `performance/`
 
 ## Contributing
 

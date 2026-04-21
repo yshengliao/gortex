@@ -59,7 +59,15 @@ type App struct {
 	developmentMode bool
 	tracer          tracing.Tracer
 	docProvider     doc.DocProvider
-	docRouteInfos   []doc.RouteInfo  // Stores route info for documentation
+	docRouteInfos   []doc.RouteInfo // Stores route info for documentation
+
+	// pendingHandlers holds the manager passed to WithHandlers until the
+	// router's default middleware chain is set up in NewApp. The Gortex
+	// router snapshots middleware at route-registration time, so handler
+	// registration must run strictly after setupRouter has attached the
+	// default chain — otherwise routes registered via WithHandlers would
+	// bypass recovery, logging, CORS, etc.
+	pendingHandlers any
 }
 
 // RouteLogInfo stores information about a registered route for logging
@@ -96,11 +104,23 @@ func NewApp(opts ...Option) (*App, error) {
 	// Configure router and middleware
 	app.setupRouter()
 
+	// Register handlers after setupRouter so they inherit the default
+	// middleware chain. The Gortex router evaluates global middleware at
+	// route-registration time, so the order here is load-bearing.
+	if app.pendingHandlers != nil {
+		if err := RegisterRoutes(app, app.pendingHandlers); err != nil {
+			return nil, err
+		}
+		if app.enableRoutesLog && app.logger != nil {
+			app.logRoutes()
+		}
+	}
+
 	// Register development routes if in development mode
 	if app.IsDevelopment() {
 		app.registerDevelopmentRoutes()
 	}
-	
+
 	// Register documentation endpoints if doc provider is set
 	if app.docProvider != nil {
 		app.registerDocumentationRoutes()
@@ -131,20 +151,12 @@ func WithLogger(logger *zap.Logger) Option {
 	}
 }
 
-// WithHandlers registers handlers using reflection
+// WithHandlers registers handlers using reflection. The actual route
+// registration is deferred to NewApp so it runs after setupRouter has
+// installed the default middleware chain; see App.pendingHandlers.
 func WithHandlers(manager any) Option {
 	return func(app *App) error {
-		// Use Gortex registration
-		err := RegisterRoutes(app, manager)
-		if err != nil {
-			return err
-		}
-
-		// Log routes if enabled
-		if app.enableRoutesLog && app.logger != nil {
-			app.logRoutes()
-		}
-
+		app.pendingHandlers = manager
 		return nil
 	}
 }
@@ -215,32 +227,92 @@ func WithDocProvider(provider doc.DocProvider) Option {
 	}
 }
 
-// setupRouter configures the Gortex router with middleware
+// setupRouter configures the Gortex router with per-route middleware.
+// The ordering is load-bearing: recovery wraps everything so panics are
+// caught no matter which downstream middleware misbehaves; request-id
+// must run before logger so log entries carry the id; the dev error
+// page (when enabled) takes over recovery with a richer HTML response;
+// the error handler runs closest to the user's route handler so it
+// sees the handler's return value before any outer middleware.
+//
+// CORS and gzip run one level higher (at http.Handler scope, via
+// serverHandler) so preflight OPTIONS and Accept-Encoding decisions
+// happen before the router decides whether a route exists.
 func (app *App) setupRouter() {
-	// Apply middleware based on configuration
-	if app.config == nil || app.config.Server.Recovery {
-		// TODO: Add recovery middleware for Gortex
+	recoveryEnabled := app.config == nil || app.config.Server.Recovery
+
+	if recoveryEnabled {
+		app.router.Use(middleware.RecoveryWithConfig(&middleware.RecoveryConfig{
+			Logger: app.logger,
+		}))
 	}
 
-	// TODO: Add compression middleware support for Gortex
-	// TODO: Add CORS middleware support for Gortex
-
-	// Request ID middleware
 	app.router.Use(middleware.RequestID())
 
-	// Development mode enhancements
-	if app.IsDevelopment() {
-		// Add development error page middleware
-		app.router.Use(middleware.RecoverWithErrorPage())
-		// TODO: Add development logger middleware
+	if app.logger != nil {
+		app.router.Use(middleware.Logger(app.logger))
 	}
 
-	// TODO: Add error handler middleware
+	if app.IsDevelopment() {
+		app.router.Use(middleware.RecoverWithErrorPage())
+	}
+
+	app.router.Use(middleware.ErrorHandlerWithConfig(&middleware.ErrorHandlerConfig{
+		Logger:                         app.logger,
+		HideInternalServerErrorDetails: !app.IsDevelopment(),
+	}))
+}
+
+// serverHandler returns the HTTP handler that App.Run installs on
+// http.Server.Handler. It applies the middleware that has to see every
+// request — including 404s and OPTIONS preflights — before the router
+// makes routing decisions. Innermost to outermost: router → CORS →
+// gzip.
+func (app *App) serverHandler() http.Handler {
+	var h http.Handler = app.router
+
+	corsEnabled := app.config == nil || app.config.Server.CORS
+	if corsEnabled {
+		h = middleware.CORSHandlerWithConfig(middleware.DefaultCORSConfig(), h)
+	}
+
+	if app.compressionEnabled() {
+		cfg := middleware.DefaultCompressionConfig()
+		if app.config != nil {
+			if app.config.Server.Compression.MinSize > 0 {
+				cfg.MinSize = app.config.Server.Compression.MinSize
+			}
+			if types := app.config.Server.Compression.ContentTypes; len(types) > 0 {
+				cfg.ContentTypes = types
+			}
+		}
+		h = middleware.GzipHandlerWithConfig(cfg, h)
+	}
+
+	return h
+}
+
+// compressionEnabled reports whether gzip compression should be wired
+// in at the HTTP handler layer. Either the legacy Server.GZip toggle
+// or the newer Server.Compression.Enabled field enables it.
+func (app *App) compressionEnabled() bool {
+	if app.config == nil {
+		return false
+	}
+	return app.config.Server.GZip || app.config.Server.Compression.Enabled
 }
 
 // Router returns the underlying Gortex router
 func (app *App) Router() httpctx.GortexRouter {
 	return app.router
+}
+
+// ServerHandler returns the HTTP handler that would be installed on
+// http.Server.Handler during Run — the router wrapped with CORS and
+// compression as configured. Exposed so tests can exercise the full
+// chain without starting a real server.
+func (app *App) ServerHandler() http.Handler {
+	return app.serverHandler()
 }
 
 // Context returns the application context
@@ -282,7 +354,7 @@ func (app *App) Run() error {
 	// Create HTTP server
 	app.server = &http.Server{
 		Addr:    address,
-		Handler: app.router,
+		Handler: app.serverHandler(),
 	}
 
 	return app.server.ListenAndServe()

@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"io/fs"
 	"mime/multipart"
 	"net/http"
 	"net/url"
-	
+
 	"github.com/yshengliao/gortex/core/types"
 )
 
@@ -282,6 +283,12 @@ func (c *testContext) Stream(code int, contentType string, r io.Reader) error {
 // File sends a file as the response
 func (c *testContext) File(file string) error {
 	http.ServeFile(c.response, c.request, file)
+	return nil
+}
+
+// FileFS serves a file from the supplied filesystem root.
+func (c *testContext) FileFS(fsys fs.FS, name string) error {
+	http.ServeFileFS(c.response, c.request, fsys, name)
 	return nil
 }
 

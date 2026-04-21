@@ -79,6 +79,8 @@ var (
 	ErrServiceUnavailable          = NewHTTPError(http.StatusServiceUnavailable)
 	ErrValidatorNotRegistered      = NewHTTPError(http.StatusInternalServerError, "validator not registered")
 	ErrInvalidRedirectCode         = NewHTTPError(http.StatusInternalServerError, "invalid redirect status code")
+	ErrUnsafeRedirectURL           = NewHTTPError(http.StatusBadRequest, "unsafe redirect URL")
+	ErrUnsafeFilePath              = NewHTTPError(http.StatusBadRequest, "unsafe file path")
 )
 
 // MIME types

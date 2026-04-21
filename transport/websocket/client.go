@@ -17,9 +17,6 @@ const (
 
 	// Send pings to peer with this period
 	pingPeriod = (pongWait * 9) / 10
-
-	// Maximum message size allowed from peer
-	maxMessageSize = 512 * 1024 // 512KB
 )
 
 // Client represents a WebSocket client connection
@@ -51,7 +48,7 @@ func (c *Client) ReadPump() {
 		c.conn.Close()
 	}()
 
-	c.conn.SetReadLimit(maxMessageSize)
+	c.conn.SetReadLimit(c.hub.maxMessageBytes())
 	c.conn.SetReadDeadline(time.Now().Add(pongWait))
 	c.conn.SetPongHandler(func(string) error {
 		c.conn.SetReadDeadline(time.Now().Add(pongWait))
@@ -73,10 +70,9 @@ func (c *Client) ReadPump() {
 		// Add client info to message
 		message.ClientID = c.ID
 
-		// Process message based on type
-		switch message.Type {
-		case "ping":
-			// Respond with pong
+		// Ping is always allowed — it's internal to the keepalive and
+		// doesn't need to pass the inbound gate.
+		if message.Type == "ping" {
 			pongMsg := &Message{
 				Type: "pong",
 				Data: map[string]any{
@@ -88,21 +84,25 @@ func (c *Client) ReadPump() {
 			default:
 				c.logger.Warn("Failed to send pong", zap.String("client_id", c.ID))
 			}
+			continue
+		}
 
-		case "broadcast":
-			// Broadcast to all clients
-			c.hub.broadcast <- &message
+		if err := c.hub.checkInbound(c, &message); err != nil {
+			c.logger.Warn("Dropping inbound WebSocket message",
+				zap.String("client_id", c.ID),
+				zap.String("type", message.Type),
+				zap.Error(err))
+			continue
+		}
 
+		switch message.Type {
 		case "private":
-			// Send to specific user
 			if target, ok := message.Data["target"].(string); ok {
 				message.Target = target
-				c.hub.broadcast <- &message
 			}
-
+			c.hub.broadcast <- broadcastOp{msg: &message}
 		default:
-			// Handle other message types or broadcast
-			c.hub.broadcast <- &message
+			c.hub.broadcast <- broadcastOp{msg: &message}
 		}
 	}
 }
