@@ -340,10 +340,11 @@ go run ./examples/basic      # 全部監聽 :8080
 
 | 文件 | 說明 |
 |------|------|
-| [API 參考](docs/API.md) | Context 介面、router、struct tag、middleware、WebSocket、安全預設 |
-| [安全指南](docs/security.md) | 檔案提供、重導向、CORS、JSON body 限制的安全使用方式 |
-| [Context 處理](docs/best-practices/context-handling.md) | 生命週期、取消、goroutine、逾時策略 |
-| [Metrics 分析](docs/performance/metrics-analysis.md) | Collector 效能測試與選擇指南 |
+| [API 參考](docs/zh-tw/API.md) | Context 介面、router、struct tag、middleware、WebSocket、安全預設 |
+| [安全指南](docs/zh-tw/security.md) | 檔案提供、重導向、CORS、JSON body 限制的安全使用方式 |
+| [Context 處理](docs/zh-tw/best-practices/context-handling.md) | 生命週期、取消、goroutine、逾時策略 |
+| [Metrics 分析](docs/zh-tw/performance/metrics-analysis.md) | Collector 效能測試與選擇指南 |
+| [架構哲學與設計決策](docs/zh-tw/architecture-philosophy.md) | 框架設計背後的問題意識與決策 |
 | [SECURITY.md](SECURITY.md) | 漏洞通報流程與支援版本 |
 
 ## 變更紀錄

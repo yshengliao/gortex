@@ -329,10 +329,11 @@ go run ./examples/basic      # all listen on :8080
 
 | Document | Description |
 |----------|-------------|
-| [API Reference](docs/API.md) | Context interface, router, struct tags, middleware, WebSocket, security defaults |
-| [Security Guide](docs/security.md) | Safe usage patterns for file serving, redirects, CORS, JSON body limits |
-| [Context Handling](docs/best-practices/context-handling.md) | Lifecycle, cancellation, goroutines, timeout strategies |
-| [Metrics Analysis](docs/performance/metrics-analysis.md) | Collector benchmarks and selection guide |
+| [API Reference](docs/en/API.md) | Context interface, router, struct tags, middleware, WebSocket, security defaults |
+| [Security Guide](docs/en/security.md) | Safe usage patterns for file serving, redirects, CORS, JSON body limits |
+| [Context Handling](docs/en/best-practices/context-handling.md) | Lifecycle, cancellation, goroutines, timeout strategies |
+| [Metrics Analysis](docs/en/performance/metrics-analysis.md) | Collector benchmarks and selection guide |
+| [Architecture Philosophy](docs/en/architecture-philosophy.md) | Framework design decisions and rationale |
 | [SECURITY.md](SECURITY.md) | Vulnerability reporting process and supported versions |
 
 ## Changelog
