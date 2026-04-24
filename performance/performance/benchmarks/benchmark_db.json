@@ -987,5 +987,28 @@
       "heap_inuse": 983040,
       "stack_inuse": 262144
     }
+  },
+  {
+    "name": "SimpleRoute",
+    "timestamp": "2026-04-25T00:46:17.977019+08:00",
+    "ns_per_op": 0,
+    "allocs_per_op": 0,
+    "bytes_per_op": 0,
+    "iterations": 1,
+    "go_version": "go1.26.2",
+    "os": "darwin",
+    "arch": "arm64",
+    "cpus": 12,
+    "gortex_version": "dev",
+    "mem_stats": {
+      "alloc": 360192,
+      "total_alloc": 360192,
+      "sys": 8145160,
+      "num_gc": 0,
+      "heap_alloc": 360192,
+      "heap_sys": 3932160,
+      "heap_inuse": 974848,
+      "stack_inuse": 262144
+    }
   }
 ]

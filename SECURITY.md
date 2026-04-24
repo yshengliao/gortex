@@ -20,11 +20,11 @@ You should receive an acknowledgement within 72 hours. Please allow up to
 ## Supported Versions
 
 Gortex is pre-1.0. Only the latest minor release line (currently
-`v0.4.x-alpha`) receives security fixes. Older lines are unsupported.
+`v0.6.x-alpha`) receives security fixes. Older lines are unsupported.
 
 ## Security Defaults
 
-The framework ships with these hardening defaults (as of v0.4.1-alpha).
+The framework ships with these hardening defaults (as of v0.6.1-alpha).
 Each can be tuned per application.
 
 | Area | Default | Override |

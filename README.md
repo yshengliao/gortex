@@ -1,7 +1,7 @@
 # Gortex - High-Performance Go Web Framework
 
 [![Go Version](https://img.shields.io/badge/go-1.25+-blue.svg)](https://go.dev/)
-![Status](https://img.shields.io/badge/status-v0.5.4--alpha-orange.svg)
+![Status](https://img.shields.io/badge/status-v0.6.1--alpha-orange.svg)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 ![AI Generated](https://img.shields.io/badge/AI_Generated-Antigravity-blueviolet.svg)
 
@@ -167,6 +167,13 @@ Full technical documentation is available in both English and Traditional Chines
 - 🔒 [SECURITY.md](SECURITY.md) — Vulnerability reporting process
 
 ## Changelog
+
+### v0.6.1-alpha (2026-04-25)
+
+- Documentation audit: fixed typos, verified all Chinese text uses Taiwanese Traditional Chinese terminology.
+- Updated `CLAUDE.md` with current performance data and feature inventory.
+- Updated `SECURITY.md` supported version line.
+- Consolidated version references across all docs.
 
 ### v0.5.4-alpha (2026-04-25)
 

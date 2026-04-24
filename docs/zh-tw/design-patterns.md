@@ -1,6 +1,6 @@
 # 設計模式與學習指南
 
-> 本文檔以 v0.5.1-alpha 為基礎，從「可以從這個框架中學到什麼」的角度，整理 Gortex 中值得研究的工程模式與尚未實作但值得探討的方向。
+> 本文檔以 v0.6.1-alpha 為基礎，從「可以從這個框架中學到什麼」的角度，整理 Gortex 中值得研究的工程模式與尚未實作但值得探討的方向。
 
 ## 已實作的核心設計模式
 
@@ -160,7 +160,7 @@ type HandlersManager struct {
 
 ### 3. 組態熱更新（Config Hot-reload）
 
-`pkg/config` 目前是一次性載入。在 K8s 中，ConfigMap 會被 kubelet 自動更新到 Pod 的掛載目錄。如果框架支援 `fsnotify` 監聯設定檔變更，就能做到不重啟即調整 log level、動態調整 rate limit 閾值、Feature flag 熱切換等。
+`pkg/config` 目前是一次性載入。在 K8s 中，ConfigMap 會被 kubelet 自動更新到 Pod 的掛載目錄。如果框架支援 `fsnotify` 監聽設定檔變更，就能做到不重啟即調整 log level、動態調整 rate limit 閾值、Feature flag 熱切換等。
 
 ### 4. 請求級別的 Timeout Propagation
 

@@ -1,7 +1,7 @@
 # Gortex — 高效能 Go Web 框架
 
 [![Go Version](https://img.shields.io/badge/go-1.25+-blue.svg)](https://go.dev/)
-![Status](https://img.shields.io/badge/status-v0.5.4--alpha-orange.svg)
+![Status](https://img.shields.io/badge/status-v0.6.1--alpha-orange.svg)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 ![AI Generated](https://img.shields.io/badge/AI_Generated-Antigravity-blueviolet.svg)
 
@@ -167,6 +167,13 @@ go run ./examples/websocket  # Hub 訊息限制與授權
 - 🔒 [SECURITY.md](SECURITY.md) — 漏洞通報流程
 
 ## 變更紀錄
+
+### v0.6.1-alpha (2026-04-25)
+
+- 文件審計：修正錯字、確認所有中文內容使用台灣繁體中文用語。
+- 更新 `CLAUDE.md` 至最新效能數據與功能清單。
+- 更新 `SECURITY.md` 支援版本行。
+- 統一各文件版本號引用。
 
 ### v0.5.4-alpha (2026-04-25)
 

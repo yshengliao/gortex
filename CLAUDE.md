@@ -1,6 +1,6 @@
 # Gortex Framework - Development Guide
 
-> **Framework**: Gortex | **Language**: Go 1.25 | **Status**: v0.4.1-alpha | **Updated**: 2026-04-24
+> **Framework**: Gortex | **Language**: Go 1.25 | **Status**: v0.6.1-alpha | **Updated**: 2026-04-25
 
 Development guide for Gortex — a high-performance Go web framework with declarative struct-tag routing.
 
@@ -140,9 +140,9 @@ With `cfg.Logger.Level = "debug"`:
 - Request/response logging with body capture
 
 ### Performance Optimizations
-- **Context Pool**: 38% reduction in memory allocations
-- **Smart Params**: Optimized for 1-4 parameters (common case)
-- **Route Caching**: Zero allocations for cached routes
+- **Zero-Allocation Routing**: 0 allocs/op for static, param, wildcard, and deep-param routes (~65 ns/op)
+- **Context Pool**: Embedded `responseWriter` value eliminates per-request allocation
+- **Smart Params**: Inline [4]string array for ≤4 params; overflow to map
 - **Reflection Caching**: 45% faster than standard routers
 
 ## Testing
@@ -236,13 +236,15 @@ handlers.UserService.DB = dbConnection
 
 ## Framework Development
 
-### Completed Features (v0.4.1-alpha)
+### Completed Features (v0.6.1-alpha)
 **Core Features**
 - Struct tag routing with segment-trie router (45% faster than radix tree)
+- **Zero-allocation routing hot path** (0 allocs/op, ~65 ns/op on M3 Pro)
 - WebSocket support with hub pattern, size limits, type whitelist, authoriser hook
 - JWT authentication with ≥32-byte secret enforcement
 - Zero-dependency config loader (YAML, .env, env vars, CLI args)
 - Development tools (`/_routes`, `/_monitor`, `/_config` with secret masking)
+- Bilingual documentation (English + Traditional Chinese)
 
 **Security Hardening**
 - Path-traversal-safe `File()` and `Redirect()`
@@ -256,7 +258,7 @@ handlers.UserService.DB = dbConnection
 - Context helper methods — `OK()`, `Created()`
 - Dev error pages with header/query redaction
 
-**Dependency Hygiene (v0.4.1)**
+**Dependency Hygiene**
 - Removed `Bofry/config` + 5 indirect deps
 - Isolated `x/tools` to standalone `tools/analyzer/` module
 - `otel/sdk` annotated as test-only
@@ -269,8 +271,8 @@ handlers.UserService.DB = dbConnection
 - **Zero Regressions**: `go test ./...` must pass before commits
 
 ### Performance Targets
-- **Routing**: <600 ns/op (currently 541 ns/op)
-- **Memory**: Zero allocations for cached routes
+- **Routing**: <100 ns/op (currently ~65 ns/op, 0 allocs)
+- **Memory**: Zero allocations on routing hot path
 - **Throughput**: >10k RPS on standard hardware
 
 ## Framework Context
@@ -296,4 +298,4 @@ handlers.UserService.DB = dbConnection
 
 ---
 
-**Last Updated**: 2026-04-24 | **Framework**: Gortex v0.4.1-alpha | **Go**: 1.25+
+**Last Updated**: 2026-04-25 | **Framework**: Gortex v0.6.1-alpha | **Go**: 1.25+
