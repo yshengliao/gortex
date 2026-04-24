@@ -4,7 +4,7 @@
 ![Status](https://img.shields.io/badge/status-v0.5.1--alpha-orange.svg)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 
-> **⚠️ [RESEARCH ONLY] This project is a local replica of a company-wide unified framework architectural philosophy. It is maintained for record-keeping and architectural learning, and is NOT intended for production use.**
+> **⚠️ [RESEARCH ONLY] This project is a local replica of past commonly used infrastructure architectural philosophies. It is maintained for record-keeping and architectural learning, and is NOT intended for production use.**
 >
 > [繁體中文](README_ZH_TW.md)
 

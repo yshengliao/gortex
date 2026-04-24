@@ -4,7 +4,7 @@
 ![Status](https://img.shields.io/badge/status-v0.5.1--alpha-orange.svg)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 
-> **⚠️ [僅供研究] 此專案是透過 AI 在本地復刻公司內部「通用基礎設施框架」的架構哲學。僅為留作紀錄與架構學習之用，請勿用於生產環境。**
+> **⚠️ [僅供研究] 此專案是透過 AI 在本地復刻過去常用的「通用基礎設施框架」架構哲學。僅為留作紀錄與架構學習之用，請勿用於生產環境。**
 >
 > [English](README.md)
 
