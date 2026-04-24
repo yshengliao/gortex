@@ -1,7 +1,7 @@
 # Gortex — 高效能 Go Web 框架
 
 [![Go Version](https://img.shields.io/badge/go-1.25+-blue.svg)](https://go.dev/)
-![Status](https://img.shields.io/badge/status-v0.5.1--alpha-orange.svg)
+![Status](https://img.shields.io/badge/status-v0.5.2--alpha-orange.svg)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 
 > **⚠️ [僅供研究] 此專案是透過 AI 在本地復刻過去常用的「通用基礎設施框架」架構哲學。僅為留作紀錄與架構學習之用，請勿用於生產環境。**
@@ -349,6 +349,15 @@ go run ./examples/basic      # 全部監聽 :8080
 | [SECURITY.md](SECURITY.md) | 漏洞通報流程與支援版本 |
 
 ## 變更紀錄
+
+### v0.5.2-alpha (2026-04-24)
+
+**文件**
+- 將 `docs/` 重新規劃為 `docs/en/` 與 `docs/zh-tw/` 雙語結構。
+- 新增 `architecture-philosophy.md`：說明 Kitchen-sink 設計理由、Jaeger/OTel 追蹤背景、K8s 多環境 Config 策略。
+- 新增 `design-patterns.md`：整理 10 個核心工程模式（Segment-trie、sync.Pool、SBO、Lock Sharding、Circuit Breaker、Actor-model Hub 等），並提供難度分級的學習路徑。
+- 將現有文件（API、安全指南、Context 處理、Metrics 分析）全數翻譯為台灣風格繁體中文。
+- 更新中英文 README 的文件連結指向對應語系版本。
 
 ### v0.5.1-alpha (2026-04-24)
 

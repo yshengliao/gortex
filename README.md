@@ -1,7 +1,7 @@
 # Gortex - High-Performance Go Web Framework
 
 [![Go Version](https://img.shields.io/badge/go-1.25+-blue.svg)](https://go.dev/)
-![Status](https://img.shields.io/badge/status-v0.5.1--alpha-orange.svg)
+![Status](https://img.shields.io/badge/status-v0.5.2--alpha-orange.svg)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 
 > **⚠️ [RESEARCH ONLY] This project is a local replica of past commonly used infrastructure architectural philosophies. It is maintained for record-keeping and architectural learning, and is NOT intended for production use.**
@@ -338,6 +338,15 @@ go run ./examples/basic      # all listen on :8080
 | [SECURITY.md](SECURITY.md) | Vulnerability reporting process and supported versions |
 
 ## Changelog
+
+### v0.5.2-alpha (2026-04-24)
+
+**Documentation**
+- Restructured `docs/` into `docs/en/` and `docs/zh-tw/` for bilingual documentation.
+- Added `architecture-philosophy.md`: explains the Kitchen-sink design rationale, Jaeger/OTel tracing context, and K8s multi-environment config strategy.
+- Added `design-patterns.md`: catalogues 10 core engineering patterns (Segment-trie, sync.Pool, SBO, Lock Sharding, Circuit Breaker, Actor-model Hub, etc.) with a difficulty-ranked learning path.
+- Translated all existing docs (API, Security, Context Handling, Metrics Analysis) to Traditional Chinese (Taiwan style).
+- Updated both READMEs with bilingual doc links.
 
 ### v0.5.1-alpha (2026-04-24)
 
