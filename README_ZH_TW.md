@@ -3,6 +3,7 @@
 [![Go Version](https://img.shields.io/badge/go-1.25+-blue.svg)](https://go.dev/)
 ![Status](https://img.shields.io/badge/status-v0.5.3--alpha-orange.svg)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
+![AI Generated](https://img.shields.io/badge/AI_Generated-Antigravity-blueviolet.svg)
 
 > **⚠️ [僅供研究] 此專案透過 AI 在本地復刻過去常用的「通用基礎設施框架」架構哲學。僅為留作紀錄與架構學習之用，請勿用於生產環境。**
 >

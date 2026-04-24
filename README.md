@@ -3,6 +3,7 @@
 [![Go Version](https://img.shields.io/badge/go-1.25+-blue.svg)](https://go.dev/)
 ![Status](https://img.shields.io/badge/status-v0.5.3--alpha-orange.svg)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
+![AI Generated](https://img.shields.io/badge/AI_Generated-Antigravity-blueviolet.svg)
 
 > **⚠️ [RESEARCH ONLY] This project is a local replica of past commonly used infrastructure architectural philosophies. It is maintained for record-keeping and architectural learning, and is NOT intended for production use.**
 >
