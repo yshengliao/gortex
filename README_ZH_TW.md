@@ -1,10 +1,10 @@
 # Gortex — 高效能 Go Web 框架
 
 [![Go Version](https://img.shields.io/badge/go-1.25+-blue.svg)](https://go.dev/)
-![Status](https://img.shields.io/badge/status-v0.4.1--alpha-orange.svg)
+![Status](https://img.shields.io/badge/status-v0.5.1--alpha-orange.svg)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 
-> **零樣板、純 Go Web 框架。用 struct tag 定義路由，不寫註冊程式碼。**
+> **⚠️ [僅供研究] 此專案是透過 AI 在本地復刻公司內部「通用基礎設施框架」的架構哲學。僅為留作紀錄與架構學習之用，請勿用於生產環境。**
 >
 > [English](README.md)
 
@@ -347,6 +347,12 @@ go run ./examples/basic      # 全部監聽 :8080
 | [SECURITY.md](SECURITY.md) | 漏洞通報流程與支援版本 |
 
 ## 變更紀錄
+
+### v0.5.1-alpha (2026-04-24)
+
+**專案定位**
+- 明確標示此為架構哲學研究與紀錄專案，不建議用於生產環境。
+- 新增完整的 Client 測試範例（結合 `httptest` 與內建的 `httpclient`）。
 
 ### v0.4.1-alpha (2026-04-24)
 

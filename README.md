@@ -1,10 +1,10 @@
 # Gortex - High-Performance Go Web Framework
 
 [![Go Version](https://img.shields.io/badge/go-1.25+-blue.svg)](https://go.dev/)
-![Status](https://img.shields.io/badge/status-v0.4.1--alpha-orange.svg)
+![Status](https://img.shields.io/badge/status-v0.5.1--alpha-orange.svg)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 
-> **Zero boilerplate, pure Go web framework. Define routes with struct tags, not code.**
+> **⚠️ [RESEARCH ONLY] This project is a local replica of a company-wide unified framework architectural philosophy. It is maintained for record-keeping and architectural learning, and is NOT intended for production use.**
 >
 > [繁體中文](README_ZH_TW.md)
 
@@ -336,6 +336,12 @@ go run ./examples/basic      # all listen on :8080
 | [SECURITY.md](SECURITY.md) | Vulnerability reporting process and supported versions |
 
 ## Changelog
+
+### v0.5.1-alpha (2026-04-24)
+
+**Project Status**
+- Explicitly marked as a research and architectural record project. Not intended for production use.
+- Added comprehensive client test examples utilizing `httptest` and the built-in `httpclient`.
 
 ### v0.4.1-alpha (2026-04-24)
 
