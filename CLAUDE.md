@@ -1,6 +1,6 @@
 # Gortex Framework - Development Guide
 
-> **Framework**: Gortex | **Language**: Go 1.24 | **Status**: v0.4.0-alpha | **Updated**: 2026-04-21
+> **Framework**: Gortex | **Language**: Go 1.25 | **Status**: v0.4.1-alpha | **Updated**: 2026-04-24
 
 Development guide for Gortex — a high-performance Go web framework with declarative struct-tag routing.
 
@@ -51,8 +51,10 @@ gortex/
 │   └── validation/
 ├── observability/          # health, metrics, tracing, otel
 ├── performance/            # Benchmark DB, perfcheck CLI
+├── tools/                  # Standalone dev tools (separate go.mod)
+│   └── analyzer/           # Context propagation static analyser
 ├── examples/               # basic, websocket, auth
-└── internal/               # Analyser tools, test utilities
+└── internal/               # Shared test utilities
 ```
 
 ## Quick Start
@@ -159,7 +161,7 @@ Hardened as of v0.4.0-alpha. Do not regress:
 - `Context.File(fsys fs.FS, name string)` — rejects `../`, absolute paths, symlinks out of root; use `FileDir(dir, name)` for filesystem-rooted serving.
 - `Context.Redirect` — only accepts same-origin paths by default; `RedirectOptions.AllowAbsolute` opts in specific hosts.
 - `middleware/cors.go` — `CORSWithConfig` returns `error` when `AllowOrigins` contains `*` and `AllowCredentials=true`; the `CORS()` convenience panics on the same misconfig.
-- `core/context.Binder` — wraps bodies in `http.MaxBytesReader` (default `10 << 20`); surfaces decode errors rather than swallowing them.
+- `core/context.Binder` — wraps bodies in `http.MaxBytesReader` (default 1 MiB); surfaces decode errors rather than swallowing them.
 - `middleware/logger.go` — `TrustedProxies` gates `X-Forwarded-For`/`X-Real-IP`; `BodyRedactor` masks JSON secret keys.
 - `middleware/dev_error_page.go` — redacts `Authorization`, `Cookie`, `Set-Cookie`, `X-Api-Key`, `X-Auth-Token`, `Proxy-Authorization`, plus `(?i)(token|password|secret|key|apikey|auth)` query params.
 - `middleware/csrf.go` — synchroniser-token pattern; `Secure`, `HttpOnly`, `SameSite=Lax`.
@@ -219,38 +221,46 @@ hub := gortexws.NewHubWithConfig(logger, gortexws.Config{
 })
 ```
 
-### Dependency Injection
+### Dependency Injection (Not Yet Implemented)
 ```go
+// NOTE: The `inject` tag is parsed but actual DI is NOT implemented.
+// Fields with `inject` tag must be set manually before RegisterRoutes,
+// or the framework will return an error for nil pointers.
 type UserService struct {
-    DB *sql.DB `inject:""`  // Auto-injected from DI container
+    DB *sql.DB `inject:""`  // Must be set manually; auto-inject is planned
 }
 
-// Register services
-ctx := app.NewContext()
-app.Register(ctx, dbConnection)
+// Set manually before registration:
+handlers.UserService.DB = dbConnection
 ```
 
 ## Framework Development
 
-### Completed Features (v0.4.0-alpha)
+### Completed Features (v0.4.1-alpha)
 **Core Features**
-- Struct tag routing with 45% performance improvement
-- WebSocket support with hub pattern and metrics
-- JWT authentication with middleware integration
-- Multi-source configuration (YAML, .env, env vars)
-- Development tools (debug endpoints, monitoring)
+- Struct tag routing with segment-trie router (45% faster than radix tree)
+- WebSocket support with hub pattern, size limits, type whitelist, authoriser hook
+- JWT authentication with ≥32-byte secret enforcement
+- Zero-dependency config loader (YAML, .env, env vars, CLI args)
+- Development tools (`/_routes`, `/_monitor`, `/_config` with secret masking)
+
+**Security Hardening**
+- Path-traversal-safe `File()` and `Redirect()`
+- CORS, CSRF, rate-limit middleware with proper response headers
+- JSON body capped at 1 MiB; multipart at 32 MiB
+- Logger redacts secrets in headers and JSON body
 
 **Developer Experience**
-- Auto handler initialization - no more nil pointer panics
-- Route logging system - automatic route documentation
-- Context helper methods - simplified parameter access
-- Development mode enhancements - helpful error pages
-- Friendly error pages with stack traces
+- Auto handler initialisation — no nil pointer panics
+- Route logging with live data (not placeholder)
+- Context helper methods — `OK()`, `Created()`
+- Dev error pages with header/query redaction
 
-**Advanced Features**
-- Struct tag system for DI, middleware, rate limiting
-- Performance optimizations with context pooling
-- Smart parameter storage for common cases
+**Dependency Hygiene (v0.4.1)**
+- Removed `Bofry/config` + 5 indirect deps
+- Isolated `x/tools` to standalone `tools/analyzer/` module
+- `otel/sdk` annotated as test-only
+- Total modules: 50 → 41 (direct 13→11, indirect 23→16)
 
 ### Development Guidelines
 - **Tests Required**: Unit tests + benchmarks for all changes
@@ -266,7 +276,7 @@ app.Register(ctx, dbConnection)
 ## Framework Context
 
 ### Positioning
-**Gortex** is a **lightweight, self-contained** Go web framework with **zero external dependencies**. Ideal for:
+**Gortex** is a **lightweight, self-contained** Go web framework with **no external infrastructure dependencies** (no Redis, Kafka, etc.). Ideal for:
 - **Real-time applications**: WebSocket-heavy apps
 - **Microservices**: Fast-starting, minimal footprint services  
 - **Rapid prototyping**: No infrastructure setup required
@@ -286,4 +296,4 @@ app.Register(ctx, dbConnection)
 
 ---
 
-**Last Updated**: 2026-04-21 | **Framework**: Gortex v0.4.0-alpha | **Go**: 1.24+
+**Last Updated**: 2026-04-24 | **Framework**: Gortex v0.4.1-alpha | **Go**: 1.25+

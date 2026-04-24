@@ -7,11 +7,28 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
 	"testing"
 	"time"
 
 	httpctx "github.com/yshengliao/gortex/transport/http"
 )
+
+// gortexVersion returns the module version from build info, falling
+// back to "dev" when running outside a versioned module build.
+func gortexVersion() string {
+	if bi, ok := debug.ReadBuildInfo(); ok {
+		for _, dep := range bi.Deps {
+			if dep.Path == "github.com/yshengliao/gortex" {
+				return dep.Version
+			}
+		}
+		if bi.Main.Version != "" && bi.Main.Version != "(devel)" {
+			return bi.Main.Version
+		}
+	}
+	return "dev"
+}
 
 // BenchmarkResult represents a single benchmark result
 type BenchmarkResult struct {
@@ -322,7 +339,7 @@ func (bs *BenchmarkSuite) recordResult(b *testing.B, name string) {
 		OS:            runtime.GOOS,
 		Arch:          runtime.GOARCH,
 		CPUs:          runtime.NumCPU(),
-		GortexVersion: "v0.4.0-alpha", // TODO: Get from version file
+		GortexVersion: gortexVersion(),
 		MemStats: MemStats{
 			Alloc:      m.Alloc,
 			TotalAlloc: m.TotalAlloc,

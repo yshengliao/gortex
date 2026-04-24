@@ -13,13 +13,12 @@ linters:
     - dogsled
     - dupl
     - errcheck
-    - exportloopref
     - exhaustive
     - goconst
     - gocritic
     - gofmt
     - goimports
-    - gomnd
+    - mnd
     - gocyclo
     - gosec
     - gosimple
@@ -84,7 +83,7 @@ linters-settings:
   goimports:
     local-prefixes: github.com/yshengliao/gortex
   
-  gomnd:
+  mnd:
     settings:
       mnd:
         # don't include the "operation" and "assign"
@@ -120,18 +119,18 @@ issues:
         - errcheck
         - dupl
         - gosec
-        - gomnd
+        - mnd
     
     # Exclude known code patterns
     - path: internal/testutil/
       linters:
-        - gomnd
+        - mnd
         - goconst
     
     # Exclude benchmarks
     - path: _bench_test\.go
       linters:
-        - gomnd
+        - mnd
         - goconst
         - dupl
 

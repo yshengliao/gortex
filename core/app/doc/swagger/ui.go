@@ -65,23 +65,3 @@ func (h *SwaggerUIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Write([]byte(html))
 }
-
-// EmbeddedSwaggerUI provides an option to use embedded Swagger UI assets
-// This is a placeholder for future implementation where we might embed
-// the Swagger UI distribution files directly in the binary
-type EmbeddedSwaggerUI struct {
-	// In a real implementation, this would contain embedded file system
-	// with Swagger UI assets
-}
-
-// NewEmbeddedSwaggerUI creates a new embedded Swagger UI handler
-func NewEmbeddedSwaggerUI() *EmbeddedSwaggerUI {
-	// TODO: Implement embedded Swagger UI using embed package
-	return &EmbeddedSwaggerUI{}
-}
-
-// Handler returns an HTTP handler for the embedded Swagger UI
-func (e *EmbeddedSwaggerUI) Handler(swaggerJSONPath string) http.Handler {
-	// For now, fallback to the CDN version
-	return NewSwaggerUIHandler(swaggerJSONPath)
-}

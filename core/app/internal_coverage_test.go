@@ -272,17 +272,6 @@ func TestIsHandlerGroup(t *testing.T) {
 	assert.False(t, isHandlerGroup("not a struct"))
 }
 
-// --- route_registration.go: getAvailableTypes stub --------------------
-
-func TestGetAvailableTypesStub(t *testing.T) {
-	ctx := appcontext.NewContext()
-	// Implementation is a TODO; just make sure it returns a non-nil
-	// (possibly empty) slice without panicking.
-	got := getAvailableTypes(ctx)
-	assert.NotNil(t, got)
-	assert.Empty(t, got)
-}
-
 // --- app.go: WithRuntimeMode, WithRoutesLogger, Config, compressionEnabled
 
 func TestWithRuntimeModeAndRoutesLogger(t *testing.T) {

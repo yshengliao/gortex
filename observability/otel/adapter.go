@@ -197,20 +197,14 @@ func SpanAdapterFromContext(ctx context.Context) *SpanAdapter {
 	return nil
 }
 
-// StartSpan implements tracing.Tracer interface
+// StartSpan implements tracing.Tracer interface.
+//
+// Only the Gortex span is started here. The simple Tracer interface
+// returns *tracing.Span which cannot carry an OTel span, so starting
+// one would leak it (the caller has no handle to call End()).
+// For full OTel integration use StartEnhancedSpan or StartSpanWithOptions.
 func (a *OTelTracerAdapter) StartSpan(ctx context.Context, operation string) (context.Context, *tracing.Span) {
-	// Start Gortex span
-	ctx, span := a.tracer.StartSpan(ctx, operation)
-	
-	// Start OpenTelemetry span
-	ctx, otelSpan := a.otelTracer.Start(ctx, operation)
-	
-	// For simple integration, we just start both spans
-	// The OTel span should be ended manually or via defer in the caller
-	// This maintains backward compatibility with the Tracer interface
-	_ = otelSpan
-	
-	return ctx, span
+	return a.tracer.StartSpan(ctx, operation)
 }
 
 // StartEnhancedSpan implements tracing.EnhancedTracer interface

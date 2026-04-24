@@ -177,9 +177,6 @@ type Context interface {
 	// Set the logger instance
 	SetLogger(l interface{})
 	
-	// Echo returns the context (for echo compatibility)
-	Echo() interface{}
-	
 	// Reset resets the context
 	Reset(r *http.Request, w http.ResponseWriter)
 	

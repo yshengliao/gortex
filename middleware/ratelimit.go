@@ -69,7 +69,10 @@ func DefaultGortexRateLimitConfig() *GortexRateLimitConfig {
 		Rate:  10,
 		Burst: 20,
 		KeyFunc: func(c Context) string {
-			// Use client IP as default key
+			// Use client IP as default rate-limit key.
+			// SECURITY WARNING: c.RealIP() trusts X-Forwarded-For unconditionally.
+			// This key can be spoofed if no trusted reverse proxy is configured.
+			// Consider a custom KeyFunc (e.g., authenticated user ID) in production.
 			return c.RealIP()
 		},
 		ErrorHandler: func(c Context) error {
@@ -82,24 +85,94 @@ func DefaultGortexRateLimitConfig() *GortexRateLimitConfig {
 	}
 }
 
-// MemoryRateLimiter implements RateLimiter using in-memory storage
-type MemoryRateLimiter struct {
-	limiters map[string]*rate.Limiter
-	mu       sync.RWMutex
-	rate     rate.Limit
-	burst    int
+// rateLimitEntry holds a rate limiter and its last-access timestamp for TTL tracking.
+type rateLimitEntry struct {
+	limiter  *rate.Limiter
+	lastSeen time.Time
 }
 
-// NewMemoryRateLimiter creates a new memory-based rate limiter
+// MemoryRateLimiterOptions configures a MemoryRateLimiter.
+type MemoryRateLimiterOptions struct {
+	Rate  rate.Limit
+	Burst int
+	// TTL is the idle duration after which an entry is eligible for cleanup.
+	// Defaults to 30 minutes.
+	TTL time.Duration
+	// CleanupInterval is how often the background goroutine scans for stale
+	// entries. Defaults to 10 minutes.
+	CleanupInterval time.Duration
+}
+
+// MemoryRateLimiter implements RateLimiter using in-memory storage with
+// automatic TTL-based cleanup to prevent unbounded memory growth.
+type MemoryRateLimiter struct {
+	entries map[string]*rateLimitEntry
+	mu      sync.RWMutex
+	rate    rate.Limit
+	burst   int
+
+	ttl             time.Duration
+	cleanupInterval time.Duration
+	stopCh          chan struct{}
+	stopOnce        sync.Once
+}
+
+// NewMemoryRateLimiter creates a new memory-based rate limiter with
+// default settings (10 req/s, burst 20, 30 min TTL, 10 min cleanup interval).
 func NewMemoryRateLimiter() *MemoryRateLimiter {
-	return &MemoryRateLimiter{
-		limiters: make(map[string]*rate.Limiter),
-		rate:     rate.Limit(10), // 10 requests per second
-		burst:    20,             // burst of 20
+	return NewMemoryRateLimiterWithOptions(MemoryRateLimiterOptions{
+		Rate:            rate.Limit(10),
+		Burst:           20,
+		TTL:             30 * time.Minute,
+		CleanupInterval: 10 * time.Minute,
+	})
+}
+
+// NewMemoryRateLimiterWithOptions creates a MemoryRateLimiter with the given
+// options and starts the background cleanup goroutine.
+func NewMemoryRateLimiterWithOptions(opts MemoryRateLimiterOptions) *MemoryRateLimiter {
+	if opts.TTL <= 0 {
+		opts.TTL = 30 * time.Minute
+	}
+	if opts.CleanupInterval <= 0 {
+		opts.CleanupInterval = 10 * time.Minute
+	}
+	if opts.Burst <= 0 {
+		opts.Burst = 20
+	}
+
+	m := &MemoryRateLimiter{
+		entries:         make(map[string]*rateLimitEntry),
+		rate:            opts.Rate,
+		burst:           opts.Burst,
+		ttl:             opts.TTL,
+		cleanupInterval: opts.CleanupInterval,
+		stopCh:          make(chan struct{}),
+	}
+	go m.runCleanup()
+	return m
+}
+
+// runCleanup periodically removes entries that have been idle longer than TTL.
+func (m *MemoryRateLimiter) runCleanup() {
+	ticker := time.NewTicker(m.cleanupInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			m.Cleanup()
+		case <-m.stopCh:
+			return
+		}
 	}
 }
 
-// SetRate sets the rate and burst for new limiters
+// Stop shuts down the background cleanup goroutine. Safe to call multiple times.
+func (m *MemoryRateLimiter) Stop() {
+	m.stopOnce.Do(func() { close(m.stopCh) })
+}
+
+// SetRate sets the rate and burst for new limiters.
 func (m *MemoryRateLimiter) SetRate(r rate.Limit, burst int) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -107,35 +180,36 @@ func (m *MemoryRateLimiter) SetRate(r rate.Limit, burst int) {
 	m.burst = burst
 }
 
-// getLimiter returns the rate limiter for a given key
-func (m *MemoryRateLimiter) getLimiter(key string) *rate.Limiter {
+// getEntry returns the entry for key, creating it if it does not exist.
+// It updates lastSeen on every access.
+func (m *MemoryRateLimiter) getEntry(key string) *rateLimitEntry {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
-	limiter, exists := m.limiters[key]
+
+	e, exists := m.entries[key]
 	if !exists {
-		limiter = rate.NewLimiter(m.rate, m.burst)
-		m.limiters[key] = limiter
+		e = &rateLimitEntry{limiter: rate.NewLimiter(m.rate, m.burst)}
+		m.entries[key] = e
 	}
-	
-	return limiter
+	e.lastSeen = time.Now()
+	return e
 }
 
-// Allow checks if a request is allowed
+// Allow checks if a request is allowed.
 func (m *MemoryRateLimiter) Allow(key string) bool {
-	return m.getLimiter(key).Allow()
+	return m.getEntry(key).limiter.Allow()
 }
 
-// AllowN checks if n requests are allowed
+// AllowN checks if n requests are allowed.
 func (m *MemoryRateLimiter) AllowN(key string, n int) bool {
-	return m.getLimiter(key).AllowN(time.Now(), n)
+	return m.getEntry(key).limiter.AllowN(time.Now(), n)
 }
 
-// Reset resets the rate limiter for a key
+// Reset removes the rate limiter for a key, resetting its counter.
 func (m *MemoryRateLimiter) Reset(key string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	delete(m.limiters, key)
+	delete(m.entries, key)
 }
 
 // Status reports the current bucket state for the given key without
@@ -143,7 +217,7 @@ func (m *MemoryRateLimiter) Reset(key string) {
 // rounded-down number of tokens currently available, and reset is when
 // the bucket will next be fully refilled.
 func (m *MemoryRateLimiter) Status(key string) (limit int, remaining int, reset time.Time) {
-	limiter := m.getLimiter(key)
+	entry := m.getEntry(key)
 
 	m.mu.RLock()
 	burst := m.burst
@@ -151,7 +225,7 @@ func (m *MemoryRateLimiter) Status(key string) (limit int, remaining int, reset 
 	m.mu.RUnlock()
 
 	now := time.Now()
-	tokens := limiter.TokensAt(now)
+	tokens := entry.limiter.TokensAt(now)
 	if tokens < 0 {
 		tokens = 0
 	}
@@ -172,15 +246,21 @@ func (m *MemoryRateLimiter) Status(key string) (limit int, remaining int, reset 
 	return
 }
 
-// Cleanup removes old limiters (should be called periodically)
+// Cleanup removes entries that have been idle longer than the configured TTL.
+// It is called automatically by the background goroutine but can also be
+// invoked manually.
 func (m *MemoryRateLimiter) Cleanup() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
-	// Simple cleanup: remove all limiters
-	// In production, you might want more sophisticated cleanup logic
-	m.limiters = make(map[string]*rate.Limiter)
+
+	cutoff := time.Now().Add(-m.ttl)
+	for key, entry := range m.entries {
+		if entry.lastSeen.Before(cutoff) {
+			delete(m.entries, key)
+		}
+	}
 }
+
 
 // GortexRateLimit returns a rate limiting middleware for Gortex
 func GortexRateLimit() MiddlewareFunc {

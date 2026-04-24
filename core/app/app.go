@@ -184,10 +184,14 @@ func WithShutdownTimeout(timeout time.Duration) Option {
 	}
 }
 
-// WithRuntimeMode sets the framework runtime mode (kept for compatibility)
+// WithRuntimeMode is a no-op retained for API compatibility.
+//
+// Only ModeGortex is supported. Passing any other value has no effect;
+// the mode is always set to ModeGortex. This option may be removed in a
+// future major release once all callers have been updated.
 func WithRuntimeMode(mode RuntimeMode) Option {
 	return func(app *App) error {
-		// Only Gortex mode is supported now
+		// Only Gortex mode is supported now.
 		app.runtimeMode = ModeGortex
 		return nil
 	}
@@ -483,11 +487,22 @@ func (app *App) runShutdownHooks(ctx context.Context) error {
 
 // registerDevelopmentRoutes registers development-only routes
 func (app *App) registerDevelopmentRoutes() {
-	// Import handlers package
+	// Record dev routes in routeInfos so that /_routes shows them too.
+	devPaths := []string{"/_routes", "/_error", "/_config", "/_monitor"}
+	for _, p := range devPaths {
+		app.routeInfos = append(app.routeInfos, RouteLogInfo{
+			Method:      "GET",
+			Path:        p,
+			Handler:     "devHandler",
+			Middlewares: []string{},
+		})
+	}
+
 	devHandlers := &devHandler{
-		logger: app.logger,
-		router: app.router,
-		config: app.config,
+		logger:     app.logger,
+		router:     app.router,
+		config:     app.config,
+		routeInfos: app.routeInfos,
 	}
 
 	// Register development routes
@@ -503,6 +518,7 @@ func (app *App) registerDevelopmentRoutes() {
 			zap.String("config", "/_config"),
 			zap.String("monitor", "/_monitor"),
 		)
+
 	}
 }
 
@@ -551,25 +567,29 @@ func (app *App) AddDocumentationRoute(routeInfo doc.RouteInfo) {
 
 // devHandler provides development endpoints
 type devHandler struct {
-	logger *zap.Logger
-	router httpctx.GortexRouter
-	config *Config
+	logger     *zap.Logger
+	router     httpctx.GortexRouter
+	config     *Config
+	routeInfos []RouteLogInfo // snapshot of registered routes at startup
 }
 
-// Routes returns debug information about all registered routes
+// Routes returns all registered routes as JSON.
+// The list is a snapshot taken at app startup; routes registered after
+// NewApp() returns are not included.
 func (h *devHandler) Routes(c httpctx.Context) error {
-	// Since GortexRouter doesn't expose routes, we'll return a placeholder
-	// In a real implementation, we'd need to add a Routes() method to the router
-
+	routes := make([]map[string]any, 0, len(h.routeInfos))
+	for _, r := range h.routeInfos {
+		routes = append(routes, map[string]any{
+			"method":      r.Method,
+			"path":        r.Path,
+			"handler":     r.Handler,
+			"middlewares": r.Middlewares,
+		})
+	}
 	return c.JSON(200, map[string]any{
-		"total_routes": 4, // Dev routes count
-		"routes": []map[string]string{
-			{"method": "GET", "path": "/_routes"},
-			{"method": "GET", "path": "/_error"},
-			{"method": "GET", "path": "/_config"},
-			{"method": "GET", "path": "/_monitor"},
-		},
-		"framework": "Gortex",
+		"total_routes": len(h.routeInfos),
+		"routes":       routes,
+		"framework":    "Gortex",
 	})
 }
 
@@ -593,13 +613,64 @@ func (h *devHandler) Error(c httpctx.Context) error {
 	}
 }
 
-// Config returns masked configuration for development
+// Config returns the application configuration with sensitive values masked.
 func (h *devHandler) Config(c httpctx.Context) error {
-	// In a real implementation, you would get config from context
-	// For now, return a simple response
+	if h.config == nil {
+		return c.JSON(200, map[string]any{
+			"message": "no configuration loaded",
+			"mode":    "development",
+		})
+	}
+
+	mask := func(s string) string {
+		if s == "" {
+			return "(empty)"
+		}
+		if len(s) <= 4 {
+			return "***"
+		}
+		return s[:2] + "***" + s[len(s)-2:]
+	}
+
 	return c.JSON(200, map[string]any{
-		"message": "Configuration endpoint",
-		"mode":    "development",
+		"server": map[string]any{
+			"address":          h.config.Server.Address,
+			"port":             h.config.Server.Port,
+			"read_timeout":     h.config.Server.ReadTimeout.String(),
+			"write_timeout":    h.config.Server.WriteTimeout.String(),
+			"idle_timeout":     h.config.Server.IdleTimeout.String(),
+			"shutdown_timeout": h.config.Server.ShutdownTimeout.String(),
+			"gzip":             h.config.Server.GZip,
+			"cors":             h.config.Server.CORS,
+			"recovery":         h.config.Server.Recovery,
+			"compression":      h.config.Server.Compression,
+		},
+		"logger": h.config.Logger,
+		"websocket": map[string]any{
+			"read_buffer_size":  h.config.WebSocket.ReadBufferSize,
+			"write_buffer_size": h.config.WebSocket.WriteBufferSize,
+			"max_message_size":  h.config.WebSocket.MaxMessageSize,
+			"pong_wait":         h.config.WebSocket.PongWait.String(),
+			"ping_period":       h.config.WebSocket.PingPeriod.String(),
+		},
+		"jwt": map[string]any{
+			"secret_key":        mask(h.config.JWT.SecretKey),
+			"access_token_ttl":  h.config.JWT.AccessTokenTTL.String(),
+			"refresh_token_ttl": h.config.JWT.RefreshTokenTTL.String(),
+			"issuer":            h.config.JWT.Issuer,
+		},
+		"database": map[string]any{
+			"driver":            h.config.Database.Driver,
+			"host":              h.config.Database.Host,
+			"port":              h.config.Database.Port,
+			"user":              h.config.Database.User,
+			"password":          mask(h.config.Database.Password),
+			"database":          h.config.Database.Database,
+			"ssl_mode":          h.config.Database.SSLMode,
+			"max_open_conns":    h.config.Database.MaxOpenConns,
+			"max_idle_conns":    h.config.Database.MaxIdleConns,
+			"conn_max_lifetime": h.config.Database.ConnMaxLifetime.String(),
+		},
 	})
 }
 
@@ -651,9 +722,9 @@ func (h *devHandler) Monitor(c httpctx.Context) error {
 		}
 	}
 
-	// TODO: Get Gortex routes count
+	// Routes summary
 	routesInfo := map[string]any{
-		"total_routes": "TBD",
+		"total_routes": len(h.routeInfos),
 	}
 
 	// Get compression status

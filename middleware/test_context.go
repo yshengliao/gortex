@@ -24,7 +24,7 @@ type testContext struct {
 func newTestContext(req *http.Request, resp http.ResponseWriter) *testContext {
 	return &testContext{
 		request:  req,
-		response: NewTestResponseWriter(resp),
+		response: newTestResponseWriter(resp),
 		values:   make(map[string]interface{}),
 		params:   make(map[string]string),
 	}
@@ -339,15 +339,10 @@ func (c *testContext) SetLogger(l interface{}) {
 	// Not implemented for test
 }
 
-// Echo returns the context
-func (c *testContext) Echo() interface{} {
-	return nil
-}
-
 // Reset resets the context
 func (c *testContext) Reset(r *http.Request, w http.ResponseWriter) {
 	c.request = r
-	c.response = NewTestResponseWriter(w)
+	c.response = newTestResponseWriter(w)
 	c.values = make(map[string]interface{})
 }
 
@@ -375,8 +370,8 @@ type testResponseWriter struct {
 	written bool
 }
 
-// NewTestResponseWriter creates a new test response writer
-func NewTestResponseWriter(w http.ResponseWriter) types.ResponseWriter {
+// newTestResponseWriter creates a new test response writer
+func newTestResponseWriter(w http.ResponseWriter) types.ResponseWriter {
 	return &testResponseWriter{
 		ResponseWriter: w,
 		status:         0, // 0 indicates not written yet

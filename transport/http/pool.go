@@ -34,7 +34,6 @@ func ReleaseContext(c Context) {
 		}
 		dc.handler = nil
 		dc.logger = nil
-		dc.echo = nil
 		dc.stdContext = nil
 		
 		// Clear the store but keep the map allocated

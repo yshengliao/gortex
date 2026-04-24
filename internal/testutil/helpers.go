@@ -181,12 +181,6 @@ func (c *MockContext) ResponseRecorder() *httptest.ResponseRecorder {
 	return c.recorder
 }
 
-// SimpleRouter creates a simple router for testing
-func SimpleRouter() interface{} {
-	// TODO: Fix this to return proper router type
-	return nil
-}
-
 // Request returns the HTTP request
 func (c *MockContext) Request() *http.Request {
 	return c.req
@@ -556,11 +550,6 @@ func (c *MockContext) Span() interface{} {
 	if span, ok := c.store["span"]; ok {
 		return span
 	}
-	return nil
-}
-
-// Echo returns the echo instance (for compatibility)
-func (c *MockContext) Echo() interface{} {
 	return nil
 }
 

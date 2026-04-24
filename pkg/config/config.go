@@ -1,4 +1,4 @@
-// Package config provides configuration management with future Bofry/config compatibility
+// Package config provides configuration management for the Gortex framework.
 package config
 
 import (
@@ -7,7 +7,7 @@ import (
 )
 
 // Config represents the application configuration structure
-// This structure is designed to be compatible with Bofry/config when migrated
+// Fields use yaml and env struct tags for multi-source loading.
 type Config struct {
 	Server    ServerConfig    `yaml:"server" env:"SERVER"`
 	Logger    LoggerConfig    `yaml:"logger" env:"LOGGER"`
@@ -80,11 +80,9 @@ type DatabaseConfig struct {
 }
 
 // LoaderFunc is a function that loads configuration
-// This allows for easy replacement with Bofry/config later
 type LoaderFunc func(*Config) error
 
 // Loader interface for configuration loading
-// This will be implemented by Bofry/config when migrated
 type Loader interface {
 	Load(cfg *Config) error
 }

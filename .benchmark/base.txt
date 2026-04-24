@@ -1,4 +1,0 @@
-PASS
-ok  	github.com/yshengliao/gortex/observability	0.220s
-PASS
-ok  	github.com/yshengliao/gortex/validation	0.230s

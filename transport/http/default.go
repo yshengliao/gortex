@@ -27,6 +27,13 @@ import (
 // are safer but may slow file uploads.
 const DefaultMaxMultipartBytes int64 = 32 << 20 // 32 MiB
 
+// DefaultMaxBodyBytes is the maximum number of bytes that Bind() will
+// read from a request body when decoding JSON or XML. Requests whose
+// bodies exceed this limit are rejected with an error. The value matches
+// the cap applied by core/context.ParameterBinder so both code paths
+// enforce the same policy.
+const DefaultMaxBodyBytes int64 = 1 << 20 // 1 MiB
+
 // maxMultipartBytesOverride holds a process-wide override set by
 // SetDefaultMaxMultipartBytes. Stored atomically so app startup and
 // request handling can race freely. A value of 0 (the zero-initialised
@@ -66,7 +73,6 @@ type DefaultContext struct {
 	store       Map
 	lock        sync.RWMutex
 	logger      interface{}
-	echo        interface{} // For compatibility
 	stdContext  context.Context
 }
 
@@ -127,7 +133,15 @@ func (c *DefaultContext) Scheme() string {
 	return "http"
 }
 
-// RealIP returns the client's real IP address
+// RealIP returns the client's real IP address.
+//
+// SECURITY WARNING: This method unconditionally trusts the X-Forwarded-For
+// and X-Real-IP headers. In environments where clients can set these headers
+// directly (no trusted reverse proxy in front of the server), the returned
+// value can be spoofed by any client. Do not use as a sole security control
+// (e.g., rate-limit key, IP allow-list) without ensuring that only a trusted
+// reverse proxy can reach the server and that the proxy strips client-supplied
+// forwarding headers before adding its own.
 func (c *DefaultContext) RealIP() string {
 	if ip := c.request.Header.Get(HeaderXForwardedFor); ip != "" {
 		i := strings.IndexAny(ip, ",")
@@ -299,33 +313,44 @@ func (c *DefaultContext) Set(key string, val interface{}) {
 	c.store[key] = val
 }
 
-// Bind binds request body to interface
+// Bind binds request body to interface.
+//
+// The request body is capped at DefaultMaxBodyBytes (1 MiB) via
+// http.MaxBytesReader to prevent oversized-payload DoS attacks. Requests
+// whose body exceeds the limit will cause Decode to return an error
+// containing "http: request body too large".
 func (c *DefaultContext) Bind(i interface{}) error {
-	// This is a simplified implementation
-	// In production, you would use a proper binding library
+	// Cap body size before any decoding to prevent DoS via oversized payloads.
+	limited := http.MaxBytesReader(c.response, c.request.Body, DefaultMaxBodyBytes)
 	contentType := c.request.Header.Get(HeaderContentType)
 	switch {
 	case strings.HasPrefix(contentType, MIMEApplicationJSON):
-		return json.NewDecoder(c.request.Body).Decode(i)
+		return json.NewDecoder(limited).Decode(i)
 	case strings.HasPrefix(contentType, MIMEApplicationXML), strings.HasPrefix(contentType, MIMETextXML):
-		return xml.NewDecoder(c.request.Body).Decode(i)
+		return xml.NewDecoder(limited).Decode(i)
 	default:
 		return ErrUnsupportedMediaType
 	}
 }
 
-// Validate validates the bound struct
+// Validate validates the bound struct.
+//
+// This method is a placeholder — no validator is registered by default.
+// It always returns ErrValidatorNotRegistered to fail loudly rather than
+// silently passing unvalidated data to the application.
+// Integrate a validator (e.g. github.com/go-playground/validator) and
+// call it here, or wrap this context to provide a custom implementation.
 func (c *DefaultContext) Validate(i interface{}) error {
-	// This should be implemented with a validator
-	// For now, return nil
-	return nil
+	return ErrValidatorNotRegistered
 }
 
-// Render renders a template with data
+// Render renders a template with data.
+//
+// This method is a placeholder — no template engine is registered by default.
+// Integrate a template engine and override this method, or wrap this context
+// to provide a custom implementation.
 func (c *DefaultContext) Render(code int, name string, data interface{}) error {
-	// This should be implemented with a template engine
-	// For now, return an error
-	return fmt.Errorf("render not implemented")
+	return fmt.Errorf("Render is not implemented: register a template engine before calling Render")
 }
 
 // JSON sends a JSON response with status code
@@ -622,11 +647,6 @@ func (c *DefaultContext) Logger() interface{} {
 // SetLogger sets the logger
 func (c *DefaultContext) SetLogger(l interface{}) {
 	c.logger = l
-}
-
-// Echo returns the Echo instance (for compatibility)
-func (c *DefaultContext) Echo() interface{} {
-	return c.echo
 }
 
 // Reset resets the context

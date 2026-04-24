@@ -1,10 +1,12 @@
 # Gortex - High-Performance Go Web Framework
 
-[![Go Version](https://img.shields.io/badge/go-1.24+-blue.svg)](https://go.dev/)
-![Status](https://img.shields.io/badge/status-v0.4.0--alpha-orange.svg)
+[![Go Version](https://img.shields.io/badge/go-1.25+-blue.svg)](https://go.dev/)
+![Status](https://img.shields.io/badge/status-v0.4.1--alpha-orange.svg)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 
 > **Zero boilerplate, pure Go web framework. Define routes with struct tags, not code.**
+>
+> [繁體中文](README_ZH_TW.md)
 
 ## Why Gortex?
 
@@ -149,7 +151,7 @@ type APIGroup struct {
 - `Context.File` only serves from an `fs.FS` (path-traversal-safe)
 - `Context.Redirect` rejects off-origin targets unless explicitly allow-listed
 - CORS refuses `*` + `AllowCredentials=true` misconfigurations
-- JSON body capped at 10 MiB (configurable); multipart capped at 32 MiB
+- JSON body capped at 1 MiB (configurable via `DefaultMaxBodyBytes`); multipart capped at 32 MiB
 - Logger redacts common secret headers and JSON keys; `X-Forwarded-For` only trusted for configured proxies
 - Synchroniser-token CSRF middleware + `X-RateLimit-*` / `Retry-After` headers
 
@@ -164,15 +166,15 @@ type HandlersManager struct {
     Private *PrivateHandler `url:"/private" middleware:"auth"`
     Admin   *AdminHandler   `url:"/admin" middleware:"auth,rbac"`
 }
+```
 
-// Or globally
-app.NewApp(
-    app.WithHandlers(handlers),
-    app.WithMiddleware(
-        middleware.Logger(),
-        middleware.Recover(),
-        middleware.CORS(),
-    ),
+Global middleware is applied via `router.Use()`:
+
+```go
+app, _ := app.NewApp(app.WithHandlers(handlers))
+app.Router().Use(
+    middleware.Logger(logger),
+    middleware.RequestID(),
 )
 ```
 
@@ -242,12 +244,17 @@ func (h *UserHandler) GET(c types.Context) error {
 
 ## Benchmarks
 
-| Operation | Performance | vs Echo | Memory |
-|-----------|------------|---------|--------|
-| Route Lookup | 541 ns/op | 45% faster | 0 allocs |
-| HTTP Request | 1.57 μs/op | 15% faster | 50% less |
-| Context Pool | 139 ns/op | N/A | 4 allocs |
-| Smart Params | 99.9 ns/op | N/A | 1 alloc |
+Measured on Apple M3 Pro, Go 1.24, `transport/http` package, `-benchmem -benchtime=2s`.
+
+| Operation | gortexRouter (production) | Memory | Notes |
+|-----------|--------------------------|--------|-------|
+| Static route | 163 ns/op | 288 B, 6 allocs | `GET /user/home` |
+| Param route | 267 ns/op | 576 B, 7 allocs | `GET /user/:name` |
+| Many routes (23 routes) | 325 ns/op | 624 B, 7 allocs | deep param lookup |
+| Context Pool | 122 ns/op | 208 B, 4 allocs | pooled vs 230 ns unpooled |
+| Smart Params | 89 ns/op | 48 B, 1 alloc | struct-tag param binding |
+
+> Measured with the production segment-trie router (`gortex_router.go`).
 
 ## Project Structure
 
@@ -269,9 +276,10 @@ gortex/
 │   ├── utils/              # Pool, circuit breaker, httpclient, requestid
 │   └── validation/         # Input validation
 ├── observability/          # health, metrics, tracing, otel
-├── performance/            # Benchmark DB, weekly reports, perfcheck CLI
+├── tools/                  # Standalone dev tools (separate go.mod)
+│   └── analyzer/           # Context propagation static analyser
 ├── examples/               # basic, websocket, auth
-└── internal/               # Analyser tools, shared test utilities
+└── internal/               # Shared test utilities
 ```
 
 ## Best Practices
@@ -305,28 +313,63 @@ cfg.Logger.Level = "debug" // Enables /_routes, /_monitor, etc.
 
 ## Examples
 
-Runnable references live under [`examples/`](examples/):
+Runnable references — each is a single `main.go` with a companion README and `curl`/`websocat` transcript.
 
-- [`examples/basic`](examples/basic) — struct-tag routing + binder + validator.
-- [`examples/websocket`](examples/websocket) — chat demo exercising message-size limits and the authoriser hook.
-- [`examples/auth`](examples/auth) — JWT login / refresh / `/me` flow using the entropy-checked `NewJWTService`.
+| Example | What it shows |
+|---------|---------------|
+| [basic](examples/basic/) | Struct-tag routing, binder, default middleware chain |
+| [auth](examples/auth/) | JWT login / refresh / `/me` with `NewJWTService` entropy check |
+| [websocket](examples/websocket/) | Hub config with message-size limit, type whitelist, authoriser hook |
 
-Each example has its own README with a `curl`/`websocat` transcript covering the golden path and rejection cases.
+```bash
+go run ./examples/basic      # all listen on :8080
+```
 
-## Recent Improvements (v0.4.0-alpha)
+## Documentation
 
-### Security hardening
+| Document | Description |
+|----------|-------------|
+| [API Reference](docs/API.md) | Context interface, router, struct tags, middleware, WebSocket, security defaults |
+| [Security Guide](docs/security.md) | Safe usage patterns for file serving, redirects, CORS, JSON body limits |
+| [Context Handling](docs/best-practices/context-handling.md) | Lifecycle, cancellation, goroutines, timeout strategies |
+| [Metrics Analysis](docs/performance/metrics-analysis.md) | Collector benchmarks and selection guide |
+| [SECURITY.md](SECURITY.md) | Vulnerability reporting process and supported versions |
+
+## Changelog
+
+### v0.4.1-alpha (2026-04-24)
+
+**Security & Reliability**
+- `Context.Bind()` enforces 1 MiB body cap via `http.MaxBytesReader`; `Context.Validate()` returns `ErrValidatorNotRegistered` instead of silent nil.
+- `Hub.Shutdown()` / `ShutdownWithTimeout()` now idempotent via `sync.Once`.
+- `MemoryRateLimiter` refactored with TTL-tracked entries and background cleanup.
+
+**Architecture**
+- Removed duplicate radix-tree router; kept production segment-trie `gortex_router.go`.
+- `/_routes` and `/_monitor` now return live data; `/_config` masks sensitive values.
+- `injectDependencies` skips reflect scan when no `inject` tag present (fast path).
+
+**Dependencies** — main module reduced from 50 → 41 modules (direct 13→11, indirect 23→16).
+- Removed `Bofry/config`; `pkg/config` uses zero-dependency `simpleLoader` (YAML + .env + env vars + CLI).
+- Moved `internal/analyzer` to standalone `tools/analyzer/` with own `go.mod`, removing `golang.org/x/tools`.
+- `otel/sdk` annotated test-only; updated `golang.org/x/crypto`.
+
+**Hygiene** — removed Echo remnants, dead code stubs, fictitious APIs, and LLM-generated placeholder docs. Consolidated config tests (876 → 532 lines). Updated `.golangci.yml`, `.gitignore`, and all documentation to match current state.
+
+### v0.4.0-alpha
+
+**Security hardening**
 - Path-traversal-safe `Context.File` and `Context.Redirect`
 - CORS, dev error page, logger and binder hardened against common misuse
 - JWT secret entropy check, trusted-proxy client-IP, WebSocket read limits + authoriser
 - CSRF middleware and rate-limit response headers
 
-### Enhanced Observability
+**Enhanced Observability**
 - 8-level severity tracing (DEBUG to EMERGENCY)
 - Built-in benchmarking and bottleneck detection
 - ShardedCollector for high-throughput metrics
 
-### CI/CD
+**CI/CD**
 - `go test ./... -race -count=1` on every PR
 - `go vet` + static analysis; benchmark history tracked in `performance/`
 

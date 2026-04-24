@@ -37,10 +37,22 @@ Thumbs.db
 /bin/
 /dist/
 
-# Example binaries
-examples/simple/simple
-examples/auth/auth
-examples/websocket/websocket
+# Go build outputs at project root (go build ./examples/...)
+/auth
+/basic
+/websocket
+/perfcheck
+/contextcheck
+
+# Example binaries in their directories
+examples/*/[a-z]*
+!examples/*/*.go
+!examples/*/*.md
+!examples/*/*.yaml
+!examples/*/*.yml
+
+# Benchmark artefacts
+.benchmark/
 
 # Temporary files
 *.tmp

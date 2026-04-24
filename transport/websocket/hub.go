@@ -4,6 +4,7 @@ package websocket
 import (
 	"errors"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -132,6 +133,7 @@ type Hub struct {
 	logger       *zap.Logger
 	shutdown     chan struct{}
 	shutdownDone chan struct{}
+	shutdownOnce sync.Once // guards close(h.shutdown) against double-close
 
 	config           Config
 	allowedTypesCache map[string]struct{}
@@ -439,18 +441,24 @@ func (h *Hub) UnregisterClient(client *Client) {
 	}
 }
 
-// Shutdown gracefully shuts down the hub
+// Shutdown gracefully shuts down the hub.
+// Safe to call multiple times — only the first call triggers the shutdown
+// sequence; subsequent calls are no-ops.
 func (h *Hub) Shutdown() {
 	h.logger.Info("Hub shutdown initiated")
-	close(h.shutdown)
+	h.shutdownOnce.Do(func() { close(h.shutdown) })
 	<-h.shutdownDone
 }
 
-// ShutdownWithTimeout gracefully shuts down the hub with a timeout
+// ShutdownWithTimeout gracefully shuts down the hub with a timeout.
+// Safe to call multiple times — only the first call triggers the shutdown
+// sequence; subsequent calls wait on shutdownDone (which is already closed)
+// and return nil immediately.
 func (h *Hub) ShutdownWithTimeout(timeout time.Duration) error {
 	h.logger.Info("Hub shutdown initiated", zap.Duration("timeout", timeout))
 	
-	// Send shutdown notification to all clients
+	// Send shutdown notification to all clients before closing the channel.
+	// Must happen before Once.Do so the message can still be broadcast.
 	shutdownMsg := &Message{
 		Type: "server_shutdown",
 		Data: map[string]any{
@@ -459,19 +467,19 @@ func (h *Hub) ShutdownWithTimeout(timeout time.Duration) error {
 		},
 	}
 	
-	// Try to broadcast shutdown message
+	// Try to broadcast shutdown message (best-effort).
 	select {
 	case h.broadcast <- broadcastOp{msg: shutdownMsg}:
-		// Give clients a moment to receive the message
+		// Give clients a moment to receive the message.
 		time.Sleep(100 * time.Millisecond)
 	default:
 		h.logger.Warn("Could not broadcast shutdown message")
 	}
 	
-	// Start shutdown
-	close(h.shutdown)
+	// Close the shutdown channel exactly once.
+	h.shutdownOnce.Do(func() { close(h.shutdown) })
 	
-	// Wait for shutdown with timeout
+	// Wait for shutdown with timeout.
 	select {
 	case <-h.shutdownDone:
 		return nil

@@ -166,15 +166,9 @@ func (c *Client) GetMetrics() ClientMetrics {
 		return ClientMetrics{}
 	}
 	
-	// Get transport metrics
-	var transportMetrics TransportMetrics
-	if mt, ok := c.Client.Transport.(*metricsTransport); ok {
-		if transport, ok := mt.base.(*http.Transport); ok {
-			transportMetrics = getTransportMetrics(transport)
-		}
-	} else if transport, ok := c.Client.Transport.(*http.Transport); ok {
-		transportMetrics = getTransportMetrics(transport)
-	}
+	// NOTE: http.Transport does not expose idle-connection counts
+	// publicly. TransportMetrics fields remain at zero until we
+	// implement our own connection tracking.
 	
 	// Calculate average response time
 	totalTime := atomic.LoadInt64(&c.metrics.totalResponseTime)
@@ -197,7 +191,6 @@ func (c *Client) GetMetrics() ClientMetrics {
 	
 	return ClientMetrics{
 		ActiveConnections:   atomic.LoadInt64(&c.metrics.ActiveConnections),
-		IdleConnections:     int64(transportMetrics.IdleConns),
 		TotalConnections:    atomic.LoadInt64(&c.metrics.TotalConnections),
 		ConnectionReuse:     atomic.LoadInt64(&c.metrics.ConnectionReuse),
 		TotalRequests:       atomic.LoadInt64(&c.metrics.TotalRequests),
@@ -205,7 +198,6 @@ func (c *Client) GetMetrics() ClientMetrics {
 		TotalErrors:         atomic.LoadInt64(&c.metrics.TotalErrors),
 		AverageResponseTime: avgResponseTime,
 		StatusCodes:         statusCodes,
-		TransportMetrics:    transportMetrics,
 	}
 }
 
@@ -267,15 +259,6 @@ func (c *Client) trackStatusCode(code int) {
 	}
 }
 
-func getTransportMetrics(transport *http.Transport) TransportMetrics {
-	// Note: These methods are not public in http.Transport
-	// In a real implementation, we would need to use reflection or
-	// maintain our own connection tracking
-	return TransportMetrics{
-		IdleConns:        0, // Would need reflection or custom tracking
-		IdleConnsPerHost: make(map[string]int),
-	}
-}
 
 // Close closes idle connections
 func (c *Client) Close() {

@@ -1,5 +1,3 @@
-//go:build !production
-// +build !production
 
 package app
 
@@ -21,8 +19,9 @@ import (
 // In development mode (default), this uses reflection for instant feedback
 // In production mode (go build -tags production), this uses generated static registration
 func RegisterRoutes(app *App, manager any) error {
-	// Clear existing route infos if logging is enabled
-	if app.enableRoutesLog {
+	// Populate routeInfos whenever logging is enabled OR the app is in
+	// development mode (so /_routes and /_monitor can show real data).
+	if app.enableRoutesLog || app.developmentMode {
 		app.routeInfos = make([]RouteLogInfo, 0)
 	}
 	return RegisterRoutesFromStruct(app.router, manager, app.ctx, app)
@@ -201,8 +200,8 @@ func registerHTTPHandlerWithMiddleware(r httpctx.GortexRouter, basePath string, 
 func registerMethodWithMiddleware(r httpctx.GortexRouter, httpMethod, path string, handler any, method reflect.Method, middleware []middleware.MiddlewareFunc, app *App) {
 	handlerFunc := createHandlerFunc(handler, method)
 
-	// Collect route info if app is provided and logging is enabled
-	if app != nil && app.enableRoutesLog {
+	// Collect route info if app is provided, logging is enabled, or dev mode is on.
+	if app != nil && (app.enableRoutesLog || app.developmentMode) {
 		handlerName := reflect.TypeOf(handler).Elem().Name()
 		var middlewareNames []string
 		// TODO: Extract middleware names - for now just count them
@@ -252,12 +251,30 @@ func registerMethodWithMiddleware(r httpctx.GortexRouter, httpMethod, path strin
 	}
 }
 
-// registerCustomMethodWithMiddleware registers a custom method with middleware
+// registerCustomMethodWithMiddleware registers a non-standard handler method as
+// an HTTP POST route.
+//
+// # Naming convention
+//
+// Any Go method whose name does not match a standard HTTP verb (GET, POST, PUT,
+// DELETE, PATCH, HEAD, OPTIONS) is treated as a "custom" method. It is always
+// registered as HTTP POST at <basePath>/<kebab-case-method-name>, regardless
+// of what the Go method name implies.
+//
+// Example:
+//
+//	type UserHandler struct{}
+//	func (h *UserHandler) GetProfile(c types.Context) error { ... }
+//	// → registered as: POST /users/get-profile   (NOT GET /users/get-profile)
+//
+// If you need a specific HTTP method for a custom endpoint, define the method
+// using a standard name (GET, POST, …) or add a `method` struct tag in a
+// future Gortex version once that tag is implemented.
 func registerCustomMethodWithMiddleware(r httpctx.GortexRouter, path string, handler any, method reflect.Method, middleware []middleware.MiddlewareFunc, app *App) {
 	handlerFunc := createHandlerFunc(handler, method)
 
-	// Collect route info for custom methods
-	if app != nil && app.enableRoutesLog {
+	// Collect route info for custom methods (same condition as standard methods).
+	if app != nil && (app.enableRoutesLog || app.developmentMode) {
 		handlerName := reflect.TypeOf(handler).Elem().Name()
 		var middlewareNames []string
 		if len(middleware) > 0 {
@@ -267,18 +284,18 @@ func registerCustomMethodWithMiddleware(r httpctx.GortexRouter, path string, han
 		}
 
 		app.routeInfos = append(app.routeInfos, RouteLogInfo{
-			Method:      "POST", // Custom methods are registered as POST
+			Method:      "POST", // Custom methods are always registered as POST.
 			Path:        path,
 			Handler:     handlerName + "." + method.Name,
 			Middlewares: middlewareNames,
 		})
 	}
-	
-	// Collect documentation info if app has doc provider
+
+	// Collect documentation info if app has doc provider.
 	if app != nil && app.docProvider != nil {
 		handlerType := reflect.TypeOf(handler).Elem()
 		routeInfo := doc.RouteInfo{
-			Method:      "POST", // Custom methods are registered as POST
+			Method:      "POST", // Custom methods are always registered as POST.
 			Path:        path,
 			Handler:     handlerType.Name() + "." + method.Name,
 			Middleware:  extractMiddlewareNames(middleware),
@@ -290,6 +307,7 @@ func registerCustomMethodWithMiddleware(r httpctx.GortexRouter, path string, han
 
 	r.POST(path, handlerFunc, middleware...)
 }
+
 
 // createHandlerFunc creates a gortex.HandlerFunc from a reflect.Method
 func createHandlerFunc(handler any, method reflect.Method) middleware.HandlerFunc {
@@ -550,7 +568,12 @@ func autoInitHandlers(v reflect.Value, checkURLTag bool) error {
 	return nil
 }
 
-// injectDependencies injects dependencies into handler fields with inject tag
+// injectDependencies is a placeholder for future DI support.
+//
+// It inspects struct fields tagged with `inject` but does NOT perform actual
+// injection — the feature is not yet implemented. If a field with an `inject`
+// tag is nil, an error is returned so the caller fails loudly rather than
+// proceeding with a nil pointer that would panic later.
 func injectDependencies(v reflect.Value, ctx *appcontext.Context) error {
 	// Handle pointer
 	if v.Kind() == reflect.Ptr && !v.IsNil() {
@@ -559,6 +582,13 @@ func injectDependencies(v reflect.Value, ctx *appcontext.Context) error {
 
 	// Only process structs
 	if v.Kind() != reflect.Struct {
+		return nil
+	}
+
+	// Fast path: skip if no field in this struct (non-recursive) has
+	// an `inject` tag. This is the common case and avoids the
+	// per-field Lookup overhead for every route registration.
+	if !hasInjectTag(v.Type()) {
 		return nil
 	}
 
@@ -572,23 +602,18 @@ func injectDependencies(v reflect.Value, ctx *appcontext.Context) error {
 			continue
 		}
 
-		// Check for inject tag
-		if injectTag := fieldType.Tag.Get("inject"); injectTag != "" {
-			// Try to inject from DI container
-			if ctx != nil {
-				// Try to get service of the field type using reflection
-				// This is a workaround since we can't use generics with reflection
-				// TODO: Add a method to Context to support this use case
-				
-				// For now, just log warning for fields that need injection
-				if field.Kind() == reflect.Ptr && field.IsNil() {
-					// Log warning but don't fail - allow partial injection
-					if logger, _ := appcontext.Get[*zap.Logger](ctx); logger != nil {
-						logger.Warn("Service not found in DI container - injection not implemented",
-							zap.String("field", fieldType.Name),
-							zap.String("type", field.Type().String()))
-					}
-				}
+		// Check for inject tag. Use Lookup so that `inject:""` (empty value)
+		// is detected — Get("inject") would return "" for both a missing tag
+		// and an empty-value tag, making them indistinguishable.
+		if _, hasInject := fieldType.Tag.Lookup("inject"); hasInject {
+			// Injection is not yet implemented. If the field is still nil,
+			// return an error to prevent a later nil-pointer panic.
+			if field.Kind() == reflect.Ptr && field.IsNil() {
+				return fmt.Errorf(
+					"field %s.%s has `inject` tag but DI injection is not implemented; "+
+						"set the field manually before calling RegisterRoutes or remove the `inject` tag",
+					t.Name(), fieldType.Name,
+				)
 			}
 		}
 
@@ -609,11 +634,21 @@ func injectDependencies(v reflect.Value, ctx *appcontext.Context) error {
 	return nil
 }
 
-// getAvailableTypes returns available types in the DI container for debugging
-func getAvailableTypes(ctx *appcontext.Context) []string {
-	// TODO: Add a method to Context to list available services
-	// For now, return empty list
-	return []string{}
+// hasInjectTag reports whether any exported field of t carries an
+// `inject` struct tag. Used as a fast-path check so that the
+// reflection walk can be skipped entirely for handler structs that
+// don't use DI.
+func hasInjectTag(t reflect.Type) bool {
+	for i := 0; i < t.NumField(); i++ {
+		f := t.Field(i)
+		if !f.IsExported() {
+			continue
+		}
+		if _, ok := f.Tag.Lookup("inject"); ok {
+			return true
+		}
+	}
+	return false
 }
 
 // Helper functions are now in utils.go

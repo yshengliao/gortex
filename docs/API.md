@@ -277,7 +277,7 @@ response.InternalServerError(c, "Server error")
 
 | Area | Default | Override |
 |------|---------|----------|
-| JSON body size | 10 MiB | `BinderConfig.MaxJSONBodyBytes` |
+| JSON body size | 1 MiB | `BinderConfig.MaxJSONBodyBytes` |
 | Multipart body | 32 MiB | `ContextConfig.MaxMultipartBytes` |
 | `Context.File` | Rooted in an `fs.FS`, `fs.ValidPath` required | `FileDir(dir, name)` wraps `os.DirFS` |
 | `Context.Redirect` | Only same-origin paths allowed | `RedirectOptions.AllowAbsolute` whitelist |

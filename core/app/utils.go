@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-	
+
 	"github.com/yshengliao/gortex/middleware"
 	httpctx "github.com/yshengliao/gortex/transport/http"
 )
@@ -78,3 +78,4 @@ func extractMiddlewareNames(middlewares []middleware.MiddlewareFunc) []string {
 	}
 	return names
 }
+

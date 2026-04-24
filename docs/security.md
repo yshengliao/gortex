@@ -69,7 +69,7 @@ if err != nil {
 
 ## JSON request bodies
 
-`context.ParameterBinder` enforces a `10 MiB` cap on JSON bodies by
+`context.ParameterBinder` enforces a `1 MiB` cap on JSON bodies by
 default via `http.MaxBytesReader`. Oversized payloads surface as
 decode errors (and HTTP 413 once the response headers are written).
 Malformed JSON also surfaces as an error rather than being silently
@@ -92,5 +92,5 @@ Gate it on `cfg.Logger.Level == "debug"` or equivalent.
 
 ## Further reading
 
-- [Comprehensive code review (2025-11-20)](reviews/2025-11-20-code-review.md)
-- [Security audit (2025-11-20)](reviews/2025-11-20-security-audit.md)
+- [SECURITY.md](../SECURITY.md) — vulnerability reporting process
+- [API reference — Security Defaults](../API.md#security-defaults)
