@@ -1,7 +1,7 @@
 # Gortex — 高效能 Go Web 框架
 
 [![Go Version](https://img.shields.io/badge/go-1.25+-blue.svg)](https://go.dev/)
-![Status](https://img.shields.io/badge/status-v0.5.3--alpha-orange.svg)
+![Status](https://img.shields.io/badge/status-v0.5.4--alpha-orange.svg)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 ![AI Generated](https://img.shields.io/badge/AI_Generated-Antigravity-blueviolet.svg)
 
@@ -132,11 +132,23 @@ cfg := config.NewConfigBuilder().
 
 | 分類 | 特性 |
 |------|------|
-| **路由** | Struct-tag 自動發現、segment-trie、巢狀群組、Context pooling |
+| **路由** | Struct-tag 自動發現、segment-trie、巢狀群組、**零分配** Context pooling |
 | **安全** | 防穿越 `File`、同源鎖定 `Redirect`、CORS 防護、1 MiB body 上限、CSRF、敏感值遮蔽 |
 | **可觀測性** | Jaeger/OTel 追蹤、分片指標收集、三態健康檢查、`/_routes` & `/_monitor` |
 | **韌性** | Circuit breaker、Token-bucket rate limiter（TTL 自動清理）、優雅關機 |
 | **即時通訊** | WebSocket Hub：訊息大小限制、類型白名單、授權勾子 |
+
+## 效能
+
+路由 hot path 達成**每請求零記憶體分配**（Apple M3 Pro, Go 1.25）：
+
+| 基準測試 | ns/op | B/op | allocs/op |
+|----------|------:|-----:|----------:|
+| 靜態路由（`/api/v1/health`） | ~71 | 0 | 0 |
+| 參數路由（`/users/:id`） | ~65 | 0 | 0 |
+| 深層參數（3 參數、7 段） | ~134 | 0 | 0 |
+| 萬用字元（`/static/*`） | ~58 | 0 | 0 |
+| JSON 回應 | ~308 | 416 | 5 |
 
 ## 範例
 
@@ -155,6 +167,10 @@ go run ./examples/websocket  # Hub 訊息限制與授權
 - 🔒 [SECURITY.md](SECURITY.md) — 漏洞通報流程
 
 ## 變更紀錄
+
+### v0.5.4-alpha (2026-04-25)
+
+- **零分配路由**：消除 hot path 上的 `map[string]string` 與 `strings.Split`；將 `responseWriter` 內嵌至池化 context。靜態、參數、萬用字元及深層參數路由皆達 0 allocs/op。
 
 ### v0.5.3-alpha (2026-04-24)
 

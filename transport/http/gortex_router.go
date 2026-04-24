@@ -200,12 +200,13 @@ func (r *gortexRouter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// Set the request path
 	ctx.SetPath(req.URL.Path)
 
-	if handler, params := r.findRoute(req.Method, req.URL.Path); handler != nil {
-		// Set path parameters efficiently
-		if len(params) > 0 {
-			SetParams(ctx, params)
-		}
+	dc, ok := ctx.(*DefaultContext)
+	if !ok {
+		http.NotFound(w, req)
+		return
+	}
 
+	if handler := r.findRoute(req.Method, req.URL.Path, dc.params); handler != nil {
 		if err := handler(ctx); err != nil {
 			// Handle error - check if it's an HTTPError
 			if he, ok := err.(*HTTPError); ok {
@@ -229,61 +230,81 @@ func (r *gortexRouter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-// findRoute finds a route handler for the given method and path
-func (r *gortexRouter) findRoute(method, path string) (HandlerFunc, map[string]string) {
+// findRoute finds a route handler for the given method and path.
+// params is written to directly, avoiding map allocation.
+func (r *gortexRouter) findRoute(method, path string, params *smartParams) HandlerFunc {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
 	root := r.trees[method]
 	if root == nil {
-		return nil, nil
+		return nil
 	}
 
-	segments := strings.Split(strings.Trim(path, "/"), "/")
-	params := make(map[string]string)
-
-	handler, _ := r.searchTree(root, segments, 0, params)
-	return handler, params
+	params.reset()
+	handler, _ := r.searchTree(root, path, params)
+	return handler
 }
 
-// searchTree recursively searches the route tree
-func (r *gortexRouter) searchTree(node *routeNode, segments []string, index int, params map[string]string) (HandlerFunc, []MiddlewareFunc) {
-	// Check if we've processed all segments or if this is root path
-	if index >= len(segments) || (len(segments) == 1 && segments[0] == "") {
+// searchTree recursively searches the route tree by walking the path
+// string directly, avoiding strings.Split allocation.
+func (r *gortexRouter) searchTree(node *routeNode, path string, params *smartParams) (HandlerFunc, []MiddlewareFunc) {
+	// Trim leading slashes
+	for len(path) > 0 && path[0] == '/' {
+		path = path[1:]
+	}
+
+	// No more segments — check current node
+	if path == "" {
 		if node.handler != nil {
 			return node.handler, node.middlewares
 		}
 		return nil, nil
 	}
 
-	segment := segments[index]
+	// Extract next segment
+	segment := path
+	rest := ""
+	if idx := strings.IndexByte(path, '/'); idx >= 0 {
+		segment = path[:idx]
+		rest = path[idx+1:]
+	}
+
+	if segment == "" {
+		if node.handler != nil {
+			return node.handler, node.middlewares
+		}
+		return nil, nil
+	}
 
 	// Try static route first
 	if child, exists := node.children[segment]; exists {
-		if handler, middlewares := r.searchTree(child, segments, index+1, params); handler != nil {
+		if handler, middlewares := r.searchTree(child, rest, params); handler != nil {
 			return handler, middlewares
 		}
 	}
 
 	// Try parameter route
 	if node.paramChild != nil {
-		params[node.paramChild.paramName] = segment
-		if handler, middlewares := r.searchTree(node.paramChild, segments, index+1, params); handler != nil {
+		saved := params.count
+		params.set(node.paramChild.paramName, segment)
+		if handler, middlewares := r.searchTree(node.paramChild, rest, params); handler != nil {
 			return handler, middlewares
 		}
-		delete(params, node.paramChild.paramName)
+		params.truncate(saved)
 	}
 
 	// Try wildcard route
 	if node.wildChild != nil {
-		// Capture all remaining segments as the wildcard value
-		remainingPath := strings.Join(segments[index:], "/")
-		params["*"] = remainingPath
-		if handler, middlewares := r.searchTree(node.wildChild, segments, len(segments), params); handler != nil {
+		saved := params.count
+		// path contains segment + rest — the full remaining path
+		params.set("*", path)
+		if handler, middlewares := r.searchTree(node.wildChild, "", params); handler != nil {
 			return handler, middlewares
 		}
-		delete(params, "*")
+		params.truncate(saved)
 	}
 
 	return nil, nil
 }
+

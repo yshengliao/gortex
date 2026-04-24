@@ -31,6 +31,12 @@ func (sp *smartParams) reset() {
 	}
 }
 
+// truncate discards parameters beyond index n. Used for backtracking
+// during route matching without allocating.
+func (sp *smartParams) truncate(n int) {
+	sp.count = n
+}
+
 // set adds or updates a parameter
 func (sp *smartParams) set(key, value string) {
 	// Check if key already exists in array

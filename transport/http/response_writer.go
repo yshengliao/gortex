@@ -72,6 +72,15 @@ func (w *responseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	return nil, nil, http.ErrNotSupported
 }
 
+// reset reinitialises a responseWriter in-place, avoiding allocation
+// when the writer is embedded as a value in a pooled context.
+func (w *responseWriter) reset(writer http.ResponseWriter) {
+	w.ResponseWriter = writer
+	w.status = http.StatusOK
+	w.size = 0
+	w.written = false
+}
+
 // Before is a no-op for basic implementation
 func (w *responseWriter) Before(func()) {}
 

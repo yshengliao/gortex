@@ -67,6 +67,7 @@ var _ Context = (*DefaultContext)(nil)
 type DefaultContext struct {
 	request     *http.Request
 	response    ResponseWriter
+	rw          responseWriter   // embedded value; same lifetime as the pooled context
 	path        string
 	params      *smartParams // Use smart params for better performance
 	handler     HandlerFunc
@@ -78,13 +79,15 @@ type DefaultContext struct {
 
 // NewDefaultContext creates a new DefaultContext
 func NewDefaultContext(r *http.Request, w http.ResponseWriter) Context {
-	return &DefaultContext{
+	dc := &DefaultContext{
 		request:    r,
-		response:   NewResponseWriter(w),
 		params:     newSmartParams(),
 		store:      make(Map),
 		stdContext: r.Context(),
 	}
+	dc.rw.reset(w)
+	dc.response = &dc.rw
+	return dc
 }
 
 // Request returns the HTTP request
@@ -652,7 +655,8 @@ func (c *DefaultContext) SetLogger(l interface{}) {
 // Reset resets the context
 func (c *DefaultContext) Reset(r *http.Request, w http.ResponseWriter) {
 	c.request = r
-	c.response = NewResponseWriter(w)
+	c.rw.reset(w)
+	c.response = &c.rw
 	c.path = ""
 	// Reset params instead of allocating new
 	if c.params == nil {

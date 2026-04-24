@@ -1,7 +1,7 @@
 # Gortex - High-Performance Go Web Framework
 
 [![Go Version](https://img.shields.io/badge/go-1.25+-blue.svg)](https://go.dev/)
-![Status](https://img.shields.io/badge/status-v0.5.3--alpha-orange.svg)
+![Status](https://img.shields.io/badge/status-v0.5.4--alpha-orange.svg)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 ![AI Generated](https://img.shields.io/badge/AI_Generated-Antigravity-blueviolet.svg)
 
@@ -132,11 +132,23 @@ cfg := config.NewConfigBuilder().
 
 | Category | Features |
 |----------|----------|
-| **Routing** | Struct-tag auto-discovery, segment-trie, nested groups, context pooling |
+| **Routing** | Struct-tag auto-discovery, segment-trie, nested groups, **zero-allocation** context pooling |
 | **Security** | Path-traversal-safe `File`, origin-locked `Redirect`, CORS guard, 1 MiB body cap, CSRF, secret redaction |
 | **Observability** | Jaeger/OTel tracing, sharded metrics, health checks (healthy/degraded/unhealthy), `/_routes` & `/_monitor` |
 | **Resilience** | Circuit breaker, token-bucket rate limiter with TTL cleanup, graceful shutdown |
 | **Real-time** | WebSocket Hub with read-size limits, type whitelist, and authoriser hooks |
+
+## Performance
+
+Routing hot path achieves **0 allocations per request** (Apple M3 Pro, Go 1.25):
+
+| Benchmark | ns/op | B/op | allocs/op |
+|-----------|------:|-----:|----------:|
+| Static route (`/api/v1/health`) | ~71 | 0 | 0 |
+| Param route (`/users/:id`) | ~65 | 0 | 0 |
+| Deep params (3 params, 7 segments) | ~134 | 0 | 0 |
+| Wildcard (`/static/*`) | ~58 | 0 | 0 |
+| JSON response | ~308 | 416 | 5 |
 
 ## Examples
 
@@ -155,6 +167,10 @@ Full technical documentation is available in both English and Traditional Chines
 - 🔒 [SECURITY.md](SECURITY.md) — Vulnerability reporting process
 
 ## Changelog
+
+### v0.5.4-alpha (2026-04-25)
+
+- **Zero-allocation routing**: eliminated `map[string]string` and `strings.Split` from hot path; embedded `responseWriter` in pooled context. 0 allocs/op for static, param, wildcard, and deep-param routes.
 
 ### v0.5.3-alpha (2026-04-24)
 

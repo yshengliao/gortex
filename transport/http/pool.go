@@ -27,6 +27,7 @@ func ReleaseContext(c Context) {
 		// Clean up the context before returning to pool
 		dc.request = nil
 		dc.response = nil
+		dc.rw.ResponseWriter = nil
 		dc.path = ""
 		// Reset params instead of nil
 		if dc.params != nil {
