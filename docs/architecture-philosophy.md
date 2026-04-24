@@ -12,9 +12,10 @@
 
 1. **強制一致性（Standardization）**：
    透過自訂的 `Context`、強制綁定的 `Config` 與統一的 `Logger`，確保跨部門、跨微服務的程式碼在處理請求、記錄日誌與讀取配置時，擁有一致的標準。這能大幅降低維運人員跨專案除錯的認知成本。
+   此外，Config 的多來源載入設計（支援 YAML、環境變數與 `.env` 混搭覆蓋）正是為了適應 Kubernetes (K8s) 的各個隔離環境。在本地端測試時可讀取設定檔，而上線時維持同一個 Docker Image，改由 K8s 注入環境變數，兩者共用同一套解析邏輯。
 
 2. **開箱即用的可觀測性（Observability Out-of-the-box）**：
-   框架內建了 `httpclient` 連線池指標收集，以及自帶的 `/_routes` 與 `/_monitor` 端點。業務開發者不需要每次建立新專案都重新配置 Prometheus 或 Tracing 的中介軟體，這些複雜度皆由框架底層吸收。
+   過去為了追蹤內部錯綜複雜的微服務鏈結，框架深度整合了分散式追蹤（Distributed Tracing，例如配合 Jaeger 與 OpenTelemetry），並內建了 `httpclient` 連線池指標收集，以及自帶的 `/_routes` 與 `/_monitor` 端點。業務開發者不需要每次建立新專案都重新配置 Prometheus 或 Tracing 的中介軟體，這些複雜度皆由框架底層吸收。
 
 3. **依賴收斂（Dependency Consolidation）**：
    將路由、參數綁定、中介軟體等核心元件收斂在框架內部，當遇到資安漏洞或需要全域調整行為（例如修改 CORS 預設策略、調整全域 Timeout）時，只需更新框架版本，而不必去每個專案逐一追查它們使用了哪一套第三方函式庫。
