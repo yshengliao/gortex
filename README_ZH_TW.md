@@ -345,6 +345,7 @@ go run ./examples/basic      # 全部監聽 :8080
 | [Context 處理](docs/zh-tw/best-practices/context-handling.md) | 生命週期、取消、goroutine、逾時策略 |
 | [Metrics 分析](docs/zh-tw/performance/metrics-analysis.md) | Collector 效能測試與選擇指南 |
 | [架構哲學與設計決策](docs/zh-tw/architecture-philosophy.md) | 框架設計背後的問題意識與決策 |
+| [設計模式與學習指南](docs/zh-tw/design-patterns.md) | 10 個核心工程模式與學習路徑 |
 | [SECURITY.md](SECURITY.md) | 漏洞通報流程與支援版本 |
 
 ## 變更紀錄

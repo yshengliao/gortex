@@ -334,6 +334,7 @@ go run ./examples/basic      # all listen on :8080
 | [Context Handling](docs/en/best-practices/context-handling.md) | Lifecycle, cancellation, goroutines, timeout strategies |
 | [Metrics Analysis](docs/en/performance/metrics-analysis.md) | Collector benchmarks and selection guide |
 | [Architecture Philosophy](docs/en/architecture-philosophy.md) | Framework design decisions and rationale |
+| [Design Patterns](docs/en/design-patterns.md) | 10 core patterns implemented and learning path |
 | [SECURITY.md](SECURITY.md) | Vulnerability reporting process and supported versions |
 
 ## Changelog
