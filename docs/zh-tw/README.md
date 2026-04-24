@@ -10,6 +10,7 @@ Gortex 框架的完整技術文件。
 | [安全指南](security.md) | 檔案提供、重導向、CORS、JSON body 限制 |
 | [架構哲學與設計決策](architecture-philosophy.md) | Kitchen-sink 設計理由、K8s Config 策略、Jaeger/OTel 追蹤背景 |
 | [設計模式與學習指南](design-patterns.md) | 10 個核心工程模式與難度分級學習路徑 |
+| [部署指南](deployment.md) | Dockerfile、Docker Compose、K8s 範例、DevOps 注意事項 |
 
 ## 最佳實踐
 

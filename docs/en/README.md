@@ -10,6 +10,7 @@ Complete technical documentation for the Gortex framework.
 | [Security Guide](security.md) | File serving, redirects, CORS, JSON body limits |
 | [Architecture Philosophy](architecture-philosophy.md) | Kitchen-sink rationale, K8s config strategy, Jaeger/OTel tracing context |
 | [Design Patterns](design-patterns.md) | 10 core engineering patterns with difficulty-ranked learning path |
+| [Deployment Guide](deployment.md) | Dockerfile, Docker Compose, K8s manifests, DevOps notes |
 
 ## Best Practices
 
