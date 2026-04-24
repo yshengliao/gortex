@@ -1,7 +1,7 @@
 # Gortex — 高效能 Go Web 框架
 
 [![Go Version](https://img.shields.io/badge/go-1.25+-blue.svg)](https://go.dev/)
-![Status](https://img.shields.io/badge/status-v0.5.2--alpha-orange.svg)
+![Status](https://img.shields.io/badge/status-v0.5.3--alpha-orange.svg)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 
 > **⚠️ [僅供研究] 此專案透過 AI 在本地復刻過去常用的「通用基礎設施框架」架構哲學。僅為留作紀錄與架構學習之用，請勿用於生產環境。**
@@ -154,6 +154,11 @@ go run ./examples/websocket  # Hub 訊息限制與授權
 - 🔒 [SECURITY.md](SECURITY.md) — 漏洞通報流程
 
 ## 變更紀錄
+
+### v0.5.3-alpha (2026-04-24)
+
+- 精簡根目錄 README，詳細內容移至 `docs/` 索引頁。
+- 新增部署指南（Dockerfile、Docker Compose、K8s 範例、DevOps 注意事項）。
 
 ### v0.5.2-alpha (2026-04-24)
 

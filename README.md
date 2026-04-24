@@ -1,7 +1,7 @@
 # Gortex - High-Performance Go Web Framework
 
 [![Go Version](https://img.shields.io/badge/go-1.25+-blue.svg)](https://go.dev/)
-![Status](https://img.shields.io/badge/status-v0.5.2--alpha-orange.svg)
+![Status](https://img.shields.io/badge/status-v0.5.3--alpha-orange.svg)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 
 > **⚠️ [RESEARCH ONLY] This project is a local replica of past commonly used infrastructure architectural philosophies. It is maintained for record-keeping and architectural learning, and is NOT intended for production use.**
@@ -154,6 +154,11 @@ Full technical documentation is available in both English and Traditional Chines
 - 🔒 [SECURITY.md](SECURITY.md) — Vulnerability reporting process
 
 ## Changelog
+
+### v0.5.3-alpha (2026-04-24)
+
+- Simplified root READMEs; moved detailed content to `docs/` index pages.
+- Added deployment guide (Dockerfile, Docker Compose, K8s manifests, DevOps notes).
 
 ### v0.5.2-alpha (2026-04-24)
 
