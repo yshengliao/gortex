@@ -219,6 +219,10 @@ func DatabaseHealthCheck(ping func(ctx context.Context) error) HealthCheck {
 
 // HTTPHealthCheck creates an HTTP endpoint health check
 func HTTPHealthCheck(url string, expectedStatus int) HealthCheck {
+	// Reuse a single client across invocations so repeated health checks
+	// share connection pooling instead of allocating a client (and its
+	// transport) on every call.
+	client := &http.Client{Timeout: 5 * time.Second}
 	return func(ctx context.Context) HealthCheckResult {
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 		if err != nil {
@@ -231,8 +235,7 @@ func HTTPHealthCheck(url string, expectedStatus int) HealthCheck {
 				},
 			}
 		}
-		
-		client := &http.Client{Timeout: 5 * time.Second}
+
 		resp, err := client.Do(req)
 		if err != nil {
 			return HealthCheckResult{
@@ -244,8 +247,8 @@ func HTTPHealthCheck(url string, expectedStatus int) HealthCheck {
 				},
 			}
 		}
-		defer resp.Body.Close()
-		
+		defer func() { _ = resp.Body.Close() }()
+
 		if resp.StatusCode != expectedStatus {
 			return HealthCheckResult{
 				Status:  HealthStatusUnhealthy,

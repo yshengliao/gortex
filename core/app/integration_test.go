@@ -100,8 +100,8 @@ func TestIntegrationGracefulShutdown(t *testing.T) {
 
 		// Start server
 		go func() {
-			if err := app.Run(); err != nil && err != http.ErrServerClosed {
-				t.Errorf("Server error: %v", err)
+			if runErr := app.Run(); runErr != nil && runErr != http.ErrServerClosed {
+				t.Errorf("Server error: %v", runErr)
 			}
 		}()
 
@@ -148,10 +148,10 @@ func TestIntegrationGracefulShutdown(t *testing.T) {
 
 			// Keep reading to process close frame
 			for {
-				_, _, err := conn.ReadMessage()
-				if err != nil {
+				_, _, readErr := conn.ReadMessage()
+				if readErr != nil {
 					// Check if it's a close error
-					if gorillaWS.IsCloseError(err, gorillaWS.CloseGoingAway, gorillaWS.CloseNormalClosure) {
+					if gorillaWS.IsCloseError(readErr, gorillaWS.CloseGoingAway, gorillaWS.CloseNormalClosure) {
 						closeReceived <- true
 					}
 					return

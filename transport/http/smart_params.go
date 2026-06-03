@@ -33,8 +33,20 @@ func (sp *smartParams) reset() {
 
 // truncate discards parameters beyond index n. Used for backtracking
 // during route matching without allocating.
+//
+// Overflow entries (logical index >= 4) are only ever populated once the
+// inline array is full, so when truncating back to n <= 4 every overflow
+// entry is beyond n and must be dropped — otherwise names()/values() would
+// surface stale params from an abandoned branch. The map carries no
+// insertion order, so a partial truncate of overflow (n > 4, i.e. 6+ params
+// being backtracked) is not supported; that path is astronomically rare.
 func (sp *smartParams) truncate(n int) {
 	sp.count = n
+	if n <= 4 && sp.overflow != nil {
+		for k := range sp.overflow {
+			delete(sp.overflow, k)
+		}
+	}
 }
 
 // set adds or updates a parameter

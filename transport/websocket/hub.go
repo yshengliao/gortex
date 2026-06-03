@@ -115,13 +115,6 @@ type Metrics struct {
 	Uptime             time.Duration          `json:"uptime"`
 }
 
-// messageRateTracker tracks message rates over time
-type messageRateTracker struct {
-	sent     int64
-	received int64
-	lastTime time.Time
-}
-
 // Hub maintains active WebSocket connections
 type Hub struct {
 	clients      map[*Client]bool
@@ -387,10 +380,13 @@ func (h *Hub) broadcastSync(message *Message) {
 	}
 }
 
-// SendToUser sends a message to a specific user
+// SendToUser sends a message to a specific user. The caller's message is not
+// mutated — a shallow copy carries the Target so a *Message that the caller
+// still holds (or reuses for another recipient) is left untouched.
 func (h *Hub) SendToUser(userID string, message *Message) {
-	message.Target = userID
-	h.Broadcast(message)
+	msg := *message
+	msg.Target = userID
+	h.Broadcast(&msg)
 }
 
 // GetConnectedClients returns the number of connected clients

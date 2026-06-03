@@ -98,7 +98,9 @@ func New(config Config) *Client {
 		DisableKeepAlives:     false,
 		ForceAttemptHTTP2:     true,
 		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: config.InsecureSkipVerify,
+			// G402: opt-in via config and defaults to false; intended for
+			// talking to self-signed endpoints in tests/dev.
+			InsecureSkipVerify: config.InsecureSkipVerify, //nolint:gosec
 		},
 	}
 	

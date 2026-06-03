@@ -201,7 +201,7 @@ func TestEnhancedSpan_CompleteWorkflow(t *testing.T) {
 	ctx := context.Background()
 
 	// Simulate a complete workflow
-	ctx, span := tracer.StartEnhancedSpan(ctx, "process-request")
+	_, span := tracer.StartEnhancedSpan(ctx, "process-request")
 
 	// Add initial tags
 	span.AddTags(map[string]string{

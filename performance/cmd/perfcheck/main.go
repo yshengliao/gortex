@@ -120,7 +120,7 @@ func main() {
 				planPath = "performance/reports/optimization_plan.md"
 			}
 			
-			if err := os.WriteFile(planPath, []byte(plan), 0644); err != nil {
+			if err := os.WriteFile(planPath, []byte(plan), 0o600); err != nil {
 				log.Fatalf("Failed to save optimization plan: %v", err)
 			}
 			fmt.Printf("\n✓ Optimization plan saved to: %s\n", planPath)

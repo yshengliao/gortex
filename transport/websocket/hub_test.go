@@ -50,8 +50,9 @@ func TestHub(t *testing.T) {
 			h.SendToUser("user123", msg)
 		})
 		
-		// Verify target is set
-		assert.Equal(t, "user123", msg.Target)
+		// SendToUser must not mutate the caller's message: the Target is
+		// carried on an internal copy so a reused *Message is left intact.
+		assert.Empty(t, msg.Target, "SendToUser should not mutate the caller's message")
 	})
 
 	t.Run("Shutdown", func(t *testing.T) {

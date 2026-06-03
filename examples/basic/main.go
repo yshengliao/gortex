@@ -190,7 +190,7 @@ type Handlers struct {
 
 func main() {
 	logger, _ := zap.NewDevelopment()
-	defer logger.Sync()
+	defer func() { _ = logger.Sync() }()
 
 	s := newStore()
 	handlers := &Handlers{

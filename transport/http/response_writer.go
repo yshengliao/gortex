@@ -67,7 +67,15 @@ func (w *responseWriter) Flush() {
 // Hijack implements http.Hijacker
 func (w *responseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	if hijacker, ok := w.ResponseWriter.(http.Hijacker); ok {
-		return hijacker.Hijack()
+		conn, buf, err := hijacker.Hijack()
+		if err == nil {
+			// The connection has been taken over (e.g. a WebSocket upgrade).
+			// Mark the writer as written so downstream logging/metrics don't
+			// report a misleading 200/written=false for a hijacked response.
+			w.written = true
+			w.status = http.StatusSwitchingProtocols
+		}
+		return conn, buf, err
 	}
 	return nil, nil, http.ErrNotSupported
 }

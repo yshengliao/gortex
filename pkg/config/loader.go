@@ -118,7 +118,7 @@ func (l *simpleLoader) loadFromDotEnv() error {
 		}
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
@@ -149,7 +149,9 @@ func (l *simpleLoader) loadFromDotEnv() error {
 		// Only set if the env var is not already set.
 		// This ensures: real env vars > .env file values.
 		if _, exists := os.LookupEnv(key); !exists {
-			os.Setenv(key, value)
+			if err := os.Setenv(key, value); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -169,7 +171,7 @@ func (l *simpleLoader) applyCommandArgs() {
 		}
 		name := strings.ToUpper(strings.ReplaceAll(kv[0], "-", "_"))
 		envName := l.envPrefix + name
-		os.Setenv(envName, kv[1])
+		_ = os.Setenv(envName, kv[1])
 	}
 }
 

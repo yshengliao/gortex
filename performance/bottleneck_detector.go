@@ -4,7 +4,6 @@ package performance
 import (
 	"fmt"
 	"runtime"
-	"runtime/pprof"
 	"sort"
 	"time"
 )
@@ -38,11 +37,7 @@ func DefaultThresholds() Thresholds {
 }
 
 // Profiler handles runtime profiling
-type Profiler struct {
-	cpuProfile    *pprof.Profile
-	memProfile    *pprof.Profile
-	goroutineProf *pprof.Profile
-}
+type Profiler struct{}
 
 // DetectionResult represents bottleneck detection results
 type DetectionResult struct {
@@ -360,16 +355,13 @@ Generated: %s
 	// Group bottlenecks by severity
 	critical := make([]DetailedBottleneck, 0)
 	high := make([]DetailedBottleneck, 0)
-	other := make([]DetailedBottleneck, 0)
-	
+
 	for _, b := range detection.Bottlenecks {
 		switch b.Severity {
 		case "critical":
 			critical = append(critical, b)
 		case "high":
 			high = append(high, b)
-		default:
-			other = append(other, b)
 		}
 	}
 	

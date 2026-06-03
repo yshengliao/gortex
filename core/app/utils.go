@@ -54,11 +54,7 @@ func isValidGortexHandler(method reflect.Method) bool {
 
 	// Return value should be error
 	errorType := reflect.TypeOf((*error)(nil)).Elem()
-	if !t.Out(0).Implements(errorType) {
-		return false
-	}
-
-	return true
+	return t.Out(0).Implements(errorType)
 }
 
 // methodNameToPath converts a method name to a URL path

@@ -166,13 +166,13 @@ func HandleBusinessError(err error) (int, *ErrorResponse) {
 	if mapping, ok := GetMapping(err); ok {
 		resp := New(mapping.Code, mapping.Message)
 		// Add the original error message as detail
-		resp.WithDetail("error", err.Error())
+		resp = resp.WithDetail("error", err.Error())
 		return mapping.HTTPStatus, resp
 	}
 	
 	// Default to internal server error
 	resp := New(CodeInternalServerError, "An error occurred")
-	resp.WithDetail("error", err.Error())
+	resp = resp.WithDetail("error", err.Error())
 	return http.StatusInternalServerError, resp
 }
 

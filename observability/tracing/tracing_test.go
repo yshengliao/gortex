@@ -17,8 +17,8 @@ func TestSimpleTracer(t *testing.T) {
 
 	t.Run("StartAndFinishSpan", func(t *testing.T) {
 		ctx := context.Background()
-		ctx, span := tracer.StartSpan(ctx, "test-operation")
-		
+		_, span := tracer.StartSpan(ctx, "test-operation")
+
 		assert.NotNil(t, span)
 		assert.NotEmpty(t, span.TraceID)
 		assert.NotEmpty(t, span.SpanID)
@@ -36,8 +36,8 @@ func TestSimpleTracer(t *testing.T) {
 		ctx, parentSpan := tracer.StartSpan(ctx, "parent-operation")
 		
 		// Start child span
-		ctx, childSpan := tracer.StartSpan(ctx, "child-operation")
-		
+		_, childSpan := tracer.StartSpan(ctx, "child-operation")
+
 		assert.Equal(t, parentSpan.TraceID, childSpan.TraceID)
 		assert.Equal(t, parentSpan.SpanID, childSpan.ParentID)
 		

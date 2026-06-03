@@ -151,7 +151,7 @@ type Handlers struct {
 
 func main() {
 	logger, _ := zap.NewDevelopment()
-	defer logger.Sync()
+	defer func() { _ = logger.Sync() }()
 
 	secret := os.Getenv("JWT_SECRET")
 	if secret == "" {

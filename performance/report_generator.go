@@ -408,7 +408,7 @@ func (rg *ReportGenerator) generateRecommendations(report *PerformanceReport) []
 func (rg *ReportGenerator) SaveReport(report *PerformanceReport) error {
 	// Create reports directory
 	reportsDir := filepath.Join("performance", "reports")
-	if err := os.MkdirAll(reportsDir, 0755); err != nil {
+	if err := os.MkdirAll(reportsDir, 0o750); err != nil {
 		return fmt.Errorf("failed to create reports directory: %w", err)
 	}
 	
@@ -423,7 +423,7 @@ func (rg *ReportGenerator) SaveReport(report *PerformanceReport) error {
 	}
 	
 	// Write to file
-	if err := os.WriteFile(filepath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(filepath, []byte(content), 0o600); err != nil {
 		return fmt.Errorf("failed to write report: %w", err)
 	}
 	

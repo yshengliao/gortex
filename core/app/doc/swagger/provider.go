@@ -116,7 +116,7 @@ func (p *SwaggerProvider) Endpoints() map[string]http.Handler {
 	// JSON endpoint
 	endpoints["/docs/swagger.json"] = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write(p.swaggerJSON)
+		_, _ = w.Write(p.swaggerJSON)
 	})
 	
 	// UI endpoint

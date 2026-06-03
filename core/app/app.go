@@ -33,6 +33,10 @@ const (
 // startTime tracks when the application started
 var startTime = time.Now()
 
+// defaultReadHeaderTimeout bounds how long the server waits for a client to
+// send the request headers, mitigating Slowloris-style attacks.
+const defaultReadHeaderTimeout = 20 * time.Second
+
 // getRuntimeModeName returns the string name of runtime mode
 func getRuntimeModeName(mode RuntimeMode) string {
 	switch mode {
@@ -359,6 +363,9 @@ func (app *App) Run() error {
 	app.server = &http.Server{
 		Addr:    address,
 		Handler: app.serverHandler(),
+		// Bound the time spent reading request headers to mitigate
+		// Slowloris-style attacks that trickle headers to exhaust connections.
+		ReadHeaderTimeout: defaultReadHeaderTimeout,
 	}
 
 	return app.server.ListenAndServe()

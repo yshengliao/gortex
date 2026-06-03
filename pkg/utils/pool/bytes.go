@@ -136,9 +136,12 @@ func (p *ByteSlicePool) Put(buf []byte) {
 		atomic.AddInt64(&metric.TotalBytesWasted, waste)
 	}
 	
-	// Reset slice to full capacity before returning to pool
+	// Reset slice to full capacity before returning to pool.
+	// SA6002: the pool intentionally stores slice headers by value to keep the
+	// Get/Put API returning []byte; switching to *[]byte to save the single
+	// header allocation per Put is tracked as a separate optimisation.
 	buf = buf[:cap(buf)]
-	p.pools[idx].Put(buf)
+	p.pools[idx].Put(buf) //nolint:staticcheck
 }
 
 // GetExact retrieves a byte slice of exact size (may waste memory)

@@ -78,13 +78,16 @@ func (c Counts) FailureRatio() float64 {
 
 // CircuitBreaker implements the circuit breaker pattern
 type CircuitBreaker struct {
-	name     string
-	config   Config
-	state    atomic.Value // State
-	mu       sync.Mutex
-	counts   Counts
-	expiry   time.Time
-	halfOpen atomic.Uint32
+	name   string
+	config Config
+	state  atomic.Value // State
+	mu     sync.Mutex
+	counts Counts
+	expiry time.Time
+	// halfOpen counts in-flight requests admitted while half-open. It is
+	// guarded by mu (not atomics) so the MaxRequests gate stays consistent
+	// with the state/expiry transitions that also run under mu.
+	halfOpen uint32
 }
 
 // New creates a new circuit breaker
@@ -212,26 +215,27 @@ func (cb *CircuitBreaker) onBeforeRequestOpen() (uint64, error) {
 	now := time.Now()
 	if cb.expiry.Before(now) {
 		cb.setState(StateHalfOpen)
-		cb.halfOpen.Store(0)
+		cb.halfOpen = 0
 		cb.expiry = now.Add(cb.config.Interval)
 		return uint64(cb.expiry.UnixNano()), nil
 	}
-	
+
 	return 0, ErrCircuitOpen
 }
 
-// onBeforeRequestHalfOpen handles before request logic for half-open state
+// onBeforeRequestHalfOpen handles before request logic for half-open state.
+// The admission gate and the generation read happen under the same lock so
+// the MaxRequests cap cannot be exceeded by requests racing in concurrently.
 func (cb *CircuitBreaker) onBeforeRequestHalfOpen() (uint64, error) {
 	cb.mu.Lock()
-	generation := uint64(cb.expiry.UnixNano())
-	cb.mu.Unlock()
-	
-	if cb.halfOpen.Add(1) > cb.config.MaxRequests {
-		cb.halfOpen.Add(^uint32(0)) // Decrement
+	defer cb.mu.Unlock()
+
+	if cb.halfOpen >= cb.config.MaxRequests {
 		return 0, ErrTooManyRequests
 	}
-	
-	return generation, nil
+	cb.halfOpen++
+
+	return uint64(cb.expiry.UnixNano()), nil
 }
 
 // onAfterRequestHalfOpen handles after request logic for half-open state
@@ -250,8 +254,7 @@ func (cb *CircuitBreaker) onAfterRequestHalfOpen(generation uint64, err error) {
 		cb.counts = Counts{}
 	} else {
 		// Check if we've had enough successful requests
-		current := cb.halfOpen.Load()
-		if current >= cb.config.MaxRequests {
+		if cb.halfOpen >= cb.config.MaxRequests {
 			cb.setState(StateClosed)
 			cb.toNewGeneration(time.Now())
 		}

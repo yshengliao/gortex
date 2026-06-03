@@ -359,14 +359,14 @@ func (bs *BenchmarkSuite) recordResult(b *testing.B, name string) {
 func (bs *BenchmarkSuite) SaveResults() error {
 	// Ensure directory exists
 	dir := filepath.Dir(bs.dbPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
-	
-	// Load existing results
+
+	// Load existing results (best-effort: a corrupt/missing DB starts fresh)
 	var existingResults []BenchmarkResult
 	if data, err := os.ReadFile(bs.dbPath); err == nil {
-		json.Unmarshal(data, &existingResults)
+		_ = json.Unmarshal(data, &existingResults)
 	}
 	
 	// Append new results
@@ -378,7 +378,7 @@ func (bs *BenchmarkSuite) SaveResults() error {
 		return fmt.Errorf("failed to marshal results: %w", err)
 	}
 	
-	if err := os.WriteFile(bs.dbPath, data, 0644); err != nil {
+	if err := os.WriteFile(bs.dbPath, data, 0o600); err != nil {
 		return fmt.Errorf("failed to write results: %w", err)
 	}
 	

@@ -82,7 +82,7 @@ func chatAuthorizer(client *websocket.Client, msg *websocket.Message) error {
 
 func main() {
 	logger, _ := zap.NewDevelopment()
-	defer logger.Sync()
+	defer func() { _ = logger.Sync() }()
 
 	hub := websocket.NewHubWithConfig(logger, websocket.Config{
 		MaxMessageBytes:     4 << 10, // 4 KiB — plenty for chat

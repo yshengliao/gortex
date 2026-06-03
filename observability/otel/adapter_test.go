@@ -62,7 +62,7 @@ func TestSpanAdapter_LogEvent(t *testing.T) {
 	ctx := context.Background()
 	
 	// Use StartSpanWithOptions to get SpanAdapter
-	ctx, spanAdapter := adapter.StartSpanWithOptions(ctx, "test-operation")
+	_, spanAdapter := adapter.StartSpanWithOptions(ctx, "test-operation")
 	
 	// Log events with different severities
 	spanAdapter.LogEvent(tracing.SpanStatusDEBUG, "Debug message", map[string]any{
@@ -103,7 +103,7 @@ func TestSpanAdapter_SetError(t *testing.T) {
 	adapter, recorder := setupTest(t)
 	ctx := context.Background()
 	
-	ctx, spanAdapter := adapter.StartSpanWithOptions(ctx, "test-operation")
+	_, spanAdapter := adapter.StartSpanWithOptions(ctx, "test-operation")
 	
 	// Set an error
 	testErr := errors.New("test error")
@@ -142,7 +142,7 @@ func TestSpanAdapter_AddTags(t *testing.T) {
 	adapter, recorder := setupTest(t)
 	ctx := context.Background()
 	
-	ctx, spanAdapter := adapter.StartSpanWithOptions(ctx, "test-operation")
+	_, spanAdapter := adapter.StartSpanWithOptions(ctx, "test-operation")
 	
 	// Add tags
 	tags := map[string]string{
@@ -189,7 +189,7 @@ func TestSpanAdapter_SetStatus(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			ctx, spanAdapter := adapter.StartSpanWithOptions(ctx, "test-operation")
+			_, spanAdapter := adapter.StartSpanWithOptions(ctx, "test-operation")
 			
 			spanAdapter.SetStatus(tt.status)
 			spanAdapter.End()

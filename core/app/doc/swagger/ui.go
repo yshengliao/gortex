@@ -63,5 +63,5 @@ func (h *SwaggerUIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 </html>`, h.swaggerJSONPath)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write([]byte(html))
+	_, _ = w.Write([]byte(html))
 }

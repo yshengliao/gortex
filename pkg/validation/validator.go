@@ -58,8 +58,12 @@ func getValidationMessage(field, tag, param string) string {
 
 // RegisterCustomValidators registers all custom validation rules
 func RegisterCustomValidators(v *validator.Validate) {
+	// The validation tags below are compile-time constants, so
+	// RegisterValidation cannot fail here; the returned error is intentionally
+	// ignored.
+
 	// Game ID validator
-	v.RegisterValidation("gameid", func(fl validator.FieldLevel) bool {
+	_ = v.RegisterValidation("gameid", func(fl validator.FieldLevel) bool {
 		gameID := fl.Field().String()
 		if len(gameID) < 3 || len(gameID) > 20 {
 			return false
@@ -73,7 +77,7 @@ func RegisterCustomValidators(v *validator.Validate) {
 	})
 
 	// Currency validator
-	v.RegisterValidation("currency", func(fl validator.FieldLevel) bool {
+	_ = v.RegisterValidation("currency", func(fl validator.FieldLevel) bool {
 		currency := fl.Field().String()
 		validCurrencies := []string{"USD", "EUR", "GBP", "JPY", "CNY", "TWD"}
 		for _, valid := range validCurrencies {
@@ -85,7 +89,7 @@ func RegisterCustomValidators(v *validator.Validate) {
 	})
 
 	// Username validator
-	v.RegisterValidation("username", func(fl validator.FieldLevel) bool {
+	_ = v.RegisterValidation("username", func(fl validator.FieldLevel) bool {
 		username := fl.Field().String()
 		if len(username) < 3 || len(username) > 30 {
 			return false

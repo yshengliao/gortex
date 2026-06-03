@@ -99,7 +99,7 @@ func NewShardedCollectorWithCardinality(maxCardinality int) *ShardedCollector {
 // hashKey returns a consistent shard index for a metric key
 func (c *ShardedCollector) hashKey(key string) int {
 	h := fnv.New32a()
-	h.Write([]byte(key))
+	_, _ = h.Write([]byte(key)) // hash.Hash.Write never returns an error
 	return int(h.Sum32()) % c.shardCount
 }
 

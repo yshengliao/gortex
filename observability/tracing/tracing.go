@@ -325,12 +325,6 @@ func EnhancedSpanFromContext(ctx context.Context) *EnhancedSpan {
 func TracingMiddleware(tracer Tracer) middleware.MiddlewareFunc {
 	return func(next middleware.HandlerFunc) middleware.HandlerFunc {
 		return func(c gortexContext.Context) error {
-			// Extract trace context from headers
-			traceID := c.Request().Header.Get("X-Trace-ID")
-			if traceID == "" {
-				traceID = uuid.New().String()
-			}
-			
 			// Start span - use EnhancedTracer if available
 			var ctx context.Context
 			var span *Span

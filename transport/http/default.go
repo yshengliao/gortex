@@ -458,11 +458,13 @@ func (c *DefaultContext) File(file string) error {
 		return err
 	}
 
-	f, err := os.Open(cleaned)
+	// G304: cleaned has been run through safeServerPath, which rejects
+	// traversal, absolute paths, and symlink escapes.
+	f, err := os.Open(cleaned) //nolint:gosec
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer f.Close() //nolint:errcheck // read-only file; close error is not actionable
 
 	fi, err := f.Stat()
 	if err != nil {
@@ -471,11 +473,11 @@ func (c *DefaultContext) File(file string) error {
 
 	if fi.IsDir() {
 		indexPath := filepath.Join(cleaned, "index.html")
-		f, err = os.Open(indexPath)
+		f, err = os.Open(indexPath) //nolint:gosec // G304: see above; index.html joined onto sanitised root
 		if err != nil {
 			return err
 		}
-		defer f.Close()
+		defer f.Close() //nolint:errcheck // read-only file; close error is not actionable
 		fi, err = f.Stat()
 		if err != nil {
 			return err
@@ -499,7 +501,7 @@ func (c *DefaultContext) FileFS(fsys fs.FS, name string) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer f.Close() //nolint:errcheck // read-only file; close error is not actionable
 
 	fi, err := f.Stat()
 	if err != nil {
@@ -515,7 +517,7 @@ func (c *DefaultContext) FileFS(fsys fs.FS, name string) error {
 		if err != nil {
 			return err
 		}
-		defer f.Close()
+		defer f.Close() //nolint:errcheck // read-only file; close error is not actionable
 		fi, err = f.Stat()
 		if err != nil {
 			return err
@@ -626,9 +628,9 @@ func (c *DefaultContext) Error(err error) {
 	// This should be handled by the framework's error handler
 	// For now, just write the error
 	if httpErr, ok := err.(*HTTPError); ok {
-		c.String(httpErr.Code, httpErr.Error())
+		_ = c.String(httpErr.Code, httpErr.Error())
 	} else {
-		c.String(http.StatusInternalServerError, err.Error())
+		_ = c.String(http.StatusInternalServerError, err.Error())
 	}
 }
 
