@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"github.com/yshengliao/gortex/pkg/config"
 )
 
@@ -102,7 +103,7 @@ func TestSimpleLoader_LoadFromEnv(t *testing.T) {
 		"GORTEX_SERVER_ADDRESS":             ":9090",
 		"GORTEX_SERVER_GZIP":                "false",
 		"GORTEX_SERVER_READ_TIMEOUT":        "60s",
-		"GORTEX_SERVER_SHUTDOWN_TIMEOUT":     "70s",
+		"GORTEX_SERVER_SHUTDOWN_TIMEOUT":    "70s",
 		"GORTEX_LOGGER_LEVEL":               "debug",
 		"GORTEX_LOGGER_ENCODING":            "console",
 		"GORTEX_WEBSOCKET_READ_BUFFER_SIZE": "4096",
@@ -383,10 +384,10 @@ GORTEX_DATABASE_PASSWORD=dotenv-pass
 
 	// env var > .env > yaml > defaults
 	assert.Equal(t, "3333", cfg.Server.Port)              // env var (highest)
-	assert.Equal(t, ":1111", cfg.Server.Address)           // yaml
-	assert.Equal(t, "warn", cfg.Logger.Level)              // yaml
-	assert.Equal(t, "console", cfg.Logger.Encoding)        // .env
-	assert.Equal(t, "yaml-secret", cfg.JWT.SecretKey)      // yaml
-	assert.Equal(t, "yaml-user", cfg.Database.User)        // yaml
-	assert.Equal(t, "dotenv-pass", cfg.Database.Password)  // .env
+	assert.Equal(t, ":1111", cfg.Server.Address)          // yaml
+	assert.Equal(t, "warn", cfg.Logger.Level)             // yaml
+	assert.Equal(t, "console", cfg.Logger.Encoding)       // .env
+	assert.Equal(t, "yaml-secret", cfg.JWT.SecretKey)     // yaml
+	assert.Equal(t, "yaml-user", cfg.Database.User)       // yaml
+	assert.Equal(t, "dotenv-pass", cfg.Database.Password) // .env
 }

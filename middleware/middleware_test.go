@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+
 	"github.com/yshengliao/gortex/pkg/errors"
 )
 
@@ -88,7 +89,7 @@ func TestErrorHandler_Middleware(t *testing.T) {
 			if tt.expectedCode != "" {
 				var response map[string]interface{}
 				json.NewDecoder(rec.Body).Decode(&response)
-				
+
 				if errMap, ok := response["error"].(map[string]interface{}); ok {
 					if code := errMap["code"]; code != tt.expectedCode {
 						t.Errorf("Expected error code %s, got %v", tt.expectedCode, code)
@@ -179,7 +180,7 @@ func TestRecovery(t *testing.T) {
 
 		var response map[string]interface{}
 		json.NewDecoder(rec.Body).Decode(&response)
-		
+
 		if errMap, ok := response["error"].(map[string]interface{}); ok {
 			if code := errMap["code"]; code != "PANIC" {
 				t.Errorf("Expected error code PANIC, got %v", code)
@@ -310,7 +311,7 @@ func TestLogger(t *testing.T) {
 
 	t.Run("logs request", func(t *testing.T) {
 		buf.Reset()
-		
+
 		body := `{"test": "data"}`
 		req := httptest.NewRequest("POST", "/test", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
@@ -352,7 +353,7 @@ func TestLogger(t *testing.T) {
 
 	t.Run("skips configured paths", func(t *testing.T) {
 		buf.Reset()
-		
+
 		req := httptest.NewRequest("GET", "/health", nil)
 		rec := httptest.NewRecorder()
 		ctx := newMockContext(req, rec)

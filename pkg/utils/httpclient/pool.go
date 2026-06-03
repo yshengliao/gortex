@@ -35,7 +35,7 @@ func NewPoolWithFactory(factory ClientFactory) *Pool {
 // defaultFactory creates clients with default configuration
 func defaultFactory(name string) *Client {
 	config := DefaultConfig()
-	
+
 	// Customize based on client name
 	switch name {
 	case "internal":
@@ -48,7 +48,7 @@ func defaultFactory(name string) *Client {
 		config.Timeout = 5 * time.Minute
 		config.MaxIdleConnsPerHost = 2
 	}
-	
+
 	return New(config)
 }
 
@@ -58,24 +58,24 @@ func (p *Pool) Get(name string) *Client {
 	p.mu.RLock()
 	client, exists := p.clients[name]
 	p.mu.RUnlock()
-	
+
 	if exists {
 		return client
 	}
-	
+
 	// Create new client
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	
+
 	// Double-check after acquiring write lock
 	if client, exists = p.clients[name]; exists {
 		return client
 	}
-	
+
 	// Create new client
 	client = p.factory(name)
 	p.clients[name] = client
-	
+
 	return client
 }
 
@@ -88,12 +88,12 @@ func (p *Pool) GetDefault() *Client {
 func (p *Pool) Set(name string, client *Client) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	
+
 	// Close old client if exists
 	if old, exists := p.clients[name]; exists {
 		old.Close()
 	}
-	
+
 	p.clients[name] = client
 }
 
@@ -101,7 +101,7 @@ func (p *Pool) Set(name string, client *Client) {
 func (p *Pool) Remove(name string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	
+
 	if client, exists := p.clients[name]; exists {
 		client.Close()
 		delete(p.clients, name)
@@ -112,7 +112,7 @@ func (p *Pool) Remove(name string) {
 func (p *Pool) Close() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	
+
 	for name, client := range p.clients {
 		client.Close()
 		delete(p.clients, name)
@@ -123,12 +123,12 @@ func (p *Pool) Close() {
 func (p *Pool) GetMetrics(name string) (ClientMetrics, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	
+
 	client, exists := p.clients[name]
 	if !exists {
 		return ClientMetrics{}, fmt.Errorf("client %s not found", name)
 	}
-	
+
 	return client.GetMetrics(), nil
 }
 
@@ -136,12 +136,12 @@ func (p *Pool) GetMetrics(name string) (ClientMetrics, error) {
 func (p *Pool) GetAllMetrics() map[string]ClientMetrics {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	
+
 	metrics := make(map[string]ClientMetrics)
 	for name, client := range p.clients {
 		metrics[name] = client.GetMetrics()
 	}
-	
+
 	return metrics
 }
 
@@ -149,7 +149,7 @@ func (p *Pool) GetAllMetrics() map[string]ClientMetrics {
 func (p *Pool) Size() int {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	
+
 	return len(p.clients)
 }
 
@@ -157,11 +157,11 @@ func (p *Pool) Size() int {
 func (p *Pool) Names() []string {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	
+
 	names := make([]string, 0, len(p.clients))
 	for name := range p.clients {
 		names = append(names, name)
 	}
-	
+
 	return names
 }

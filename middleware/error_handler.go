@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"go.uber.org/zap"
+
 	"github.com/yshengliao/gortex/pkg/errors"
 	httpctx "github.com/yshengliao/gortex/transport/http"
 )
@@ -99,12 +100,12 @@ func ErrorHandlerWithConfig(config *ErrorHandlerConfig) MiddlewareFunc {
 				code = http.StatusInternalServerError
 				errCode = "INTERNAL_ERROR"
 				message = err.Error()
-				
+
 				// Hide details in production
 				if config.HideInternalServerErrorDetails {
 					message = config.DefaultMessage
 				}
-				
+
 				// Log the actual error
 				if config.Logger != nil {
 					config.Logger.Error("Internal server error",
@@ -128,24 +129,24 @@ func writeErrorResponse(c Context, statusCode int, errCode, message string, deta
 			"message": message,
 		},
 	}
-	
+
 	// Add request ID if available
 	if requestID != "" {
 		response["request_id"] = requestID
 	}
-	
+
 	// Add details if available and not hidden
 	if details != nil && (!config.HideInternalServerErrorDetails || statusCode < 500) {
 		response["error"].(map[string]interface{})["details"] = details
 	}
-	
+
 	// For development mode, add the error to details if it's a standard error
 	if !config.HideInternalServerErrorDetails && statusCode >= 500 && details == nil && message != config.DefaultMessage {
 		response["error"].(map[string]interface{})["details"] = map[string]interface{}{
 			"error": message,
 		}
 	}
-	
+
 	// Set response header and write JSON
 	if resp, ok := c.Response().(http.ResponseWriter); ok {
 		resp.Header().Set("Content-Type", "application/json")
@@ -153,7 +154,7 @@ func writeErrorResponse(c Context, statusCode int, errCode, message string, deta
 		encoder := json.NewEncoder(resp)
 		return encoder.Encode(response)
 	}
-	
+
 	// Fallback to context JSON method
 	return c.JSON(statusCode, response)
 }
@@ -163,4 +164,3 @@ func getPath(c Context) string {
 	req := c.Request()
 	return req.URL.Path
 }
-

@@ -1,4 +1,3 @@
-
 package app
 
 import (
@@ -8,11 +7,12 @@ import (
 	"strconv"
 	"strings"
 
-	appcontext "github.com/yshengliao/gortex/core/context"
+	"go.uber.org/zap"
+
 	"github.com/yshengliao/gortex/core/app/doc"
+	appcontext "github.com/yshengliao/gortex/core/context"
 	"github.com/yshengliao/gortex/middleware"
 	httpctx "github.com/yshengliao/gortex/transport/http"
-	"go.uber.org/zap"
 )
 
 // RegisterRoutes registers routes from a HandlersManager struct
@@ -218,7 +218,7 @@ func registerMethodWithMiddleware(r httpctx.GortexRouter, httpMethod, path strin
 			Middlewares: middlewareNames,
 		})
 	}
-	
+
 	// Collect documentation info if app has doc provider
 	if app != nil && app.docProvider != nil {
 		handlerType := reflect.TypeOf(handler).Elem()
@@ -307,7 +307,6 @@ func registerCustomMethodWithMiddleware(r httpctx.GortexRouter, path string, han
 
 	r.POST(path, handlerFunc, middleware...)
 }
-
 
 // createHandlerFunc creates a gortex.HandlerFunc from a reflect.Method
 func createHandlerFunc(handler any, method reflect.Method) middleware.HandlerFunc {

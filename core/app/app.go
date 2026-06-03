@@ -10,13 +10,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yshengliao/gortex/pkg/config"
-	appcontext "github.com/yshengliao/gortex/core/context"
+	"go.uber.org/zap"
+
 	"github.com/yshengliao/gortex/core/app/doc"
+	appcontext "github.com/yshengliao/gortex/core/context"
 	"github.com/yshengliao/gortex/middleware"
 	"github.com/yshengliao/gortex/observability/tracing"
+	"github.com/yshengliao/gortex/pkg/config"
 	httpctx "github.com/yshengliao/gortex/transport/http"
-	"go.uber.org/zap"
 )
 
 // ShutdownHook is a function that gets called during shutdown
@@ -539,10 +540,10 @@ func (app *App) registerDocumentationRoutes() {
 			app.logger.Error("Failed to generate documentation", zap.Error(err))
 		}
 	}
-	
+
 	// Get endpoints from the doc provider
 	endpoints := app.docProvider.Endpoints()
-	
+
 	registeredPaths := []string{}
 	for path, handler := range endpoints {
 		// Register each endpoint with the router
@@ -553,7 +554,7 @@ func (app *App) registerDocumentationRoutes() {
 		})
 		registeredPaths = append(registeredPaths, path)
 	}
-	
+
 	if app.logger != nil && len(registeredPaths) > 0 {
 		app.logger.Info("Documentation routes registered",
 			zap.Strings("paths", registeredPaths),
@@ -566,7 +567,7 @@ func (app *App) registerDocumentationRoutes() {
 func (app *App) AddDocumentationRoute(routeInfo doc.RouteInfo) {
 	app.mu.Lock()
 	defer app.mu.Unlock()
-	
+
 	if app.docProvider != nil {
 		app.docRouteInfos = append(app.docRouteInfos, routeInfo)
 	}

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/go-playground/validator/v10"
+
 	httpctx "github.com/yshengliao/gortex/transport/http"
 )
 
@@ -17,10 +18,10 @@ type Validator struct {
 // NewValidator creates a new validator instance with custom rules
 func NewValidator() *Validator {
 	v := validator.New()
-	
+
 	// Register custom validators
 	RegisterCustomValidators(v)
-	
+
 	return &Validator{
 		validator: v,
 	}
@@ -95,8 +96,8 @@ func RegisterCustomValidators(v *validator.Validate) {
 			return false
 		}
 		for i, r := range username {
-			if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || 
-			   (r >= '0' && r <= '9') || r == '_' || r == '-') {
+			if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') ||
+				(r >= '0' && r <= '9') || r == '_' || r == '-') {
 				return false
 			}
 			if (r == '_' || r == '-') && (i == 0 || i == len(username)-1) {
@@ -117,17 +118,17 @@ func NewValidationError(err error) *ValidationError {
 	ve := &ValidationError{
 		Errors: make(map[string]string),
 	}
-	
+
 	if validationErrors, ok := err.(validator.ValidationErrors); ok {
 		for _, e := range validationErrors {
 			field := strings.ToLower(e.Field())
 			tag := e.Tag()
-			
+
 			// Custom error messages
 			ve.Errors[field] = getValidationMessage(field, tag, e.Param())
 		}
 	}
-	
+
 	return ve
 }
 
@@ -136,7 +137,7 @@ func (ve *ValidationError) Error() string {
 	if len(ve.Errors) == 0 {
 		return "validation failed"
 	}
-	
+
 	var errors []string
 	for field, msg := range ve.Errors {
 		errors = append(errors, fmt.Sprintf("%s: %s", field, msg))
@@ -149,7 +150,7 @@ func BindAndValidate(c httpctx.Context, i any) error {
 	if err := c.Bind(i); err != nil {
 		return httpctx.NewHTTPError(400, "Invalid request format")
 	}
-	
+
 	// Create a validator instance
 	v := NewValidator()
 	if err := v.Validate(i); err != nil {
@@ -158,6 +159,6 @@ func BindAndValidate(c httpctx.Context, i any) error {
 		}
 		return httpctx.NewHTTPError(400, err.Error())
 	}
-	
+
 	return nil
 }

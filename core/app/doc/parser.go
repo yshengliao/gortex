@@ -20,11 +20,11 @@ func (p *TagParser) ParseHandlerMetadata(handler interface{}) (*HandlerMetadata,
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
 	}
-	
+
 	if t.Kind() != reflect.Struct {
 		return nil, fmt.Errorf("handler must be a struct, got %v", t.Kind())
 	}
-	
+
 	// Check for api tag on the struct
 	structTag := ""
 	for i := 0; i < t.NumField(); i++ {
@@ -50,19 +50,19 @@ func (p *TagParser) ParseHandlerMetadata(handler interface{}) (*HandlerMetadata,
 			}
 		}
 	}
-	
+
 	// If no api tag found, check the struct itself (through type name convention)
 	// This requires a different approach, so let's parse from field tags
-	
+
 	metadata := &HandlerMetadata{
 		Tags: []string{},
 	}
-	
+
 	// Parse the api tag
 	if structTag != "" {
 		p.parseAPITag(structTag, metadata)
 	}
-	
+
 	return metadata, nil
 }
 
@@ -92,7 +92,7 @@ func (p *TagParser) ParseRouteInfo(handlerType reflect.Type, method reflect.Meth
 		Handler:  fmt.Sprintf("%s.%s", handlerType.Name(), method.Name),
 		Metadata: make(map[string]interface{}),
 	}
-	
+
 	// Inherit metadata from handler
 	if baseMetadata != nil {
 		routeInfo.Tags = append(routeInfo.Tags, baseMetadata.Tags...)
@@ -103,27 +103,27 @@ func (p *TagParser) ParseRouteInfo(handlerType reflect.Type, method reflect.Meth
 			routeInfo.Metadata["version"] = baseMetadata.Version
 		}
 	}
-	
+
 	// Parse method-specific api tag if present
 	if method.Type.NumIn() > 0 {
 		// Check for api tag on the method (this would require method tags which Go doesn't support directly)
 		// Instead, we can use naming conventions or comments
 		methodName := method.Name
-		
+
 		// Extract HTTP method from method name
 		httpMethod := p.extractHTTPMethod(methodName)
 		if httpMethod != "" {
 			routeInfo.Method = httpMethod
 		}
-		
+
 		// Generate path from method name
 		routePath := p.generateRoutePath(methodName, basePath)
 		routeInfo.Path = routePath
-		
+
 		// Set description based on method name
 		routeInfo.Description = p.generateDescription(handlerType.Name(), methodName)
 	}
-	
+
 	return routeInfo
 }
 
@@ -131,13 +131,13 @@ func (p *TagParser) ParseRouteInfo(handlerType reflect.Type, method reflect.Meth
 func (p *TagParser) extractHTTPMethod(methodName string) string {
 	// Standard HTTP method names
 	httpMethods := []string{"GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"}
-	
+
 	for _, method := range httpMethods {
 		if methodName == method {
 			return method
 		}
 	}
-	
+
 	// Check for RESTful naming conventions
 	if strings.HasPrefix(methodName, "List") || strings.HasPrefix(methodName, "Get") {
 		return "GET"
@@ -151,7 +151,7 @@ func (p *TagParser) extractHTTPMethod(methodName string) string {
 	if strings.HasPrefix(methodName, "Delete") || strings.HasPrefix(methodName, "Remove") {
 		return "DELETE"
 	}
-	
+
 	// Default to POST for custom methods
 	return "POST"
 }
@@ -165,11 +165,11 @@ func (p *TagParser) generateRoutePath(methodName string, basePath string) string
 			return basePath
 		}
 	}
-	
+
 	// For custom methods, append to base path
 	// Convert CamelCase to kebab-case
 	routeName := camelToKebab(methodName)
-	
+
 	if basePath == "/" {
 		return "/" + routeName
 	}
@@ -181,11 +181,11 @@ func (p *TagParser) generateDescription(handlerName, methodName string) string {
 	// Remove common suffixes
 	handlerName = strings.TrimSuffix(handlerName, "Handler")
 	handlerName = strings.TrimSuffix(handlerName, "Controller")
-	
+
 	// Generate human-readable description
 	action := methodNameToAction(methodName)
 	resource := camelToWords(handlerName)
-	
+
 	return fmt.Sprintf("%s %s", action, resource)
 }
 
@@ -195,7 +195,7 @@ func (p *TagParser) generateDescription(handlerName, methodName string) string {
 func camelToKebab(s string) string {
 	var result []rune
 	runes := []rune(s)
-	
+
 	for i, r := range runes {
 		if i > 0 && 'A' <= r && r <= 'Z' {
 			// Check if this is the start of a new word
@@ -205,7 +205,7 @@ func camelToKebab(s string) string {
 			prevIsLower := 'a' <= runes[i-1] && runes[i-1] <= 'z'
 			nextIsLower := i+1 < len(runes) && 'a' <= runes[i+1] && runes[i+1] <= 'z'
 			prevIsUpper := 'A' <= runes[i-1] && runes[i-1] <= 'Z'
-			
+
 			if prevIsLower || (prevIsUpper && nextIsLower) {
 				result = append(result, '-')
 			}

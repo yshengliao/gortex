@@ -12,8 +12,9 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	httpctx "github.com/yshengliao/gortex/transport/http"
 	"go.uber.org/zap"
+
+	httpctx "github.com/yshengliao/gortex/transport/http"
 )
 
 // Test structures for parameter binding

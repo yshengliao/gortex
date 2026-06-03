@@ -7,8 +7,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	gortexContext "github.com/yshengliao/gortex/transport/http"
 	"go.uber.org/zap"
+
+	gortexContext "github.com/yshengliao/gortex/transport/http"
 )
 
 func TestFromGortexContext(t *testing.T) {
@@ -16,10 +17,10 @@ func TestFromGortexContext(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		rec := httptest.NewRecorder()
 		c := gortexContext.NewDefaultContext(req, rec)
-		
+
 		expectedID := "test-request-id"
 		c.Set("request_id", expectedID)
-		
+
 		assert.Equal(t, expectedID, FromGortexContext(c))
 	})
 
@@ -27,10 +28,10 @@ func TestFromGortexContext(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		rec := httptest.NewRecorder()
 		c := gortexContext.NewDefaultContext(req, rec)
-		
+
 		expectedID := "header-request-id"
 		c.Response().Header().Set(HeaderXRequestID, expectedID)
-		
+
 		assert.Equal(t, expectedID, FromGortexContext(c))
 	})
 
@@ -40,7 +41,7 @@ func TestFromGortexContext(t *testing.T) {
 		req.Header.Set(HeaderXRequestID, expectedID)
 		rec := httptest.NewRecorder()
 		c := gortexContext.NewDefaultContext(req, rec)
-		
+
 		assert.Equal(t, expectedID, FromGortexContext(c))
 	})
 
@@ -49,10 +50,10 @@ func TestFromGortexContext(t *testing.T) {
 		req.Header.Set(HeaderXRequestID, "request-id")
 		rec := httptest.NewRecorder()
 		c := gortexContext.NewDefaultContext(req, rec)
-		
+
 		c.Response().Header().Set(HeaderXRequestID, "response-id")
 		c.Set("request_id", "context-id")
-		
+
 		// Context value should have highest priority
 		assert.Equal(t, "context-id", FromGortexContext(c))
 	})
@@ -61,7 +62,7 @@ func TestFromGortexContext(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		rec := httptest.NewRecorder()
 		c := gortexContext.NewDefaultContext(req, rec)
-		
+
 		assert.Empty(t, FromGortexContext(c))
 	})
 }
@@ -70,10 +71,10 @@ func TestContextOperations(t *testing.T) {
 	t.Run("WithContext and FromContext", func(t *testing.T) {
 		ctx := context.Background()
 		requestID := "test-123"
-		
+
 		// Add request ID to context
 		ctx = WithContext(ctx, requestID)
-		
+
 		// Retrieve request ID
 		assert.Equal(t, requestID, FromContext(ctx))
 	})
@@ -87,13 +88,13 @@ func TestContextOperations(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		rec := httptest.NewRecorder()
 		c := gortexContext.NewDefaultContext(req, rec)
-		
+
 		requestID := "echo-request-id"
 		c.Set("request_id", requestID)
-		
+
 		ctx := context.Background()
 		ctx = WithGortexContext(ctx, c)
-		
+
 		assert.Equal(t, requestID, FromContext(ctx))
 	})
 }
@@ -102,7 +103,7 @@ func TestHTTPHeaderOperations(t *testing.T) {
 	t.Run("SetHeader and GetHeader", func(t *testing.T) {
 		req, _ := http.NewRequest(http.MethodGet, "http://example.com", nil)
 		requestID := "header-id-123"
-		
+
 		SetHeader(req, requestID)
 		assert.Equal(t, requestID, req.Header.Get(HeaderXRequestID))
 		assert.Equal(t, requestID, GetHeader(req))
@@ -110,7 +111,7 @@ func TestHTTPHeaderOperations(t *testing.T) {
 
 	t.Run("SetHeader with empty ID", func(t *testing.T) {
 		req, _ := http.NewRequest(http.MethodGet, "http://example.com", nil)
-		
+
 		SetHeader(req, "")
 		assert.Empty(t, req.Header.Get(HeaderXRequestID))
 	})
@@ -121,13 +122,13 @@ func TestPropagation(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		rec := httptest.NewRecorder()
 		c := gortexContext.NewDefaultContext(req, rec)
-		
+
 		requestID := "propagate-123"
 		c.Set("request_id", requestID)
-		
+
 		outReq, _ := http.NewRequest(http.MethodGet, "http://example.com", nil)
 		PropagateToRequest(c, outReq)
-		
+
 		assert.Equal(t, requestID, outReq.Header.Get(HeaderXRequestID))
 	})
 
@@ -135,10 +136,10 @@ func TestPropagation(t *testing.T) {
 		ctx := context.Background()
 		requestID := "ctx-propagate-456"
 		ctx = WithContext(ctx, requestID)
-		
+
 		req, _ := http.NewRequest(http.MethodGet, "http://example.com", nil)
 		PropagateFromContext(ctx, req)
-		
+
 		assert.Equal(t, requestID, req.Header.Get(HeaderXRequestID))
 	})
 }
@@ -147,7 +148,7 @@ func TestLoggerIntegration(t *testing.T) {
 	t.Run("Logger with request ID", func(t *testing.T) {
 		logger := zap.NewNop()
 		requestID := "logger-id-123"
-		
+
 		newLogger := Logger(logger, requestID)
 		assert.NotNil(t, newLogger)
 		// Note: We can't easily test that the field was added to a nop logger
@@ -156,7 +157,7 @@ func TestLoggerIntegration(t *testing.T) {
 
 	t.Run("Logger with empty request ID", func(t *testing.T) {
 		logger := zap.NewNop()
-		
+
 		newLogger := Logger(logger, "")
 		assert.Equal(t, logger, newLogger) // Should return same logger
 	})
@@ -165,10 +166,10 @@ func TestLoggerIntegration(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		rec := httptest.NewRecorder()
 		c := gortexContext.NewDefaultContext(req, rec)
-		
+
 		requestID := "echo-logger-id"
 		c.Set("request_id", requestID)
-		
+
 		logger := zap.NewNop()
 		newLogger := LoggerFromGortex(logger, c)
 		assert.NotNil(t, newLogger)
@@ -178,7 +179,7 @@ func TestLoggerIntegration(t *testing.T) {
 		ctx := context.Background()
 		requestID := "ctx-logger-id"
 		ctx = WithContext(ctx, requestID)
-		
+
 		logger := zap.NewNop()
 		newLogger := LoggerFromContext(logger, ctx)
 		assert.NotNil(t, newLogger)
@@ -190,7 +191,7 @@ func TestHTTPClient(t *testing.T) {
 		ctx := context.Background()
 		requestID := "client-id-123"
 		ctx = WithContext(ctx, requestID)
-		
+
 		client := NewHTTPClient(nil, ctx)
 		assert.NotNil(t, client)
 		assert.Equal(t, http.DefaultClient, client.client)
@@ -208,14 +209,14 @@ func TestHTTPClient(t *testing.T) {
 		ctx := context.Background()
 		requestID := "do-test-id"
 		ctx = WithContext(ctx, requestID)
-		
+
 		client := NewHTTPClient(nil, ctx)
 		req, _ := http.NewRequest(http.MethodGet, server.URL, nil)
-		
+
 		resp, err := client.Do(req)
 		assert.NoError(t, err)
 		defer resp.Body.Close()
-		
+
 		// Verify request ID was propagated
 		assert.Equal(t, requestID, req.Header.Get(HeaderXRequestID))
 	})
@@ -231,12 +232,12 @@ func TestHTTPClient(t *testing.T) {
 		ctx := context.Background()
 		requestID := "get-test-id"
 		ctx = WithContext(ctx, requestID)
-		
+
 		client := NewHTTPClient(nil, ctx)
 		resp, err := client.Get(server.URL)
 		assert.NoError(t, err)
 		defer resp.Body.Close()
-		
+
 		assert.Equal(t, requestID, receivedID)
 	})
 
@@ -252,12 +253,12 @@ func TestHTTPClient(t *testing.T) {
 		ctx := context.Background()
 		requestID := "post-test-id"
 		ctx = WithContext(ctx, requestID)
-		
+
 		client := NewHTTPClient(nil, ctx)
 		resp, err := client.Post(server.URL, "application/json", nil)
 		assert.NoError(t, err)
 		defer resp.Body.Close()
-		
+
 		assert.Equal(t, requestID, receivedID)
 	})
 }

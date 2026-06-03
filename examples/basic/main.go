@@ -14,9 +14,10 @@ import (
 	"syscall"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/yshengliao/gortex/core/app"
 	httpctx "github.com/yshengliao/gortex/transport/http"
-	"go.uber.org/zap"
 )
 
 // Todo is the example domain model.

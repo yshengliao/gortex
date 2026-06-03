@@ -3,7 +3,7 @@ package http
 
 import (
 	"net/http"
-	
+
 	"github.com/yshengliao/gortex/core/types"
 )
 
@@ -138,7 +138,7 @@ const (
 	HeaderOrigin              = "Origin"
 	HeaderCacheControl        = "Cache-Control"
 	HeaderConnection          = "Connection"
-	
+
 	// Access control
 	HeaderAccessControlRequestMethod    = "Access-Control-Request-Method"
 	HeaderAccessControlRequestHeaders   = "Access-Control-Request-Headers"
@@ -148,7 +148,7 @@ const (
 	HeaderAccessControlAllowCredentials = "Access-Control-Allow-Credentials"
 	HeaderAccessControlExposeHeaders    = "Access-Control-Expose-Headers"
 	HeaderAccessControlMaxAge           = "Access-Control-Max-Age"
-	
+
 	// Security
 	HeaderStrictTransportSecurity         = "Strict-Transport-Security"
 	HeaderXContentTypeOptions             = "X-Content-Type-Options"

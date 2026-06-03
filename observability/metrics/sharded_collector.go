@@ -14,37 +14,37 @@ type ShardedCollector struct {
 	// Atomic counters for high-frequency metrics
 	httpRequestCount     int64
 	websocketConnections int64
-	
+
 	// HTTP stats with minimal locking
-	httpMu             sync.RWMutex
-	httpStats          HTTPStats
-	
+	httpMu    sync.RWMutex
+	httpStats HTTPStats
+
 	// WebSocket stats with minimal locking
-	websocketMu        sync.RWMutex
-	websocketStats     WebSocketStats
-	
+	websocketMu    sync.RWMutex
+	websocketStats WebSocketStats
+
 	// System stats with minimal locking
-	systemMu           sync.RWMutex
-	systemStats        SystemStats
-	lastUpdate         time.Time
-	
+	systemMu    sync.RWMutex
+	systemStats SystemStats
+	lastUpdate  time.Time
+
 	// Business metrics with sharded locks
-	shardCount         int
-	shards            []*metricShard
-	maxCardinality     int
+	shardCount          int
+	shards              []*metricShard
+	maxCardinality      int
 	globalEvictionStats EvictionStats
-	globalMu           sync.RWMutex // For global eviction stats only
+	globalMu            sync.RWMutex // For global eviction stats only
 }
 
 // metricShard holds a subset of business metrics with its own lock
 type metricShard struct {
-	mu              sync.RWMutex
-	metrics         map[string]float64
-	lruList        *list.List
-	lruMap         map[string]*list.Element
-	evictionStats  EvictionStats
-	currentCount   int64
-	maxCount       int64 // Max metrics per shard
+	mu            sync.RWMutex
+	metrics       map[string]float64
+	lruList       *list.List
+	lruMap        map[string]*list.Element
+	evictionStats EvictionStats
+	currentCount  int64
+	maxCount      int64 // Max metrics per shard
 }
 
 // NewShardedCollector creates a collector with sharded business metrics
@@ -57,27 +57,27 @@ func NewShardedCollectorWithCardinality(maxCardinality int) *ShardedCollector {
 	if maxCardinality <= 0 {
 		maxCardinality = 10000
 	}
-	
+
 	// Use number of CPUs as shard count for optimal performance
 	shardCount := 16 // Fixed number for predictable performance
 	maxPerShard := int64(maxCardinality / shardCount)
 	if maxPerShard < 1 {
 		maxPerShard = 1
 	}
-	
+
 	shards := make([]*metricShard, shardCount)
 	for i := 0; i < shardCount; i++ {
 		shards[i] = &metricShard{
-			metrics:   make(map[string]float64),
-			lruList:   list.New(),
-			lruMap:    make(map[string]*list.Element),
-			maxCount:  maxPerShard,
+			metrics:  make(map[string]float64),
+			lruList:  list.New(),
+			lruMap:   make(map[string]*list.Element),
+			maxCount: maxPerShard,
 			evictionStats: EvictionStats{
 				EvictedMetrics: make([]string, 0),
 			},
 		}
 	}
-	
+
 	return &ShardedCollector{
 		httpStats: HTTPStats{
 			RequestsByStatus: make(map[int]int64),
@@ -88,7 +88,7 @@ func NewShardedCollectorWithCardinality(maxCardinality int) *ShardedCollector {
 		},
 		lastUpdate:     time.Now(),
 		shardCount:     shardCount,
-		shards:        shards,
+		shards:         shards,
 		maxCardinality: maxCardinality,
 		globalEvictionStats: EvictionStats{
 			EvictedMetrics: make([]string, 0),
@@ -106,12 +106,12 @@ func (c *ShardedCollector) hashKey(key string) int {
 // RecordHTTPRequest records an HTTP request (same as original)
 func (c *ShardedCollector) RecordHTTPRequest(method, path string, statusCode int, duration time.Duration) {
 	atomic.AddInt64(&c.httpRequestCount, 1)
-	
+
 	c.httpMu.Lock()
 	c.httpStats.TotalRequests = atomic.LoadInt64(&c.httpRequestCount)
 	c.httpStats.RequestsByStatus[statusCode]++
 	c.httpStats.RequestsByMethod[method]++
-	
+
 	if c.httpStats.AverageLatency == 0 {
 		c.httpStats.AverageLatency = duration
 	} else {
@@ -135,7 +135,7 @@ func (c *ShardedCollector) RecordWebSocketConnection(connected bool) {
 	} else {
 		atomic.AddInt64(&c.websocketConnections, -1)
 	}
-	
+
 	c.websocketMu.Lock()
 	c.websocketStats.ActiveConnections = atomic.LoadInt64(&c.websocketConnections)
 	c.websocketStats.LastUpdated = time.Now()
@@ -145,7 +145,7 @@ func (c *ShardedCollector) RecordWebSocketConnection(connected bool) {
 func (c *ShardedCollector) RecordWebSocketMessage(direction string, messageType string, size int64) {
 	c.websocketMu.Lock()
 	c.websocketStats.TotalMessages++
-	
+
 	key := direction + "_" + messageType
 	c.websocketStats.MessagesByType[key]++
 	c.websocketStats.LastUpdated = time.Now()
@@ -162,21 +162,21 @@ func (c *ShardedCollector) RecordBusinessMetric(name string, value float64, tags
 			break
 		}
 	}
-	
+
 	// Determine shard
 	shardIndex := c.hashKey(metricKey)
 	shard := c.shards[shardIndex]
-	
+
 	// Only lock the specific shard
 	shard.mu.Lock()
 	defer shard.mu.Unlock()
-	
+
 	// Check if metric exists
 	_, exists := shard.metrics[metricKey]
-	
+
 	// Update metric value
 	shard.metrics[metricKey] = value
-	
+
 	// Handle LRU for this shard
 	if exists {
 		// Update existing entry in LRU
@@ -189,12 +189,12 @@ func (c *ShardedCollector) RecordBusinessMetric(name string, value float64, tags
 	} else {
 		// New metric
 		atomic.AddInt64(&shard.currentCount, 1)
-		
+
 		// Check if we need to evict from this shard
 		if shard.currentCount > shard.maxCount {
 			c.evictFromShard(shard)
 		}
-		
+
 		// Add to LRU
 		entry := &lruEntry{
 			key:       metricKey,
@@ -212,22 +212,22 @@ func (c *ShardedCollector) evictFromShard(shard *metricShard) {
 	if shard.lruList.Len() == 0 {
 		return
 	}
-	
+
 	// Get least recently used element
 	elem := shard.lruList.Back()
 	if elem == nil {
 		return
 	}
-	
+
 	entry := elem.Value.(*lruEntry)
 	evictedKey := entry.key
-	
+
 	// Remove from shard
 	shard.lruList.Remove(elem)
 	delete(shard.lruMap, evictedKey)
 	delete(shard.metrics, evictedKey)
 	atomic.AddInt64(&shard.currentCount, -1)
-	
+
 	// Update shard eviction stats
 	shard.evictionStats.TotalEvictions++
 	shard.evictionStats.LastEvictionTime = time.Now()
@@ -235,7 +235,7 @@ func (c *ShardedCollector) evictFromShard(shard *metricShard) {
 	if len(shard.evictionStats.EvictedMetrics) > 5 { // Keep fewer per shard
 		shard.evictionStats.EvictedMetrics = shard.evictionStats.EvictedMetrics[1:]
 	}
-	
+
 	// Update global stats (minimal lock)
 	c.globalMu.Lock()
 	c.globalEvictionStats.TotalEvictions++
@@ -267,19 +267,19 @@ func (c *ShardedCollector) GetStats() map[string]any {
 	c.httpMu.RLock()
 	httpStats := c.httpStats
 	c.httpMu.RUnlock()
-	
+
 	c.websocketMu.RLock()
 	websocketStats := c.websocketStats
 	c.websocketMu.RUnlock()
-	
+
 	c.systemMu.RLock()
 	systemStats := c.systemStats
 	c.systemMu.RUnlock()
-	
+
 	// Aggregate business metrics from all shards
 	businessMetrics := make(map[string]float64)
 	var totalCurrentCount int64
-	
+
 	for _, shard := range c.shards {
 		shard.mu.RLock()
 		for k, v := range shard.metrics {
@@ -288,20 +288,20 @@ func (c *ShardedCollector) GetStats() map[string]any {
 		totalCurrentCount += atomic.LoadInt64(&shard.currentCount)
 		shard.mu.RUnlock()
 	}
-	
+
 	c.globalMu.RLock()
 	evictionStats := c.globalEvictionStats
 	c.globalMu.RUnlock()
-	
+
 	return map[string]any{
-		"http":       httpStats,
-		"websocket":  websocketStats,
-		"system":     systemStats,
-		"business":   businessMetrics,
+		"http":      httpStats,
+		"websocket": websocketStats,
+		"system":    systemStats,
+		"business":  businessMetrics,
 		"cardinality": map[string]any{
-			"current":    totalCurrentCount,
-			"max":        c.maxCardinality,
-			"evictions":  evictionStats,
+			"current":   totalCurrentCount,
+			"max":       c.maxCardinality,
+			"evictions": evictionStats,
 		},
 		"timestamp": time.Now().Unix(),
 	}
@@ -332,25 +332,25 @@ func (c *ShardedCollector) GetSystemStats() SystemStats {
 func (c *ShardedCollector) Reset() {
 	atomic.StoreInt64(&c.httpRequestCount, 0)
 	atomic.StoreInt64(&c.websocketConnections, 0)
-	
+
 	c.httpMu.Lock()
 	c.httpStats = HTTPStats{
 		RequestsByStatus: make(map[int]int64),
 		RequestsByMethod: make(map[string]int64),
 	}
 	c.httpMu.Unlock()
-	
+
 	c.websocketMu.Lock()
 	c.websocketStats = WebSocketStats{
 		MessagesByType: make(map[string]int64),
 	}
 	c.websocketMu.Unlock()
-	
+
 	c.systemMu.Lock()
 	c.systemStats = SystemStats{}
 	c.lastUpdate = time.Now()
 	c.systemMu.Unlock()
-	
+
 	// Reset all shards
 	for _, shard := range c.shards {
 		shard.mu.Lock()
@@ -363,7 +363,7 @@ func (c *ShardedCollector) Reset() {
 		atomic.StoreInt64(&shard.currentCount, 0)
 		shard.mu.Unlock()
 	}
-	
+
 	c.globalMu.Lock()
 	c.globalEvictionStats = EvictionStats{
 		EvictedMetrics: make([]string, 0),
@@ -381,15 +381,15 @@ func (c *ShardedCollector) GetEvictionStats() EvictionStats {
 // GetCardinalityInfo returns current cardinality information
 func (c *ShardedCollector) GetCardinalityInfo() map[string]any {
 	var totalCurrentCount int64
-	
+
 	for _, shard := range c.shards {
 		totalCurrentCount += atomic.LoadInt64(&shard.currentCount)
 	}
-	
+
 	c.globalMu.RLock()
 	evictionStats := c.globalEvictionStats
 	c.globalMu.RUnlock()
-	
+
 	return map[string]any{
 		"current_metrics": totalCurrentCount,
 		"max_cardinality": c.maxCardinality,

@@ -74,4 +74,3 @@ func extractMiddlewareNames(middlewares []middleware.MiddlewareFunc) []string {
 	}
 	return names
 }
-

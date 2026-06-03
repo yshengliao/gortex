@@ -11,7 +11,7 @@ import (
 // BenchmarkContextWithoutPool tests context creation without pooling
 func BenchmarkContextWithoutPool(b *testing.B) {
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		w := httptest.NewRecorder()
@@ -25,7 +25,7 @@ func BenchmarkContextWithoutPool(b *testing.B) {
 // BenchmarkContextWithPool tests context creation with pooling
 func BenchmarkContextWithPool(b *testing.B) {
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		w := httptest.NewRecorder()
@@ -41,12 +41,12 @@ func BenchmarkContextWithPool(b *testing.B) {
 func BenchmarkSmartParams(b *testing.B) {
 	req := httptest.NewRequest(http.MethodGet, "/users/123/posts/456", nil)
 	w := httptest.NewRecorder()
-	
+
 	params := map[string]string{
 		"userId": "123",
 		"postId": "456",
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		ctx := httpctx.AcquireContext(req, w)
@@ -61,7 +61,7 @@ func BenchmarkSmartParams(b *testing.B) {
 func BenchmarkManyParams(b *testing.B) {
 	req := httptest.NewRequest(http.MethodGet, "/a/b/c/d/e/f", nil)
 	w := httptest.NewRecorder()
-	
+
 	params := map[string]string{
 		"a": "1",
 		"b": "2",
@@ -70,7 +70,7 @@ func BenchmarkManyParams(b *testing.B) {
 		"e": "5",
 		"f": "6",
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		ctx := httpctx.AcquireContext(req, w)

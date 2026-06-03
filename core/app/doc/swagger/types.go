@@ -67,18 +67,18 @@ type PathItem struct {
 
 // Operation represents a single API operation on a path
 type Operation struct {
-	Tags         []string                        `json:"tags,omitempty"`
-	Summary      string                          `json:"summary,omitempty"`
-	Description  string                          `json:"description,omitempty"`
-	ExternalDocs *ExternalDocumentation          `json:"externalDocs,omitempty"`
-	OperationID  string                          `json:"operationId,omitempty"`
-	Parameters   []Parameter                     `json:"parameters,omitempty"`
-	RequestBody  *RequestBody                    `json:"requestBody,omitempty"`
-	Responses    map[string]*Response            `json:"responses"`
-	Callbacks    map[string]map[string]PathItem  `json:"callbacks,omitempty"`
-	Deprecated   bool                            `json:"deprecated,omitempty"`
-	Security     []SecurityRequirement           `json:"security,omitempty"`
-	Servers      []Server                        `json:"servers,omitempty"`
+	Tags         []string                       `json:"tags,omitempty"`
+	Summary      string                         `json:"summary,omitempty"`
+	Description  string                         `json:"description,omitempty"`
+	ExternalDocs *ExternalDocumentation         `json:"externalDocs,omitempty"`
+	OperationID  string                         `json:"operationId,omitempty"`
+	Parameters   []Parameter                    `json:"parameters,omitempty"`
+	RequestBody  *RequestBody                   `json:"requestBody,omitempty"`
+	Responses    map[string]*Response           `json:"responses"`
+	Callbacks    map[string]map[string]PathItem `json:"callbacks,omitempty"`
+	Deprecated   bool                           `json:"deprecated,omitempty"`
+	Security     []SecurityRequirement          `json:"security,omitempty"`
+	Servers      []Server                       `json:"servers,omitempty"`
 }
 
 // Parameter represents a parameter for an operation
@@ -121,52 +121,52 @@ type Response struct {
 
 // Schema represents a schema
 type Schema struct {
-	Ref                  string              `json:"$ref,omitempty"`
-	Type                 string              `json:"type,omitempty"`
-	Format               string              `json:"format,omitempty"`
-	Title                string              `json:"title,omitempty"`
-	Description          string              `json:"description,omitempty"`
-	Default              any                 `json:"default,omitempty"`
-	Maximum              *float64            `json:"maximum,omitempty"`
-	ExclusiveMaximum     bool                `json:"exclusiveMaximum,omitempty"`
-	Minimum              *float64            `json:"minimum,omitempty"`
-	ExclusiveMinimum     bool                `json:"exclusiveMinimum,omitempty"`
-	MaxLength            *int                `json:"maxLength,omitempty"`
-	MinLength            *int                `json:"minLength,omitempty"`
-	Pattern              string              `json:"pattern,omitempty"`
-	MaxItems             *int                `json:"maxItems,omitempty"`
-	MinItems             *int                `json:"minItems,omitempty"`
-	UniqueItems          bool                `json:"uniqueItems,omitempty"`
-	MaxProperties        *int                `json:"maxProperties,omitempty"`
-	MinProperties        *int                `json:"minProperties,omitempty"`
-	Required             []string            `json:"required,omitempty"`
-	Enum                 []any               `json:"enum,omitempty"`
-	Items                *Schema             `json:"items,omitempty"`
-	Properties           map[string]*Schema  `json:"properties,omitempty"`
-	AdditionalProperties any                 `json:"additionalProperties,omitempty"`
-	AllOf                []*Schema           `json:"allOf,omitempty"`
-	OneOf                []*Schema           `json:"oneOf,omitempty"`
-	AnyOf                []*Schema           `json:"anyOf,omitempty"`
-	Not                  *Schema             `json:"not,omitempty"`
-	Discriminator        *Discriminator      `json:"discriminator,omitempty"`
-	ReadOnly             bool                `json:"readOnly,omitempty"`
-	WriteOnly            bool                `json:"writeOnly,omitempty"`
-	XML                  *XML                `json:"xml,omitempty"`
+	Ref                  string                 `json:"$ref,omitempty"`
+	Type                 string                 `json:"type,omitempty"`
+	Format               string                 `json:"format,omitempty"`
+	Title                string                 `json:"title,omitempty"`
+	Description          string                 `json:"description,omitempty"`
+	Default              any                    `json:"default,omitempty"`
+	Maximum              *float64               `json:"maximum,omitempty"`
+	ExclusiveMaximum     bool                   `json:"exclusiveMaximum,omitempty"`
+	Minimum              *float64               `json:"minimum,omitempty"`
+	ExclusiveMinimum     bool                   `json:"exclusiveMinimum,omitempty"`
+	MaxLength            *int                   `json:"maxLength,omitempty"`
+	MinLength            *int                   `json:"minLength,omitempty"`
+	Pattern              string                 `json:"pattern,omitempty"`
+	MaxItems             *int                   `json:"maxItems,omitempty"`
+	MinItems             *int                   `json:"minItems,omitempty"`
+	UniqueItems          bool                   `json:"uniqueItems,omitempty"`
+	MaxProperties        *int                   `json:"maxProperties,omitempty"`
+	MinProperties        *int                   `json:"minProperties,omitempty"`
+	Required             []string               `json:"required,omitempty"`
+	Enum                 []any                  `json:"enum,omitempty"`
+	Items                *Schema                `json:"items,omitempty"`
+	Properties           map[string]*Schema     `json:"properties,omitempty"`
+	AdditionalProperties any                    `json:"additionalProperties,omitempty"`
+	AllOf                []*Schema              `json:"allOf,omitempty"`
+	OneOf                []*Schema              `json:"oneOf,omitempty"`
+	AnyOf                []*Schema              `json:"anyOf,omitempty"`
+	Not                  *Schema                `json:"not,omitempty"`
+	Discriminator        *Discriminator         `json:"discriminator,omitempty"`
+	ReadOnly             bool                   `json:"readOnly,omitempty"`
+	WriteOnly            bool                   `json:"writeOnly,omitempty"`
+	XML                  *XML                   `json:"xml,omitempty"`
 	ExternalDocs         *ExternalDocumentation `json:"externalDocs,omitempty"`
-	Example              any                 `json:"example,omitempty"`
-	Deprecated           bool                `json:"deprecated,omitempty"`
+	Example              any                    `json:"example,omitempty"`
+	Deprecated           bool                   `json:"deprecated,omitempty"`
 }
 
 // Components represents reusable components
 type Components struct {
-	Schemas         map[string]*Schema         `json:"schemas,omitempty"`
-	Responses       map[string]*Response       `json:"responses,omitempty"`
-	Parameters      map[string]*Parameter      `json:"parameters,omitempty"`
-	Examples        map[string]*Example        `json:"examples,omitempty"`
-	RequestBodies   map[string]*RequestBody    `json:"requestBodies,omitempty"`
-	Headers         map[string]*Header         `json:"headers,omitempty"`
-	SecuritySchemes map[string]*SecurityScheme `json:"securitySchemes,omitempty"`
-	Links           map[string]*Link           `json:"links,omitempty"`
+	Schemas         map[string]*Schema             `json:"schemas,omitempty"`
+	Responses       map[string]*Response           `json:"responses,omitempty"`
+	Parameters      map[string]*Parameter          `json:"parameters,omitempty"`
+	Examples        map[string]*Example            `json:"examples,omitempty"`
+	RequestBodies   map[string]*RequestBody        `json:"requestBodies,omitempty"`
+	Headers         map[string]*Header             `json:"headers,omitempty"`
+	SecuritySchemes map[string]*SecurityScheme     `json:"securitySchemes,omitempty"`
+	Links           map[string]*Link               `json:"links,omitempty"`
 	Callbacks       map[string]map[string]PathItem `json:"callbacks,omitempty"`
 }
 
@@ -213,12 +213,12 @@ type Header struct {
 }
 
 type Link struct {
-	OperationRef string                 `json:"operationRef,omitempty"`
-	OperationId  string                 `json:"operationId,omitempty"`
-	Parameters   map[string]any         `json:"parameters,omitempty"`
-	RequestBody  any                    `json:"requestBody,omitempty"`
-	Description  string                 `json:"description,omitempty"`
-	Server       *Server                `json:"server,omitempty"`
+	OperationRef string         `json:"operationRef,omitempty"`
+	OperationId  string         `json:"operationId,omitempty"`
+	Parameters   map[string]any `json:"parameters,omitempty"`
+	RequestBody  any            `json:"requestBody,omitempty"`
+	Description  string         `json:"description,omitempty"`
+	Server       *Server        `json:"server,omitempty"`
 }
 
 type Discriminator struct {

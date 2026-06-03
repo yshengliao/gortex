@@ -13,10 +13,11 @@ import (
 	"time"
 
 	gorillaWS "github.com/gorilla/websocket"
+	"go.uber.org/zap"
+
 	"github.com/yshengliao/gortex/core/app"
 	httpctx "github.com/yshengliao/gortex/transport/http"
 	"github.com/yshengliao/gortex/transport/websocket"
-	"go.uber.org/zap"
 )
 
 // ChatHandler upgrades incoming HTTP requests to WebSocket and hands the

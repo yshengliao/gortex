@@ -1,8 +1,9 @@
 package testutil
 
 import (
-	httpctx "github.com/yshengliao/gortex/transport/http"
 	"go.uber.org/zap"
+
+	httpctx "github.com/yshengliao/gortex/transport/http"
 )
 
 // TestHandler is a simple handler for testing

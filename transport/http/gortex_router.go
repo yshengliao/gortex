@@ -146,7 +146,7 @@ func (r *gortexRouter) addToTree(root *routeNode, path string, handler HandlerFu
 		root.middlewares = middlewares
 		return
 	}
-	
+
 	segments := strings.Split(strings.Trim(path, "/"), "/")
 	current := root
 
@@ -196,7 +196,7 @@ func (r *gortexRouter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// Use context pool for better performance
 	ctx := AcquireContext(req, w)
 	defer ReleaseContext(ctx)
-	
+
 	// Set the request path
 	ctx.SetPath(req.URL.Path)
 
@@ -307,4 +307,3 @@ func (r *gortexRouter) searchTree(node *routeNode, path string, params *smartPar
 
 	return nil, nil
 }
-

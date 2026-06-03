@@ -14,22 +14,22 @@ func TestErrorCode_Message(t *testing.T) {
 		{"ValidationFailed", CodeValidationFailed, "Validation failed"},
 		{"InvalidInput", CodeInvalidInput, "Invalid input provided"},
 		{"MissingRequiredField", CodeMissingRequiredField, "Required field is missing"},
-		
+
 		// Auth errors
 		{"Unauthorized", CodeUnauthorized, "Unauthorized access"},
 		{"TokenExpired", CodeTokenExpired, "Token has expired"},
 		{"Forbidden", CodeForbidden, "Access forbidden"},
-		
+
 		// System errors
 		{"InternalServerError", CodeInternalServerError, "Internal server error"},
 		{"DatabaseError", CodeDatabaseError, "Database error occurred"},
 		{"RateLimitExceeded", CodeRateLimitExceeded, "Rate limit exceeded"},
-		
+
 		// Business errors
 		{"ResourceNotFound", CodeResourceNotFound, "Resource not found"},
 		{"Conflict", CodeConflict, "Resource conflict"},
 		{"InsufficientBalance", CodeInsufficientBalance, "Insufficient balance"},
-		
+
 		// Unknown code
 		{"Unknown", ErrorCode(9999), "Unknown error"},
 	}
@@ -102,7 +102,7 @@ func TestErrorCodeCategories(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			codeInt := tt.code.Int()
 			if codeInt < tt.minCode || codeInt > tt.maxCode {
-				t.Errorf("%s code %d is not in expected range [%d, %d]", 
+				t.Errorf("%s code %d is not in expected range [%d, %d]",
 					tt.category, codeInt, tt.minCode, tt.maxCode)
 			}
 		})

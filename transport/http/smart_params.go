@@ -6,7 +6,7 @@ package http
 type smartParams struct {
 	count    int
 	keys     [4]string
-	vals     [4]string  // Renamed to avoid conflict with values() method
+	vals     [4]string // Renamed to avoid conflict with values() method
 	overflow map[string]string
 }
 
@@ -58,7 +58,7 @@ func (sp *smartParams) set(key, value string) {
 			return
 		}
 	}
-	
+
 	// Check if key exists in overflow map
 	if sp.overflow != nil {
 		if _, exists := sp.overflow[key]; exists {
@@ -66,7 +66,7 @@ func (sp *smartParams) set(key, value string) {
 			return
 		}
 	}
-	
+
 	// Add new parameter
 	if sp.count < 4 {
 		sp.keys[sp.count] = key
@@ -90,12 +90,12 @@ func (sp *smartParams) get(key string) string {
 			return sp.vals[i]
 		}
 	}
-	
+
 	// Check overflow map
 	if sp.overflow != nil {
 		return sp.overflow[key]
 	}
-	
+
 	return ""
 }
 
@@ -104,11 +104,11 @@ func (sp *smartParams) getByIndex(index int) (string, string) {
 	if index < 0 || index >= sp.count {
 		return "", ""
 	}
-	
+
 	if index < 4 {
 		return sp.keys[index], sp.vals[index]
 	}
-	
+
 	// For overflow items, we need to iterate
 	// This is less efficient but only happens with many params
 	if sp.overflow != nil {
@@ -121,7 +121,7 @@ func (sp *smartParams) getByIndex(index int) (string, string) {
 			current++
 		}
 	}
-	
+
 	return "", ""
 }
 
@@ -130,7 +130,7 @@ func (sp *smartParams) setByIndex(index int, key, value string) {
 	if index < 0 || index >= sp.count {
 		return
 	}
-	
+
 	if index < 4 {
 		sp.keys[index] = key
 		sp.vals[index] = value
@@ -149,21 +149,21 @@ func (sp *smartParams) names() []string {
 	if sp.count == 0 {
 		return nil
 	}
-	
+
 	names := make([]string, 0, sp.count)
-	
+
 	// Add array keys
 	for i := 0; i < sp.count && i < 4; i++ {
 		names = append(names, sp.keys[i])
 	}
-	
+
 	// Add overflow keys
 	if sp.overflow != nil {
 		for k := range sp.overflow {
 			names = append(names, k)
 		}
 	}
-	
+
 	return names
 }
 
@@ -172,20 +172,20 @@ func (sp *smartParams) values() []string {
 	if sp.count == 0 {
 		return nil
 	}
-	
+
 	values := make([]string, 0, sp.count)
-	
+
 	// Add array values
 	for i := 0; i < sp.count && i < 4; i++ {
 		values = append(values, sp.vals[i])
 	}
-	
+
 	// Add overflow values
 	if sp.overflow != nil {
 		for _, v := range sp.overflow {
 			values = append(values, v)
 		}
 	}
-	
+
 	return values
 }

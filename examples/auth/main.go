@@ -15,10 +15,11 @@ import (
 	"syscall"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/yshengliao/gortex/core/app"
 	"github.com/yshengliao/gortex/pkg/auth"
 	httpctx "github.com/yshengliao/gortex/transport/http"
-	"go.uber.org/zap"
 )
 
 // fakeUser is the demo account. Production code would look this up from a

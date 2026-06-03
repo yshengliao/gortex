@@ -9,9 +9,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zaptest"
+
 	"github.com/yshengliao/gortex/pkg/config"
 	httpctx "github.com/yshengliao/gortex/transport/http"
-	"go.uber.org/zap/zaptest"
 )
 
 func TestDevelopmentModeFeatures(t *testing.T) {

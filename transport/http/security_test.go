@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	httpctx "github.com/yshengliao/gortex/transport/http"
 )
 
@@ -93,7 +94,7 @@ func TestFileServesTrustedPath(t *testing.T) {
 
 func TestFileFSRejectsEscapes(t *testing.T) {
 	fsys := fstest.MapFS{
-		"index.html": &fstest.MapFile{Data: []byte("root")},
+		"index.html":    &fstest.MapFile{Data: []byte("root")},
 		"static/app.js": &fstest.MapFile{Data: []byte("js")},
 	}
 	cases := []string{"../etc/passwd", "/etc/passwd", "./foo", "static/../../etc"}

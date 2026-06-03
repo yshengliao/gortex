@@ -14,8 +14,8 @@ type Embedded struct {
 	_ struct{} `api:"group=Test,version=v1,desc=Test API,tags=test|example"`
 }
 
-func (h *TestHandler) GET() {}
-func (h *TestHandler) CreateUser() {}
+func (h *TestHandler) GET()           {}
+func (h *TestHandler) CreateUser()    {}
 func (h *TestHandler) UpdateProfile() {}
 
 func TestParseHandlerMetadata(t *testing.T) {

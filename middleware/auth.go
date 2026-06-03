@@ -112,7 +112,7 @@ func JWTAuthWithConfig(config *AuthConfig) MiddlewareFunc {
 			// Also store in request context for standard Go code
 			ctx := context.WithValue(req.Context(), contextKey(config.ClaimsContextKey), claims)
 			newReq := req.WithContext(ctx)
-			
+
 			// Update the request in context if possible
 			if setter, ok := c.(interface{ SetRequest(*http.Request) }); ok {
 				setter.SetRequest(newReq)
@@ -381,7 +381,7 @@ func SessionAuthWithConfig(config *SessionConfig) MiddlewareFunc {
 			ctx := context.WithValue(req.Context(), sessionContextKey, sessionData)
 			ctx = context.WithValue(ctx, sessionIDContextKey, sessionID)
 			newReq := req.WithContext(ctx)
-			
+
 			// Update the request in context if possible
 			if setter, ok := c.(interface{ SetRequest(*http.Request) }); ok {
 				setter.SetRequest(newReq)

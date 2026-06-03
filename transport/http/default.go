@@ -65,16 +65,16 @@ var _ Context = (*DefaultContext)(nil)
 
 // DefaultContext is the default implementation of Context interface
 type DefaultContext struct {
-	request     *http.Request
-	response    ResponseWriter
-	rw          responseWriter   // embedded value; same lifetime as the pooled context
-	path        string
-	params      *smartParams // Use smart params for better performance
-	handler     HandlerFunc
-	store       Map
-	lock        sync.RWMutex
-	logger      interface{}
-	stdContext  context.Context
+	request    *http.Request
+	response   ResponseWriter
+	rw         responseWriter // embedded value; same lifetime as the pooled context
+	path       string
+	params     *smartParams // Use smart params for better performance
+	handler    HandlerFunc
+	store      Map
+	lock       sync.RWMutex
+	logger     interface{}
+	stdContext context.Context
 }
 
 // NewDefaultContext creates a new DefaultContext

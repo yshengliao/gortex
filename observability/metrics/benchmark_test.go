@@ -52,17 +52,17 @@ func benchmarkCollectorSuite(b *testing.B, factory func() interface {
 	b.Run("HighConcurrencyWrites", func(b *testing.B) {
 		collector := factory()
 		numWorkers := runtime.NumCPU()
-		
+
 		b.ResetTimer()
 		var wg sync.WaitGroup
 		wg.Add(numWorkers)
-		
+
 		start := make(chan struct{})
 		for i := 0; i < numWorkers; i++ {
 			go func(workerID int) {
 				defer wg.Done()
 				<-start
-				
+
 				for j := 0; j < b.N/numWorkers; j++ {
 					metricName := fmt.Sprintf("worker_%d_metric_%d", workerID, j%100)
 					tags := map[string]string{"worker": fmt.Sprintf("%d", workerID)}
@@ -70,7 +70,7 @@ func benchmarkCollectorSuite(b *testing.B, factory func() interface {
 				}
 			}(i)
 		}
-		
+
 		close(start)
 		wg.Wait()
 	})
@@ -78,7 +78,7 @@ func benchmarkCollectorSuite(b *testing.B, factory func() interface {
 	// Scenario 2: Different Tag Combinations (High Cardinality)
 	b.Run("HighCardinalityTags", func(b *testing.B) {
 		collector := factory()
-		
+
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			// Create metrics with different tag combinations
@@ -96,22 +96,22 @@ func benchmarkCollectorSuite(b *testing.B, factory func() interface {
 	b.Run("MixedReadWrite", func(b *testing.B) {
 		collector := factory()
 		numWorkers := runtime.NumCPU()
-		
+
 		// Pre-populate with some data
 		for i := 0; i < 100; i++ {
 			collector.RecordBusinessMetric(fmt.Sprintf("metric_%d", i), float64(i), nil)
 		}
-		
+
 		b.ResetTimer()
 		var wg sync.WaitGroup
 		wg.Add(numWorkers)
-		
+
 		start := make(chan struct{})
 		for i := 0; i < numWorkers; i++ {
 			go func(workerID int) {
 				defer wg.Done()
 				<-start
-				
+
 				for j := 0; j < b.N/numWorkers; j++ {
 					if j%4 == 0 {
 						// Read operation (25% of operations)
@@ -124,7 +124,7 @@ func benchmarkCollectorSuite(b *testing.B, factory func() interface {
 				}
 			}(i)
 		}
-		
+
 		close(start)
 		wg.Wait()
 	})
@@ -135,14 +135,14 @@ func benchmarkCollectorSuite(b *testing.B, factory func() interface {
 		methods := []string{"GET", "POST", "PUT", "DELETE"}
 		paths := []string{"/api/users", "/api/orders", "/api/products", "/health"}
 		statusCodes := []int{200, 201, 400, 404, 500}
-		
+
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			method := methods[i%len(methods)]
 			path := paths[i%len(paths)]
 			statusCode := statusCodes[i%len(statusCodes)]
 			duration := time.Duration(i%100) * time.Millisecond
-			
+
 			collector.RecordHTTPRequest(method, path, statusCode, duration)
 		}
 	})
@@ -150,13 +150,13 @@ func benchmarkCollectorSuite(b *testing.B, factory func() interface {
 	// Scenario 5: Bulk Metrics Recording
 	b.Run("BulkMetricsRecording", func(b *testing.B) {
 		collector := factory()
-		
+
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			// Simulate bulk recording of related metrics
 			userID := i % 1000
 			tags := map[string]string{"user_id": fmt.Sprintf("%d", userID)}
-			
+
 			collector.RecordBusinessMetric("user_login_count", 1, tags)
 			collector.RecordBusinessMetric("user_session_duration", float64(i%3600), tags)
 			collector.RecordBusinessMetric("user_page_views", float64(i%50), tags)
@@ -166,7 +166,7 @@ func benchmarkCollectorSuite(b *testing.B, factory func() interface {
 	// Scenario 6: Single-Threaded Performance Baseline
 	b.Run("SingleThreadedBaseline", func(b *testing.B) {
 		collector := factory()
-		
+
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			collector.RecordBusinessMetric(fmt.Sprintf("metric_%d", i%100), float64(i), nil)
@@ -176,7 +176,7 @@ func benchmarkCollectorSuite(b *testing.B, factory func() interface {
 	// Scenario 7: Aggregated Data Reads (Dashboard simulation)
 	b.Run("AggregatedDataReads", func(b *testing.B) {
 		collector := factory()
-		
+
 		// Pre-populate with realistic data
 		for i := 0; i < 500; i++ {
 			tags := map[string]string{
@@ -186,7 +186,7 @@ func benchmarkCollectorSuite(b *testing.B, factory func() interface {
 			collector.RecordBusinessMetric("requests_total", float64(i), tags)
 			collector.RecordHTTPRequest("GET", "/api", 200, time.Millisecond)
 		}
-		
+
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			// Simulate dashboard refreshing all metrics
@@ -200,7 +200,7 @@ func benchmarkCollectorSuite(b *testing.B, factory func() interface {
 	// Scenario 8: Memory Pressure Simulation
 	b.Run("MemoryPressure", func(b *testing.B) {
 		collector := factory()
-		
+
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			// Create unique metric names to force memory allocation
@@ -216,7 +216,7 @@ func benchmarkCollectorSuite(b *testing.B, factory func() interface {
 	// Scenario 9: Time Series Simulation
 	b.Run("TimeSeriesSimulation", func(b *testing.B) {
 		collector := factory()
-		
+
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			// Simulate time series data with consistent metric names but changing values
@@ -225,7 +225,7 @@ func benchmarkCollectorSuite(b *testing.B, factory func() interface {
 				"timestamp": fmt.Sprintf("%d", timestamp.Unix()),
 				"host":      fmt.Sprintf("host_%d", i%10),
 			}
-			
+
 			collector.RecordBusinessMetric("cpu_usage", float64(i%100), tags)
 			collector.RecordBusinessMetric("memory_usage", float64((i*2)%100), tags)
 			collector.RecordBusinessMetric("disk_usage", float64((i*3)%100), tags)
@@ -236,17 +236,17 @@ func benchmarkCollectorSuite(b *testing.B, factory func() interface {
 	b.Run("ContentiousKeyAccess", func(b *testing.B) {
 		collector := factory()
 		numWorkers := runtime.NumCPU()
-		
+
 		b.ResetTimer()
 		var wg sync.WaitGroup
 		wg.Add(numWorkers)
-		
+
 		start := make(chan struct{})
 		for i := 0; i < numWorkers; i++ {
 			go func(workerID int) {
 				defer wg.Done()
 				<-start
-				
+
 				for j := 0; j < b.N/numWorkers; j++ {
 					// All workers update the same few metrics (worst case contention)
 					metricName := fmt.Sprintf("shared_metric_%d", j%3)
@@ -254,7 +254,7 @@ func benchmarkCollectorSuite(b *testing.B, factory func() interface {
 				}
 			}(i)
 		}
-		
+
 		close(start)
 		wg.Wait()
 	})
@@ -283,10 +283,10 @@ func BenchmarkMetricsMemoryFootprint(b *testing.B) {
 	for collectorName, factory := range collectors {
 		b.Run(collectorName, func(b *testing.B) {
 			collector := factory()
-			
+
 			b.ReportAllocs()
 			b.ResetTimer()
-			
+
 			for i := 0; i < b.N; i++ {
 				metricName := fmt.Sprintf("metric_%d", i%1000)
 				tags := map[string]string{"batch": fmt.Sprintf("%d", i/1000)}
@@ -299,12 +299,12 @@ func BenchmarkMetricsMemoryFootprint(b *testing.B) {
 // BenchmarkCardinalityLimits tests behavior under cardinality pressure
 func BenchmarkCardinalityLimits(b *testing.B) {
 	cardinalityLimits := []int{100, 1000, 10000}
-	
+
 	for _, limit := range cardinalityLimits {
 		b.Run(fmt.Sprintf("Limit_%d", limit), func(b *testing.B) {
 			b.Run("ImprovedCollector", func(b *testing.B) {
 				collector := NewImprovedCollectorWithCardinality(limit)
-				
+
 				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
 					// Generate more unique metrics than the limit
@@ -312,10 +312,10 @@ func BenchmarkCardinalityLimits(b *testing.B) {
 					collector.RecordBusinessMetric(metricName, float64(i), nil)
 				}
 			})
-			
+
 			b.Run("ShardedCollector", func(b *testing.B) {
 				collector := NewShardedCollectorWithCardinality(limit)
-				
+
 				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
 					// Generate more unique metrics than the limit
@@ -330,17 +330,17 @@ func BenchmarkCardinalityLimits(b *testing.B) {
 // BenchmarkScalability tests performance scaling with worker count
 func BenchmarkScalability(b *testing.B) {
 	workerCounts := []int{1, 2, 4, 8, 16, 32}
-	
+
 	for _, workers := range workerCounts {
 		if workers > runtime.NumCPU()*4 {
 			continue // Skip unrealistic worker counts
 		}
-		
+
 		b.Run(fmt.Sprintf("Workers_%d", workers), func(b *testing.B) {
 			b.Run("ImprovedCollector", func(b *testing.B) {
 				benchmarkScalabilityImpl(b, NewImprovedCollectorWithCardinality(1000), workers)
 			})
-			
+
 			b.Run("ShardedCollector", func(b *testing.B) {
 				benchmarkScalabilityImpl(b, NewShardedCollectorWithCardinality(1000), workers)
 			})
@@ -352,23 +352,23 @@ func benchmarkScalabilityImpl(b *testing.B, collector interface {
 	RecordBusinessMetric(name string, value float64, tags map[string]string)
 }, workers int) {
 	b.ResetTimer()
-	
+
 	var wg sync.WaitGroup
 	wg.Add(workers)
-	
+
 	start := make(chan struct{})
 	for i := 0; i < workers; i++ {
 		go func(workerID int) {
 			defer wg.Done()
 			<-start
-			
+
 			for j := 0; j < b.N/workers; j++ {
 				metricName := fmt.Sprintf("worker_%d_metric_%d", workerID, j%100)
 				collector.RecordBusinessMetric(metricName, float64(j), nil)
 			}
 		}(i)
 	}
-	
+
 	close(start)
 	wg.Wait()
 }

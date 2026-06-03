@@ -17,7 +17,7 @@ func TestHealthCheckerRaceConditions(t *testing.T) {
 		defer checker.Stop()
 
 		var wg sync.WaitGroup
-		
+
 		// Concurrently register health checks
 		for i := 0; i < 10; i++ {
 			wg.Add(1)
@@ -53,10 +53,10 @@ func TestHealthCheckerRaceConditions(t *testing.T) {
 		}
 
 		wg.Wait()
-		
+
 		// Wait a bit for background processing
 		time.Sleep(100 * time.Millisecond)
-		
+
 		// Verify checks are registered
 		results := checker.GetResults()
 		assert.Greater(t, len(results), 0)
@@ -68,7 +68,7 @@ func TestHealthCheckerRaceConditions(t *testing.T) {
 
 		// Use atomic counter to avoid race condition
 		var updateCount int64
-		
+
 		checker.Register("background", func(ctx context.Context) HealthCheckResult {
 			atomic.AddInt64(&updateCount, 1)
 			return HealthCheckResult{
@@ -78,7 +78,7 @@ func TestHealthCheckerRaceConditions(t *testing.T) {
 
 		// Wait for background checks to run
 		time.Sleep(250 * time.Millisecond)
-		
+
 		// Read with atomic operation
 		count := atomic.LoadInt64(&updateCount)
 		assert.GreaterOrEqual(t, count, int64(2))

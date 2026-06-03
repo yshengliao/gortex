@@ -29,14 +29,14 @@ func NewObjectPool[T any](new func() T, reset func(*T)) *ObjectPool[T] {
 		reset:   reset,
 		metrics: &ObjectMetrics{},
 	}
-	
+
 	p.pool = &sync.Pool{
 		New: func() any {
 			atomic.AddInt64(&p.metrics.TotalNew, 1)
 			return p.new()
 		},
 	}
-	
+
 	return p
 }
 
@@ -44,7 +44,7 @@ func NewObjectPool[T any](new func() T, reset func(*T)) *ObjectPool[T] {
 func (p *ObjectPool[T]) Get() T {
 	atomic.AddInt64(&p.metrics.TotalGet, 1)
 	atomic.AddInt64(&p.metrics.CurrentActive, 1)
-	
+
 	obj := p.pool.Get().(T)
 	return obj
 }
@@ -53,12 +53,12 @@ func (p *ObjectPool[T]) Get() T {
 func (p *ObjectPool[T]) Put(obj T) {
 	atomic.AddInt64(&p.metrics.TotalPut, 1)
 	atomic.AddInt64(&p.metrics.CurrentActive, -1)
-	
+
 	// Reset object if reset function provided
 	if p.reset != nil {
 		p.reset(&obj)
 	}
-	
+
 	p.pool.Put(obj)
 }
 
@@ -86,20 +86,20 @@ func NewStructPool(example any) *StructPool {
 	if structType.Kind() == reflect.Ptr {
 		structType = structType.Elem()
 	}
-	
+
 	sp := &StructPool{
 		structType: structType,
 		zeroValue:  reflect.Zero(structType).Interface(),
 		metrics:    &ObjectMetrics{},
 	}
-	
+
 	sp.pool = &sync.Pool{
 		New: func() any {
 			atomic.AddInt64(&sp.metrics.TotalNew, 1)
 			return reflect.New(sp.structType).Interface()
 		},
 	}
-	
+
 	return sp
 }
 
@@ -107,7 +107,7 @@ func NewStructPool(example any) *StructPool {
 func (sp *StructPool) Get() any {
 	atomic.AddInt64(&sp.metrics.TotalGet, 1)
 	atomic.AddInt64(&sp.metrics.CurrentActive, 1)
-	
+
 	return sp.pool.Get()
 }
 
@@ -116,16 +116,16 @@ func (sp *StructPool) Put(obj any) {
 	if obj == nil {
 		return
 	}
-	
+
 	atomic.AddInt64(&sp.metrics.TotalPut, 1)
 	atomic.AddInt64(&sp.metrics.CurrentActive, -1)
-	
+
 	// Reset struct to zero value
 	v := reflect.ValueOf(obj)
 	if v.Kind() == reflect.Ptr && !v.IsNil() {
 		v.Elem().Set(reflect.Zero(sp.structType))
 	}
-	
+
 	sp.pool.Put(obj)
 }
 

@@ -11,23 +11,24 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+
 	appcontext "github.com/yshengliao/gortex/core/context"
 	"github.com/yshengliao/gortex/middleware"
 	httpctx "github.com/yshengliao/gortex/transport/http"
-	"go.uber.org/zap"
 )
 
 // --- utils.go ----------------------------------------------------------
 
 func TestCamelToKebab(t *testing.T) {
 	cases := map[string]string{
-		"":              "",
-		"Hello":         "hello",
-		"HelloWorld":    "hello-world",
-		"ABC":           "a-b-c",
-		"getUserByID":   "get-user-by-i-d",
-		"doStuff":       "do-stuff",
-		"HTTPServer":    "h-t-t-p-server",
+		"":            "",
+		"Hello":       "hello",
+		"HelloWorld":  "hello-world",
+		"ABC":         "a-b-c",
+		"getUserByID": "get-user-by-i-d",
+		"doStuff":     "do-stuff",
+		"HTTPServer":  "h-t-t-p-server",
 	}
 	for input, want := range cases {
 		assert.Equal(t, want, camelToKebab(input), "input=%q", input)
@@ -58,9 +59,9 @@ func TestContainsHelper(t *testing.T) {
 // isValidGortexHandler only accepts the (ctx) error signature.
 type validTarget struct{}
 
-func (validTarget) GET(c httpctx.Context) error  { return nil }
-func (validTarget) Wrong(s string) error         { return nil }
-func (validTarget) NoReturn(c httpctx.Context)   {}
+func (validTarget) GET(c httpctx.Context) error { return nil }
+func (validTarget) Wrong(s string) error        { return nil }
+func (validTarget) NoReturn(c httpctx.Context)  {}
 func (validTarget) TwoReturn(c httpctx.Context) (int, error) {
 	return 0, nil
 }
@@ -85,13 +86,13 @@ func TestIsValidGortexHandler(t *testing.T) {
 
 type cacheTestHandler struct{}
 
-func (cacheTestHandler) GET(c httpctx.Context) error            { return nil }
-func (cacheTestHandler) POST(c httpctx.Context) error           { return nil }
-func (cacheTestHandler) CreateWidget(c httpctx.Context) error   { return nil }
-func (cacheTestHandler) UpdateWidget(c httpctx.Context) error   { return nil }
-func (cacheTestHandler) DeleteWidget(c httpctx.Context) error   { return nil }
-func (cacheTestHandler) ListWidgets(c httpctx.Context) error    { return nil }
-func (cacheTestHandler) notExported(c httpctx.Context) error    { return nil } //nolint:unused
+func (cacheTestHandler) GET(c httpctx.Context) error          { return nil }
+func (cacheTestHandler) POST(c httpctx.Context) error         { return nil }
+func (cacheTestHandler) CreateWidget(c httpctx.Context) error { return nil }
+func (cacheTestHandler) UpdateWidget(c httpctx.Context) error { return nil }
+func (cacheTestHandler) DeleteWidget(c httpctx.Context) error { return nil }
+func (cacheTestHandler) ListWidgets(c httpctx.Context) error  { return nil }
+func (cacheTestHandler) notExported(c httpctx.Context) error  { return nil } //nolint:unused
 
 func TestHandlerCacheBuildsStandardAndCustomMethods(t *testing.T) {
 	ClearCache()

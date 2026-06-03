@@ -32,30 +32,30 @@ func gortexVersion() string {
 
 // BenchmarkResult represents a single benchmark result
 type BenchmarkResult struct {
-	Name              string    `json:"name"`
-	Timestamp         time.Time `json:"timestamp"`
-	NsPerOp           int64     `json:"ns_per_op"`
-	AllocsPerOp       int64     `json:"allocs_per_op"`
-	BytesPerOp        int64     `json:"bytes_per_op"`
-	Iterations        int       `json:"iterations"`
-	GoVersion         string    `json:"go_version"`
-	OS                string    `json:"os"`
-	Arch              string    `json:"arch"`
-	CPUs              int       `json:"cpus"`
-	GortexVersion     string    `json:"gortex_version"`
-	MemStats          MemStats  `json:"mem_stats"`
+	Name          string    `json:"name"`
+	Timestamp     time.Time `json:"timestamp"`
+	NsPerOp       int64     `json:"ns_per_op"`
+	AllocsPerOp   int64     `json:"allocs_per_op"`
+	BytesPerOp    int64     `json:"bytes_per_op"`
+	Iterations    int       `json:"iterations"`
+	GoVersion     string    `json:"go_version"`
+	OS            string    `json:"os"`
+	Arch          string    `json:"arch"`
+	CPUs          int       `json:"cpus"`
+	GortexVersion string    `json:"gortex_version"`
+	MemStats      MemStats  `json:"mem_stats"`
 }
 
 // MemStats captures memory statistics
 type MemStats struct {
-	Alloc        uint64 `json:"alloc"`
-	TotalAlloc   uint64 `json:"total_alloc"`
-	Sys          uint64 `json:"sys"`
-	NumGC        uint32 `json:"num_gc"`
-	HeapAlloc    uint64 `json:"heap_alloc"`
-	HeapSys      uint64 `json:"heap_sys"`
-	HeapInuse    uint64 `json:"heap_inuse"`
-	StackInuse   uint64 `json:"stack_inuse"`
+	Alloc      uint64 `json:"alloc"`
+	TotalAlloc uint64 `json:"total_alloc"`
+	Sys        uint64 `json:"sys"`
+	NumGC      uint32 `json:"num_gc"`
+	HeapAlloc  uint64 `json:"heap_alloc"`
+	HeapSys    uint64 `json:"heap_sys"`
+	HeapInuse  uint64 `json:"heap_inuse"`
+	StackInuse uint64 `json:"stack_inuse"`
 }
 
 // BenchmarkSuite manages benchmark execution and result storage
@@ -95,10 +95,10 @@ func (bs *BenchmarkSuite) benchmarkSimpleRoute(b *testing.B) {
 	router.GET("/api/v1/health", handler)
 
 	req := NewTestRequest("GET", "/users", nil)
-	
+
 	b.ResetTimer()
 	b.ReportAllocs()
-	
+
 	for i := 0; i < b.N; i++ {
 		w := NewTestResponseRecorder()
 		router.ServeHTTP(w, req)
@@ -117,12 +117,12 @@ func (bs *BenchmarkSuite) benchmarkParameterizedRoute(b *testing.B) {
 
 	router.GET("/users/:id", handler)
 	router.GET("/posts/:id/comments/:cid", handler)
-	
+
 	req := NewTestRequest("GET", "/users/123", nil)
-	
+
 	b.ResetTimer()
 	b.ReportAllocs()
-	
+
 	for i := 0; i < b.N; i++ {
 		w := NewTestResponseRecorder()
 		router.ServeHTTP(w, req)
@@ -140,12 +140,12 @@ func (bs *BenchmarkSuite) benchmarkWildcardRoute(b *testing.B) {
 	}
 
 	router.GET("/static/*", handler)
-	
+
 	req := NewTestRequest("GET", "/static/css/main.css", nil)
-	
+
 	b.ResetTimer()
 	b.ReportAllocs()
-	
+
 	for i := 0; i < b.N; i++ {
 		w := NewTestResponseRecorder()
 		router.ServeHTTP(w, req)
@@ -165,16 +165,16 @@ func (bs *BenchmarkSuite) benchmarkNestedGroups(b *testing.B) {
 	v1 := api.Group("/v1")
 	v1.GET("/users", handler)
 	v1.GET("/posts", handler)
-	
+
 	v2 := api.Group("/v2")
 	v2.GET("/users", handler)
 	v2.GET("/posts", handler)
-	
+
 	req := NewTestRequest("GET", "/api/v2/users", nil)
-	
+
 	b.ResetTimer()
 	b.ReportAllocs()
-	
+
 	for i := 0; i < b.N; i++ {
 		w := NewTestResponseRecorder()
 		router.ServeHTTP(w, req)
@@ -186,7 +186,7 @@ func (bs *BenchmarkSuite) benchmarkNestedGroups(b *testing.B) {
 // benchmarkMiddlewareChain tests middleware chain performance
 func (bs *BenchmarkSuite) benchmarkMiddlewareChain(b *testing.B) {
 	router := httpctx.NewGortexRouter()
-	
+
 	// Create middleware chain
 	middleware1 := func(next httpctx.HandlerFunc) httpctx.HandlerFunc {
 		return func(c httpctx.Context) error {
@@ -194,33 +194,33 @@ func (bs *BenchmarkSuite) benchmarkMiddlewareChain(b *testing.B) {
 			return next(c)
 		}
 	}
-	
+
 	middleware2 := func(next httpctx.HandlerFunc) httpctx.HandlerFunc {
 		return func(c httpctx.Context) error {
 			c.Response().Header().Set("X-Middleware-2", "true")
 			return next(c)
 		}
 	}
-	
+
 	middleware3 := func(next httpctx.HandlerFunc) httpctx.HandlerFunc {
 		return func(c httpctx.Context) error {
 			c.Response().Header().Set("X-Middleware-3", "true")
 			return next(c)
 		}
 	}
-	
+
 	handler := func(c httpctx.Context) error {
 		return c.String(200, "OK")
 	}
 
 	router.Use(middleware1, middleware2, middleware3)
 	router.GET("/test", handler)
-	
+
 	req := NewTestRequest("GET", "/test", nil)
-	
+
 	b.ResetTimer()
 	b.ReportAllocs()
-	
+
 	for i := 0; i < b.N; i++ {
 		w := NewTestResponseRecorder()
 		router.ServeHTTP(w, req)
@@ -240,10 +240,10 @@ func (bs *BenchmarkSuite) RunContextBenchmarks(b *testing.B) {
 // benchmarkContextCreation tests context creation performance
 func (bs *BenchmarkSuite) benchmarkContextCreation(b *testing.B) {
 	req := NewTestRequest("GET", "/test", nil)
-	
+
 	b.ResetTimer()
 	b.ReportAllocs()
-	
+
 	for i := 0; i < b.N; i++ {
 		w := NewTestResponseRecorder()
 		ctx := httpctx.AcquireContext(req, w)
@@ -258,18 +258,18 @@ func (bs *BenchmarkSuite) benchmarkContextParamAccess(b *testing.B) {
 	req := NewTestRequest("GET", "/users/123", nil)
 	w := NewTestResponseRecorder()
 	ctx := httpctx.AcquireContext(req, w)
-	
+
 	// Set params
 	params := map[string]string{
-		"id": "123",
+		"id":     "123",
 		"action": "view",
 		"format": "json",
 	}
 	httpctx.SetParams(ctx, params)
-	
+
 	b.ResetTimer()
 	b.ReportAllocs()
-	
+
 	for i := 0; i < b.N; i++ {
 		_ = ctx.Param("id")
 		_ = ctx.Param("action")
@@ -285,15 +285,15 @@ func (bs *BenchmarkSuite) benchmarkContextValueStorage(b *testing.B) {
 	req := NewTestRequest("GET", "/test", nil)
 	w := NewTestResponseRecorder()
 	ctx := httpctx.AcquireContext(req, w)
-	
+
 	b.ResetTimer()
 	b.ReportAllocs()
-	
+
 	for i := 0; i < b.N; i++ {
 		ctx.Set("user_id", 12345)
 		ctx.Set("tenant_id", "tenant-123")
 		ctx.Set("request_id", "req-abc-123")
-		
+
 		_ = ctx.Get("user_id")
 		_ = ctx.Get("tenant_id")
 		_ = ctx.Get("request_id")
@@ -306,10 +306,10 @@ func (bs *BenchmarkSuite) benchmarkContextValueStorage(b *testing.B) {
 // benchmarkContextPooling tests context pooling efficiency
 func (bs *BenchmarkSuite) benchmarkContextPooling(b *testing.B) {
 	req := NewTestRequest("GET", "/test", nil)
-	
+
 	b.ResetTimer()
 	b.ReportAllocs()
-	
+
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			w := NewTestResponseRecorder()
@@ -327,7 +327,7 @@ func (bs *BenchmarkSuite) benchmarkContextPooling(b *testing.B) {
 func (bs *BenchmarkSuite) recordResult(b *testing.B, name string) {
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
-	
+
 	result := BenchmarkResult{
 		Name:          name,
 		Timestamp:     time.Now(),
@@ -351,7 +351,7 @@ func (bs *BenchmarkSuite) recordResult(b *testing.B, name string) {
 			StackInuse: m.StackInuse,
 		},
 	}
-	
+
 	bs.results = append(bs.results, result)
 }
 
@@ -368,20 +368,20 @@ func (bs *BenchmarkSuite) SaveResults() error {
 	if data, err := os.ReadFile(bs.dbPath); err == nil {
 		_ = json.Unmarshal(data, &existingResults)
 	}
-	
+
 	// Append new results
 	existingResults = append(existingResults, bs.results...)
-	
+
 	// Save all results
 	data, err := json.MarshalIndent(existingResults, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal results: %w", err)
 	}
-	
+
 	if err := os.WriteFile(bs.dbPath, data, 0o600); err != nil {
 		return fmt.Errorf("failed to write results: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -391,12 +391,12 @@ func (bs *BenchmarkSuite) GetLatestResults() (map[string]BenchmarkResult, error)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read benchmark database: %w", err)
 	}
-	
+
 	var allResults []BenchmarkResult
 	if err := json.Unmarshal(data, &allResults); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal results: %w", err)
 	}
-	
+
 	// Get latest result for each benchmark
 	latest := make(map[string]BenchmarkResult)
 	for _, result := range allResults {
@@ -404,6 +404,6 @@ func (bs *BenchmarkSuite) GetLatestResults() (map[string]BenchmarkResult, error)
 			latest[result.Name] = result
 		}
 	}
-	
+
 	return latest, nil
 }

@@ -10,8 +10,10 @@ import (
 	gorillaWS "github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	gortexContext "github.com/yshengliao/gortex/transport/http"
 	"github.com/yshengliao/gortex/transport/websocket"
+
 	// Hub is in websocket package, not a subpackage
 	"go.uber.org/zap/zaptest"
 )

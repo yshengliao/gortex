@@ -8,19 +8,19 @@ import (
 
 // StandardResponse represents a standard API response
 type StandardResponse struct {
-	Success bool        `json:"success"`
-	Data    any `json:"data,omitempty"`
-	Error   string      `json:"error,omitempty"`
-	Code    int         `json:"code,omitempty"`
+	Success bool   `json:"success"`
+	Data    any    `json:"data,omitempty"`
+	Error   string `json:"error,omitempty"`
+	Code    int    `json:"code,omitempty"`
 }
 
 // SuccessResponse represents a standardized success response
 type SuccessResponse struct {
-	Success   bool                   `json:"success"`
-	Data      any                    `json:"data,omitempty"`
-	Meta      map[string]any         `json:"meta,omitempty"`
-	Timestamp time.Time              `json:"timestamp"`
-	RequestID string                 `json:"request_id,omitempty"`
+	Success   bool           `json:"success"`
+	Data      any            `json:"data,omitempty"`
+	Meta      map[string]any `json:"meta,omitempty"`
+	Timestamp time.Time      `json:"timestamp"`
+	RequestID string         `json:"request_id,omitempty"`
 }
 
 // Success sends a successful response
@@ -42,7 +42,6 @@ func SuccessWithMeta(c Context, statusCode int, data any, meta map[string]any) e
 	}
 	return c.JSON(statusCode, resp)
 }
-
 
 // Created sends a 201 Created response
 func Created(c Context, data any) error {

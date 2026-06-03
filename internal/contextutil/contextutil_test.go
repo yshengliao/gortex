@@ -12,12 +12,12 @@ func TestDoWithContext(t *testing.T) {
 	t.Run("successful execution", func(t *testing.T) {
 		ctx := context.Background()
 		executed := false
-		
+
 		err := DoWithContext(ctx, func(ctx context.Context) error {
 			executed = true
 			return nil
 		})
-		
+
 		if err != nil {
 			t.Errorf("expected no error, got %v", err)
 		}
@@ -29,11 +29,11 @@ func TestDoWithContext(t *testing.T) {
 	t.Run("function returns error", func(t *testing.T) {
 		ctx := context.Background()
 		expectedErr := errors.New("test error")
-		
+
 		err := DoWithContext(ctx, func(ctx context.Context) error {
 			return expectedErr
 		})
-		
+
 		if err != expectedErr {
 			t.Errorf("expected error %v, got %v", expectedErr, err)
 		}
@@ -42,13 +42,13 @@ func TestDoWithContext(t *testing.T) {
 	t.Run("context cancelled before execution", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel() // Cancel immediately
-		
+
 		executed := false
 		err := DoWithContext(ctx, func(ctx context.Context) error {
 			executed = true
 			return nil
 		})
-		
+
 		if err != context.Canceled {
 			t.Errorf("expected context.Canceled, got %v", err)
 		}
@@ -59,19 +59,19 @@ func TestDoWithContext(t *testing.T) {
 
 	t.Run("context cancelled during execution", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
-		
+
 		err := DoWithContext(ctx, func(ctx context.Context) error {
 			// Cancel context during execution
 			go func() {
 				time.Sleep(10 * time.Millisecond)
 				cancel()
 			}()
-			
+
 			// Simulate long operation
 			time.Sleep(50 * time.Millisecond)
 			return nil
 		})
-		
+
 		if err != context.Canceled {
 			t.Errorf("expected context.Canceled, got %v", err)
 		}
@@ -82,12 +82,12 @@ func TestRetryWithContext(t *testing.T) {
 	t.Run("succeeds on first attempt", func(t *testing.T) {
 		ctx := context.Background()
 		attempts := 0
-		
+
 		err := RetryWithContext(ctx, func(ctx context.Context) error {
 			attempts++
 			return nil
 		}, DefaultRetryOptions())
-		
+
 		if err != nil {
 			t.Errorf("expected no error, got %v", err)
 		}
@@ -99,7 +99,7 @@ func TestRetryWithContext(t *testing.T) {
 	t.Run("succeeds after retries", func(t *testing.T) {
 		ctx := context.Background()
 		attempts := 0
-		
+
 		err := RetryWithContext(ctx, func(ctx context.Context) error {
 			attempts++
 			if attempts < 3 {
@@ -110,7 +110,7 @@ func TestRetryWithContext(t *testing.T) {
 			MaxAttempts: 3,
 			Delay:       10 * time.Millisecond,
 		})
-		
+
 		if err != nil {
 			t.Errorf("expected no error, got %v", err)
 		}
@@ -122,7 +122,7 @@ func TestRetryWithContext(t *testing.T) {
 	t.Run("fails after max attempts", func(t *testing.T) {
 		ctx := context.Background()
 		attempts := 0
-		
+
 		err := RetryWithContext(ctx, func(ctx context.Context) error {
 			attempts++
 			return errors.New("persistent error")
@@ -130,7 +130,7 @@ func TestRetryWithContext(t *testing.T) {
 			MaxAttempts: 3,
 			Delay:       10 * time.Millisecond,
 		})
-		
+
 		if err == nil {
 			t.Error("expected error, got nil")
 		}
@@ -142,13 +142,13 @@ func TestRetryWithContext(t *testing.T) {
 	t.Run("context cancelled during retry", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		attempts := 0
-		
+
 		// Cancel after first attempt
 		go func() {
 			time.Sleep(20 * time.Millisecond)
 			cancel()
 		}()
-		
+
 		err := RetryWithContext(ctx, func(ctx context.Context) error {
 			attempts++
 			return errors.New("error")
@@ -156,7 +156,7 @@ func TestRetryWithContext(t *testing.T) {
 			MaxAttempts: 5,
 			Delay:       30 * time.Millisecond,
 		})
-		
+
 		if err == nil {
 			t.Error("expected error due to cancellation")
 		}
@@ -170,7 +170,7 @@ func TestRetryWithContext(t *testing.T) {
 		attempts := 0
 		var delays []time.Duration
 		lastTime := time.Now()
-		
+
 		err := RetryWithContext(ctx, func(ctx context.Context) error {
 			attempts++
 			if attempts > 1 {
@@ -188,11 +188,11 @@ func TestRetryWithContext(t *testing.T) {
 				return delay * time.Duration(attempt)
 			},
 		})
-		
+
 		if err != nil {
 			t.Errorf("expected no error, got %v", err)
 		}
-		
+
 		// Verify backoff worked (delays should increase)
 		if len(delays) != 2 {
 			t.Fatalf("expected 2 delays, got %d", len(delays))
@@ -207,7 +207,7 @@ func TestParallelWithContext(t *testing.T) {
 	t.Run("all functions succeed", func(t *testing.T) {
 		ctx := context.Background()
 		var completed int32
-		
+
 		err := ParallelWithContext(ctx,
 			func(ctx context.Context) error {
 				atomic.AddInt32(&completed, 1)
@@ -222,7 +222,7 @@ func TestParallelWithContext(t *testing.T) {
 				return nil
 			},
 		)
-		
+
 		if err != nil {
 			t.Errorf("expected no error, got %v", err)
 		}
@@ -233,7 +233,7 @@ func TestParallelWithContext(t *testing.T) {
 
 	t.Run("one function fails", func(t *testing.T) {
 		ctx := context.Background()
-		
+
 		err := ParallelWithContext(ctx,
 			func(ctx context.Context) error {
 				return nil
@@ -246,7 +246,7 @@ func TestParallelWithContext(t *testing.T) {
 				return nil
 			},
 		)
-		
+
 		if err == nil {
 			t.Error("expected error, got nil")
 		}
@@ -254,13 +254,13 @@ func TestParallelWithContext(t *testing.T) {
 
 	t.Run("context cancelled", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
-		
+
 		// Cancel after functions start
 		go func() {
 			time.Sleep(10 * time.Millisecond)
 			cancel()
 		}()
-		
+
 		err := ParallelWithContext(ctx,
 			func(ctx context.Context) error {
 				time.Sleep(100 * time.Millisecond)
@@ -271,7 +271,7 @@ func TestParallelWithContext(t *testing.T) {
 				return nil
 			},
 		)
-		
+
 		if err == nil {
 			t.Error("expected error due to cancellation")
 		}
@@ -280,7 +280,7 @@ func TestParallelWithContext(t *testing.T) {
 	t.Run("empty functions", func(t *testing.T) {
 		ctx := context.Background()
 		err := ParallelWithContext(ctx)
-		
+
 		if err != nil {
 			t.Errorf("expected no error for empty functions, got %v", err)
 		}
@@ -289,7 +289,7 @@ func TestParallelWithContext(t *testing.T) {
 	t.Run("nil functions are skipped", func(t *testing.T) {
 		ctx := context.Background()
 		executed := false
-		
+
 		err := ParallelWithContext(ctx,
 			nil,
 			func(ctx context.Context) error {
@@ -298,7 +298,7 @@ func TestParallelWithContext(t *testing.T) {
 			},
 			nil,
 		)
-		
+
 		if err != nil {
 			t.Errorf("expected no error, got %v", err)
 		}
@@ -313,12 +313,12 @@ func TestForEachWithContext(t *testing.T) {
 		ctx := context.Background()
 		items := []int{1, 2, 3, 4, 5}
 		var processed []int
-		
+
 		err := ForEachWithContext(ctx, items, func(ctx context.Context, item int) error {
 			processed = append(processed, item)
 			return nil
 		})
-		
+
 		if err != nil {
 			t.Errorf("expected no error, got %v", err)
 		}
@@ -331,7 +331,7 @@ func TestForEachWithContext(t *testing.T) {
 		ctx := context.Background()
 		items := []int{1, 2, 3, 4, 5}
 		var processed []int
-		
+
 		err := ForEachWithContext(ctx, items, func(ctx context.Context, item int) error {
 			processed = append(processed, item)
 			if item == 3 {
@@ -339,7 +339,7 @@ func TestForEachWithContext(t *testing.T) {
 			}
 			return nil
 		})
-		
+
 		if err == nil {
 			t.Error("expected error, got nil")
 		}
@@ -352,7 +352,7 @@ func TestForEachWithContext(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		items := []int{1, 2, 3, 4, 5}
 		var processed []int
-		
+
 		err := ForEachWithContext(ctx, items, func(ctx context.Context, item int) error {
 			processed = append(processed, item)
 			if item == 2 {
@@ -361,7 +361,7 @@ func TestForEachWithContext(t *testing.T) {
 			time.Sleep(10 * time.Millisecond)
 			return nil
 		})
-		
+
 		if err == nil {
 			t.Error("expected error due to cancellation")
 		}
@@ -378,7 +378,7 @@ func TestTimeoutFunc(t *testing.T) {
 			time.Sleep(10 * time.Millisecond)
 			return nil
 		})
-		
+
 		err := fn(ctx)
 		if err != nil {
 			t.Errorf("expected no error, got %v", err)
@@ -395,7 +395,7 @@ func TestTimeoutFunc(t *testing.T) {
 				return nil
 			}
 		})
-		
+
 		err := fn(ctx)
 		if err == nil {
 			t.Error("expected timeout error, got nil")
@@ -408,7 +408,7 @@ func TestTimeoutFunc(t *testing.T) {
 	t.Run("inherits parent context cancellation", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
-		
+
 		fn := TimeoutFunc(100*time.Millisecond, func(ctx context.Context) error {
 			select {
 			case <-ctx.Done():
@@ -417,7 +417,7 @@ func TestTimeoutFunc(t *testing.T) {
 				return nil
 			}
 		})
-		
+
 		err := fn(ctx)
 		if err != context.Canceled {
 			t.Errorf("expected context.Canceled, got %v", err)
@@ -428,7 +428,7 @@ func TestTimeoutFunc(t *testing.T) {
 func TestRace(t *testing.T) {
 	t.Run("first success wins", func(t *testing.T) {
 		ctx := context.Background()
-		
+
 		err := Race(ctx,
 			func(ctx context.Context) error {
 				time.Sleep(100 * time.Millisecond)
@@ -443,7 +443,7 @@ func TestRace(t *testing.T) {
 				return nil
 			},
 		)
-		
+
 		if err != nil {
 			t.Errorf("expected no error, got %v", err)
 		}
@@ -451,7 +451,7 @@ func TestRace(t *testing.T) {
 
 	t.Run("all fail", func(t *testing.T) {
 		ctx := context.Background()
-		
+
 		err := Race(ctx,
 			func(ctx context.Context) error {
 				return errors.New("error 1")
@@ -463,7 +463,7 @@ func TestRace(t *testing.T) {
 				return errors.New("error 3")
 			},
 		)
-		
+
 		if err == nil {
 			t.Error("expected error when all functions fail")
 		}
@@ -471,12 +471,12 @@ func TestRace(t *testing.T) {
 
 	t.Run("context cancellation", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
-		
+
 		go func() {
 			time.Sleep(10 * time.Millisecond)
 			cancel()
 		}()
-		
+
 		err := Race(ctx,
 			func(ctx context.Context) error {
 				time.Sleep(100 * time.Millisecond)
@@ -487,7 +487,7 @@ func TestRace(t *testing.T) {
 				return nil
 			},
 		)
-		
+
 		if err != context.Canceled {
 			t.Errorf("expected context.Canceled, got %v", err)
 		}
@@ -496,7 +496,7 @@ func TestRace(t *testing.T) {
 	t.Run("no functions provided", func(t *testing.T) {
 		ctx := context.Background()
 		err := Race(ctx)
-		
+
 		if err == nil {
 			t.Error("expected error for no functions")
 		}
@@ -504,7 +504,7 @@ func TestRace(t *testing.T) {
 
 	t.Run("nil functions are skipped", func(t *testing.T) {
 		ctx := context.Background()
-		
+
 		err := Race(ctx,
 			nil,
 			func(ctx context.Context) error {
@@ -512,7 +512,7 @@ func TestRace(t *testing.T) {
 			},
 			nil,
 		)
-		
+
 		if err != nil {
 			t.Errorf("expected no error, got %v", err)
 		}

@@ -68,7 +68,6 @@ func TestSuccessWithMeta(t *testing.T) {
 	}
 }
 
-
 func TestCreated(t *testing.T) {
 	ctx := testutil.NewMockContext("POST", "/").Build()
 	mockCtx := ctx.(*testutil.MockContext)
@@ -85,4 +84,3 @@ func TestCreated(t *testing.T) {
 		t.Errorf("Expected status code %d, got %d", http.StatusCreated, rec.Code)
 	}
 }
-

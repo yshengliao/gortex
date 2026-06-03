@@ -191,7 +191,6 @@ func (c *MockContext) SetRequest(r *http.Request) {
 	c.req = r
 }
 
-
 // IsTLS returns true if the request is using TLS
 func (c *MockContext) IsTLS() bool {
 	return c.req.TLS != nil

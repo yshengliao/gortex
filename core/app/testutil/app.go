@@ -3,9 +3,10 @@ package testutil
 import (
 	"testing"
 
+	"go.uber.org/zap"
+
 	"github.com/yshengliao/gortex/core/app"
 	"github.com/yshengliao/gortex/pkg/config"
-	"go.uber.org/zap"
 )
 
 // NewTestApp creates a new app instance for testing with minimal configuration

@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yshengliao/gortex/pkg/auth"
 	"github.com/yshengliao/gortex/core/types"
+	"github.com/yshengliao/gortex/pkg/auth"
 )
 
 func TestJWTAuth(t *testing.T) {
@@ -86,7 +86,7 @@ func TestJWTAuth(t *testing.T) {
 			})
 
 			err := handler(ctx)
-			
+
 			if tt.expectedStatus == 401 {
 				if err == nil {
 					t.Error("Expected error for unauthorized request")
@@ -112,7 +112,7 @@ func TestJWTAuthSkipPaths(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewJWTService: %v", err)
 	}
-	
+
 	config := &AuthConfig{
 		JWTService: jwtService,
 		SkipPaths:  []string{"/public", "/health"},
@@ -180,7 +180,7 @@ func TestRequireRole(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewJWTService: %v", err)
 	}
-	
+
 	// Generate tokens with different roles
 	adminToken, _ := jwtService.GenerateAccessToken("admin123", "admin", "admin@example.com", "admin")
 	userToken, _ := jwtService.GenerateAccessToken("user123", "user", "user@example.com", "user")
@@ -235,7 +235,7 @@ func TestRequireGameID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewJWTService: %v", err)
 	}
-	
+
 	// Generate tokens with and without game ID
 	gameToken, _ := jwtService.GenerateGameToken("user123", "player1", "game456")
 	normalToken, _ := jwtService.GenerateAccessToken("user123", "player1", "player@example.com", "user")
@@ -314,7 +314,7 @@ func (s *mockSessionStore) Validate(sessionID string) (bool, error) {
 
 func TestSessionAuth(t *testing.T) {
 	store := newMockSessionStore()
-	
+
 	// Add test sessions
 	validSessionID := "valid-session-123"
 	store.sessions[validSessionID] = map[string]interface{}{
@@ -368,7 +368,7 @@ func TestSessionAuth(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest("GET", "/test", nil)
-			
+
 			if tt.sessionID != "" {
 				if tt.inCookie {
 					req.AddCookie(&http.Cookie{
@@ -379,7 +379,7 @@ func TestSessionAuth(t *testing.T) {
 					req.Header.Set("session_id", tt.sessionID)
 				}
 			}
-			
+
 			rec := httptest.NewRecorder()
 			ctx := newMockContext(req, rec)
 
@@ -417,7 +417,7 @@ func TestSessionAuth(t *testing.T) {
 func TestGetClaimsHelpers(t *testing.T) {
 	// Test GetUserID and GetUsername helpers
 	ctx := newMockContext(httptest.NewRequest("GET", "/", nil), httptest.NewRecorder())
-	
+
 	claims := &auth.Claims{
 		UserID:   "user123",
 		Username: "testuser",
@@ -425,24 +425,24 @@ func TestGetClaimsHelpers(t *testing.T) {
 		Role:     "admin",
 		GameID:   "game456",
 	}
-	
+
 	ctx.Set("jwt-claims", claims)
-	
+
 	if userID := GetUserID(ctx); userID != "user123" {
 		t.Errorf("Expected UserID user123, got %s", userID)
 	}
-	
+
 	if username := GetUsername(ctx); username != "testuser" {
 		t.Errorf("Expected Username testuser, got %s", username)
 	}
-	
+
 	// Test with no claims
 	ctx.Set("jwt-claims", nil)
-	
+
 	if userID := GetUserID(ctx); userID != "" {
 		t.Errorf("Expected empty UserID, got %s", userID)
 	}
-	
+
 	if username := GetUsername(ctx); username != "" {
 		t.Errorf("Expected empty Username, got %s", username)
 	}
@@ -453,19 +453,19 @@ func TestGetClaimsFromContext(t *testing.T) {
 		UserID:   "user123",
 		Username: "testuser",
 	}
-	
+
 	req := httptest.NewRequest("GET", "/test", nil)
 	rec := httptest.NewRecorder()
 	ctx := newMockContext(req, rec)
 	ctx.Set("jwt-claims", claims)
-	
+
 	retrieved := GetClaimsFromContext(ctx)
 	if retrieved == nil {
 		t.Error("Expected to retrieve claims from context")
 	} else if retrieved.UserID != "user123" {
 		t.Errorf("Expected UserID user123, got %s", retrieved.UserID)
 	}
-	
+
 	// Test with no claims
 	emptyReq := httptest.NewRequest("GET", "/test", nil)
 	emptyRec := httptest.NewRecorder()
