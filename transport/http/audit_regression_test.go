@@ -36,6 +36,28 @@ func TestSmartParams_TruncateClearsOverflow(t *testing.T) {
 	assert.Empty(t, sp.get("f"), "stale overflow param must be gone after truncate")
 }
 
+// TestSmartParams_TruncatePartialOverflow verifies that backtracking a route
+// with more than five params (a partial truncation, n > 4) drops exactly the
+// params added by the abandoned branch — the ordered overflow slice makes this
+// exact, where the old map could not.
+func TestSmartParams_TruncatePartialOverflow(t *testing.T) {
+	sp := newSmartParams()
+	for _, kv := range [][2]string{
+		{"a", "1"}, {"b", "2"}, {"c", "3"}, {"d", "4"}, {"e", "5"}, {"f", "6"},
+	} {
+		sp.set(kv[0], kv[1])
+	}
+	require.Len(t, sp.names(), 6)
+
+	// Drop only the 6th param (index 5); keep the 5th (index 4).
+	sp.truncate(5)
+
+	assert.Equal(t, []string{"a", "b", "c", "d", "e"}, sp.names())
+	assert.Equal(t, []string{"1", "2", "3", "4", "5"}, sp.values())
+	assert.Equal(t, "5", sp.get("e"))
+	assert.Empty(t, sp.get("f"), "the 6th param must be dropped by partial truncate")
+}
+
 // hijackableWriter is a ResponseWriter that also satisfies http.Hijacker,
 // simulating a successful connection takeover (e.g. a WebSocket upgrade).
 type hijackableWriter struct {

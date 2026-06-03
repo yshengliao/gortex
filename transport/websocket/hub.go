@@ -384,6 +384,9 @@ func (h *Hub) broadcastSync(message *Message) {
 // mutated — a shallow copy carries the Target so a *Message that the caller
 // still holds (or reuses for another recipient) is left untouched.
 func (h *Hub) SendToUser(userID string, message *Message) {
+	if message == nil {
+		return
+	}
 	msg := *message
 	msg.Target = userID
 	h.Broadcast(&msg)

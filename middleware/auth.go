@@ -109,8 +109,11 @@ func JWTAuthWithConfig(config *AuthConfig) MiddlewareFunc {
 			// Store claims in router context
 			c.Set(config.ClaimsContextKey, claims)
 
-			// Also store in request context for standard Go code
-			ctx := context.WithValue(req.Context(), contextKey(config.ClaimsContextKey), claims)
+			// Also store in request context for standard Go code. The key is
+			// kept as the user-configured string (not a private type) so
+			// external handlers can read it back via r.Context().Value(key).
+			//nolint:staticcheck // SA1029: dynamic, user-configured key meant for external lookup
+			ctx := context.WithValue(req.Context(), config.ClaimsContextKey, claims)
 			newReq := req.WithContext(ctx)
 
 			// Update the request in context if possible

@@ -188,10 +188,8 @@ func (c *DefaultContext) Params() url.Values {
 			values.Set(c.params.keys[i], c.params.vals[i])
 		}
 		// Then add any overflow values
-		if c.params.overflow != nil {
-			for k, v := range c.params.overflow {
-				values.Set(k, v)
-			}
+		for _, p := range c.params.overflow {
+			values.Set(p.key, p.val)
 		}
 	}
 	return values
