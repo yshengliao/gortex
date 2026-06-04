@@ -9,24 +9,24 @@ import (
 
 func TestByteSlicePool(t *testing.T) {
 	pool := NewByteSlicePool()
-	
+
 	// Test various sizes
 	sizes := []int{100, 500, 1000, 5000, 10000}
-	
+
 	for _, size := range sizes {
 		buf := pool.Get(size)
 		assert.NotNil(t, buf)
 		assert.Equal(t, size, len(buf))
 		assert.True(t, cap(buf) >= size)
-		
+
 		// Write some data
 		for i := 0; i < size; i++ {
 			buf[i] = byte(i % 256)
 		}
-		
+
 		pool.Put(buf)
 	}
-	
+
 	// Check metrics
 	metrics := pool.GetMetrics()
 	assert.NotEmpty(t, metrics)
@@ -35,15 +35,15 @@ func TestByteSlicePool(t *testing.T) {
 func TestByteSlicePoolExactSize(t *testing.T) {
 	sizes := []int{512, 1024, 2048}
 	pool := NewByteSlicePoolWithSizes(sizes)
-	
+
 	// Get exact size
 	buf := pool.GetExact(1024)
 	assert.NotNil(t, buf)
 	assert.Equal(t, 1024, len(buf))
 	assert.Equal(t, 1024, cap(buf))
-	
+
 	pool.Put(buf)
-	
+
 	// Get non-exact size
 	buf2 := pool.GetExact(1000)
 	assert.NotNil(t, buf2)
@@ -53,16 +53,16 @@ func TestByteSlicePoolExactSize(t *testing.T) {
 
 func TestByteSlicePoolLargeSize(t *testing.T) {
 	pool := NewByteSlicePool()
-	
+
 	// Request larger than largest pool size
 	largeSize := 10 * 1024 * 1024 // 10MB
 	buf := pool.Get(largeSize)
 	assert.NotNil(t, buf)
 	assert.Equal(t, largeSize, len(buf))
-	
+
 	// Put won't add to pool
 	pool.Put(buf)
-	
+
 	metrics := pool.GetMetrics()
 	// No metrics for this size
 	for _, metric := range metrics {
@@ -74,15 +74,15 @@ func TestByteSlicePoolLargeSize(t *testing.T) {
 
 func TestByteSlicePoolWastedBytes(t *testing.T) {
 	pool := NewByteSlicePool()
-	
+
 	// Get 100 bytes (will get from 512 pool)
 	buf := pool.Get(100)
 	assert.Equal(t, 100, len(buf))
 	assert.True(t, cap(buf) >= 512)
-	
+
 	// Return with original length
 	pool.Put(buf)
-	
+
 	// Check wasted bytes
 	metrics := pool.GetMetrics()
 	if metric, ok := metrics[512]; ok {
@@ -92,32 +92,32 @@ func TestByteSlicePoolWastedBytes(t *testing.T) {
 
 func TestByteSlicePoolConcurrency(t *testing.T) {
 	pool := NewByteSlicePool()
-	
+
 	var wg sync.WaitGroup
 	numGoroutines := 50
 	numOperations := 100
-	
+
 	for i := 0; i < numGoroutines; i++ {
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
-			
+
 			for j := 0; j < numOperations; j++ {
 				size := 100 + (j % 1000)
 				buf := pool.Get(size)
-				
+
 				// Use the buffer
 				for k := 0; k < len(buf); k++ {
 					buf[k] = byte(k)
 				}
-				
+
 				pool.Put(buf)
 			}
 		}(i)
 	}
-	
+
 	wg.Wait()
-	
+
 	// Verify no active buffers
 	metrics := pool.GetMetrics()
 	for _, metric := range metrics {
@@ -131,9 +131,9 @@ func TestDefaultByteSlicePool(t *testing.T) {
 	buf := GetBytes(256)
 	assert.NotNil(t, buf)
 	assert.Equal(t, 256, len(buf))
-	
+
 	PutBytes(buf)
-	
+
 	// Verify it's working
 	metrics := DefaultByteSlicePool.GetMetrics()
 	assert.NotEmpty(t, metrics)
@@ -141,10 +141,10 @@ func TestDefaultByteSlicePool(t *testing.T) {
 
 func BenchmarkByteSlicePool(b *testing.B) {
 	pool := NewByteSlicePool()
-	
+
 	b.ResetTimer()
 	b.ReportAllocs()
-	
+
 	for i := 0; i < b.N; i++ {
 		buf := pool.Get(1024)
 		// Simulate some work
@@ -158,10 +158,10 @@ func BenchmarkByteSlicePool(b *testing.B) {
 func BenchmarkByteSlicePoolVariedSizes(b *testing.B) {
 	pool := NewByteSlicePool()
 	sizes := []int{64, 256, 1024, 4096, 16384}
-	
+
 	b.ResetTimer()
 	b.ReportAllocs()
-	
+
 	for i := 0; i < b.N; i++ {
 		size := sizes[i%len(sizes)]
 		buf := pool.Get(size)
@@ -172,7 +172,7 @@ func BenchmarkByteSlicePoolVariedSizes(b *testing.B) {
 func BenchmarkByteSliceNoPool(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
-	
+
 	for i := 0; i < b.N; i++ {
 		buf := make([]byte, 1024)
 		// Simulate some work

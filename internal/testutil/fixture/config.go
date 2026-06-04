@@ -2,6 +2,7 @@ package fixture
 
 import (
 	"time"
+
 	"github.com/yshengliao/gortex/pkg/config"
 )
 

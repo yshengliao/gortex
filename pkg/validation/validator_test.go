@@ -9,9 +9,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"github.com/yshengliao/gortex/core/types"
-	httpctx "github.com/yshengliao/gortex/transport/http"
 	"github.com/yshengliao/gortex/pkg/validation"
+	httpctx "github.com/yshengliao/gortex/transport/http"
 )
 
 func TestNewValidator(t *testing.T) {

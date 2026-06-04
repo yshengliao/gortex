@@ -6,8 +6,9 @@ import (
 	"io"
 	"net/http"
 
-	gortexContext "github.com/yshengliao/gortex/transport/http"
 	"go.uber.org/zap"
+
+	gortexContext "github.com/yshengliao/gortex/transport/http"
 )
 
 // contextKey is a type for context keys to avoid collisions

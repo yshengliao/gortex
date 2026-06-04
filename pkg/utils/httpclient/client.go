@@ -17,18 +17,18 @@ type Config struct {
 	MaxIdleConnsPerHost int
 	MaxConnsPerHost     int
 	IdleConnTimeout     time.Duration
-	
+
 	// Client timeout
 	Timeout time.Duration
-	
+
 	// Connection settings
 	DialTimeout         time.Duration
 	TLSHandshakeTimeout time.Duration
 	KeepAlive           time.Duration
-	
+
 	// TLS configuration
 	InsecureSkipVerify bool
-	
+
 	// Metrics collection
 	EnableMetrics bool
 }
@@ -59,22 +59,22 @@ type Client struct {
 // Metrics tracks HTTP client metrics
 type Metrics struct {
 	// Connection metrics
-	ActiveConnections   int64
-	IdleConnections     int64
-	TotalConnections    int64
-	ConnectionReuse     int64
-	
+	ActiveConnections int64
+	IdleConnections   int64
+	TotalConnections  int64
+	ConnectionReuse   int64
+
 	// Request metrics
-	TotalRequests       int64
-	TotalResponses      int64
-	TotalErrors         int64
-	
+	TotalRequests  int64
+	TotalResponses int64
+	TotalErrors    int64
+
 	// Response time tracking
-	totalResponseTime   int64
-	requestCount        int64
-	
+	totalResponseTime int64
+	requestCount      int64
+
 	// Status code tracking
-	statusCodes         sync.Map // map[int]int64
+	statusCodes sync.Map // map[int]int64
 }
 
 // New creates a new HTTP client with connection pooling
@@ -84,7 +84,7 @@ func New(config Config) *Client {
 		Timeout:   config.DialTimeout,
 		KeepAlive: config.KeepAlive,
 	}
-	
+
 	// Create transport with connection pooling
 	transport := &http.Transport{
 		DialContext:           dialer.DialContext,
@@ -98,10 +98,12 @@ func New(config Config) *Client {
 		DisableKeepAlives:     false,
 		ForceAttemptHTTP2:     true,
 		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: config.InsecureSkipVerify,
+			// G402: opt-in via config and defaults to false; intended for
+			// talking to self-signed endpoints in tests/dev.
+			InsecureSkipVerify: config.InsecureSkipVerify, //nolint:gosec
 		},
 	}
-	
+
 	client := &Client{
 		Client: &http.Client{
 			Transport: transport,
@@ -110,7 +112,7 @@ func New(config Config) *Client {
 		config:  config,
 		metrics: &Metrics{},
 	}
-	
+
 	// Wrap transport with metrics if enabled
 	if config.EnableMetrics {
 		client.Client.Transport = &metricsTransport{
@@ -118,7 +120,7 @@ func New(config Config) *Client {
 			metrics: client.metrics,
 		}
 	}
-	
+
 	return client
 }
 
@@ -132,11 +134,11 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 	if c.config.EnableMetrics {
 		atomic.AddInt64(&c.metrics.TotalRequests, 1)
 	}
-	
+
 	start := time.Now()
 	resp, err := c.Client.Do(req)
 	elapsed := time.Since(start)
-	
+
 	if c.config.EnableMetrics {
 		if err != nil {
 			atomic.AddInt64(&c.metrics.TotalErrors, 1)
@@ -144,14 +146,14 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 			atomic.AddInt64(&c.metrics.TotalResponses, 1)
 			atomic.AddInt64(&c.metrics.totalResponseTime, elapsed.Nanoseconds())
 			atomic.AddInt64(&c.metrics.requestCount, 1)
-			
+
 			// Track status code
 			if resp != nil {
 				c.trackStatusCode(resp.StatusCode)
 			}
 		}
 	}
-	
+
 	return resp, err
 }
 
@@ -165,11 +167,11 @@ func (c *Client) GetMetrics() ClientMetrics {
 	if !c.config.EnableMetrics || c.metrics == nil {
 		return ClientMetrics{}
 	}
-	
+
 	// NOTE: http.Transport does not expose idle-connection counts
 	// publicly. TransportMetrics fields remain at zero until we
 	// implement our own connection tracking.
-	
+
 	// Calculate average response time
 	totalTime := atomic.LoadInt64(&c.metrics.totalResponseTime)
 	count := atomic.LoadInt64(&c.metrics.requestCount)
@@ -177,7 +179,7 @@ func (c *Client) GetMetrics() ClientMetrics {
 	if count > 0 {
 		avgResponseTime = time.Duration(totalTime / count)
 	}
-	
+
 	// Collect status codes
 	statusCodes := make(map[int]int64)
 	c.metrics.statusCodes.Range(func(key, value any) bool {
@@ -188,7 +190,7 @@ func (c *Client) GetMetrics() ClientMetrics {
 		}
 		return true
 	})
-	
+
 	return ClientMetrics{
 		ActiveConnections:   atomic.LoadInt64(&c.metrics.ActiveConnections),
 		TotalConnections:    atomic.LoadInt64(&c.metrics.TotalConnections),
@@ -204,20 +206,20 @@ func (c *Client) GetMetrics() ClientMetrics {
 // ClientMetrics contains HTTP client metrics
 type ClientMetrics struct {
 	// Connection metrics
-	ActiveConnections   int64
-	IdleConnections     int64
-	TotalConnections    int64
-	ConnectionReuse     int64
-	
+	ActiveConnections int64
+	IdleConnections   int64
+	TotalConnections  int64
+	ConnectionReuse   int64
+
 	// Request metrics
 	TotalRequests       int64
 	TotalResponses      int64
 	TotalErrors         int64
 	AverageResponseTime time.Duration
-	
+
 	// Status code distribution
 	StatusCodes map[int]int64
-	
+
 	// Transport-level metrics
 	TransportMetrics TransportMetrics
 }
@@ -238,27 +240,26 @@ func (t *metricsTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 	// Track active connections
 	atomic.AddInt64(&t.metrics.ActiveConnections, 1)
 	defer atomic.AddInt64(&t.metrics.ActiveConnections, -1)
-	
+
 	// Check if this is a reused connection
 	if req.Header.Get("Connection") != "close" {
 		atomic.AddInt64(&t.metrics.ConnectionReuse, 1)
 	} else {
 		atomic.AddInt64(&t.metrics.TotalConnections, 1)
 	}
-	
+
 	return t.base.RoundTrip(req)
 }
 
 func (c *Client) trackStatusCode(code int) {
 	key := code
-	
+
 	// Load or create counter
 	val, _ := c.metrics.statusCodes.LoadOrStore(key, new(int64))
 	if counter, ok := val.(*int64); ok {
 		atomic.AddInt64(counter, 1)
 	}
 }
-
 
 // Close closes idle connections
 func (c *Client) Close() {

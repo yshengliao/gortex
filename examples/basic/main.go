@@ -14,9 +14,10 @@ import (
 	"syscall"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/yshengliao/gortex/core/app"
 	httpctx "github.com/yshengliao/gortex/transport/http"
-	"go.uber.org/zap"
 )
 
 // Todo is the example domain model.
@@ -190,7 +191,7 @@ type Handlers struct {
 
 func main() {
 	logger, _ := zap.NewDevelopment()
-	defer logger.Sync()
+	defer func() { _ = logger.Sync() }()
 
 	s := newStore()
 	handlers := &Handlers{

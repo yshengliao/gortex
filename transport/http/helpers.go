@@ -11,12 +11,12 @@ func (c *DefaultContext) ParamInt(name string, defaultValue int) int {
 	if param == "" {
 		return defaultValue
 	}
-	
+
 	value, err := strconv.Atoi(param)
 	if err != nil {
 		return defaultValue
 	}
-	
+
 	return value
 }
 
@@ -26,12 +26,12 @@ func (c *DefaultContext) QueryInt(name string, defaultValue int) int {
 	if query == "" {
 		return defaultValue
 	}
-	
+
 	value, err := strconv.Atoi(query)
 	if err != nil {
 		return defaultValue
 	}
-	
+
 	return value
 }
 
@@ -41,12 +41,12 @@ func (c *DefaultContext) QueryBool(name string, defaultValue bool) bool {
 	if query == "" {
 		return defaultValue
 	}
-	
+
 	value, err := strconv.ParseBool(query)
 	if err != nil {
 		return defaultValue
 	}
-	
+
 	return value
 }
 

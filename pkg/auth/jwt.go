@@ -21,10 +21,10 @@ var ErrJWTSecretTooShort = errors.New("auth: JWT secret must be at least 32 byte
 
 // JWTService handles JWT token generation and validation
 type JWTService struct {
-	secretKey        string
-	accessTokenTTL   time.Duration
-	refreshTokenTTL  time.Duration
-	issuer           string
+	secretKey       string
+	accessTokenTTL  time.Duration
+	refreshTokenTTL time.Duration
+	issuer          string
 }
 
 // Claims represents the JWT claims structure

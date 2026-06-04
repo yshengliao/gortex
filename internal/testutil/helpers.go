@@ -191,7 +191,6 @@ func (c *MockContext) SetRequest(r *http.Request) {
 	c.req = r
 }
 
-
 // IsTLS returns true if the request is using TLS
 func (c *MockContext) IsTLS() bool {
 	return c.req.TLS != nil
@@ -463,7 +462,7 @@ func (c *MockContext) File(file string) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer f.Close() //nolint:errcheck // test helper; close error is not actionable
 
 	fi, err := f.Stat()
 	if err != nil {
@@ -517,7 +516,7 @@ func (c *MockContext) Redirect(code int, url string) error {
 // Error writes an error
 func (c *MockContext) Error(err error) {
 	c.res.WriteHeader(http.StatusInternalServerError)
-	c.res.Write([]byte(err.Error()))
+	_, _ = c.res.Write([]byte(err.Error()))
 }
 
 // Handler returns the handler

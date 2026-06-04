@@ -13,10 +13,11 @@ import (
 	"time"
 
 	gorillaWS "github.com/gorilla/websocket"
+	"go.uber.org/zap"
+
 	"github.com/yshengliao/gortex/core/app"
 	httpctx "github.com/yshengliao/gortex/transport/http"
 	"github.com/yshengliao/gortex/transport/websocket"
-	"go.uber.org/zap"
 )
 
 // ChatHandler upgrades incoming HTTP requests to WebSocket and hands the
@@ -82,7 +83,7 @@ func chatAuthorizer(client *websocket.Client, msg *websocket.Message) error {
 
 func main() {
 	logger, _ := zap.NewDevelopment()
-	defer logger.Sync()
+	defer func() { _ = logger.Sync() }()
 
 	hub := websocket.NewHubWithConfig(logger, websocket.Config{
 		MaxMessageBytes:     4 << 10, // 4 KiB — plenty for chat

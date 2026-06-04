@@ -9,6 +9,16 @@ import (
 	"github.com/yshengliao/gortex/pkg/errors"
 )
 
+// contextKey is a private type for keys stored in the standard request
+// context. Using a dedicated type (rather than a built-in string) avoids
+// collisions with keys defined in other packages (staticcheck SA1029).
+type contextKey string
+
+const (
+	sessionContextKey   contextKey = "session"
+	sessionIDContextKey contextKey = "session_id"
+)
+
 // AuthConfig contains configuration for the auth middleware
 type AuthConfig struct {
 	// JWTService is the JWT service for token validation
@@ -99,10 +109,13 @@ func JWTAuthWithConfig(config *AuthConfig) MiddlewareFunc {
 			// Store claims in router context
 			c.Set(config.ClaimsContextKey, claims)
 
-			// Also store in request context for standard Go code
+			// Also store in request context for standard Go code. The key is
+			// kept as the user-configured string (not a private type) so
+			// external handlers can read it back via r.Context().Value(key).
+			//nolint:staticcheck // SA1029: dynamic, user-configured key meant for external lookup
 			ctx := context.WithValue(req.Context(), config.ClaimsContextKey, claims)
 			newReq := req.WithContext(ctx)
-			
+
 			// Update the request in context if possible
 			if setter, ok := c.(interface{ SetRequest(*http.Request) }); ok {
 				setter.SetRequest(newReq)
@@ -368,10 +381,10 @@ func SessionAuthWithConfig(config *SessionConfig) MiddlewareFunc {
 			c.Set("session_id", sessionID)
 
 			// Also store in request context
-			ctx := context.WithValue(req.Context(), "session", sessionData)
-			ctx = context.WithValue(ctx, "session_id", sessionID)
+			ctx := context.WithValue(req.Context(), sessionContextKey, sessionData)
+			ctx = context.WithValue(ctx, sessionIDContextKey, sessionID)
 			newReq := req.WithContext(ctx)
-			
+
 			// Update the request in context if possible
 			if setter, ok := c.(interface{ SetRequest(*http.Request) }); ok {
 				setter.SetRequest(newReq)

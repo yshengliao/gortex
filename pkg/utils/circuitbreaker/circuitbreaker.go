@@ -20,7 +20,7 @@ const (
 var (
 	// ErrCircuitOpen is returned when the circuit breaker is open
 	ErrCircuitOpen = errors.New("circuit breaker is open")
-	
+
 	// ErrTooManyRequests is returned when half-open state limit is reached
 	ErrTooManyRequests = errors.New("too many requests in half-open state")
 )
@@ -30,18 +30,18 @@ type Config struct {
 	// MaxRequests is the maximum number of requests allowed to pass through
 	// when the circuit breaker is half-open
 	MaxRequests uint32
-	
+
 	// Interval is the cyclic period of the closed state
 	Interval time.Duration
-	
+
 	// Timeout is the timeout for the circuit breaker to stay in open state
 	Timeout time.Duration
-	
+
 	// ReadyToTrip is called with a copy of Counts whenever a request fails
 	// in the closed state. If ReadyToTrip returns true, the circuit breaker
 	// will be placed into the open state
 	ReadyToTrip func(counts Counts) bool
-	
+
 	// OnStateChange is called whenever the state of the circuit breaker changes
 	OnStateChange func(name string, from State, to State)
 }
@@ -78,13 +78,16 @@ func (c Counts) FailureRatio() float64 {
 
 // CircuitBreaker implements the circuit breaker pattern
 type CircuitBreaker struct {
-	name     string
-	config   Config
-	state    atomic.Value // State
-	mu       sync.Mutex
-	counts   Counts
-	expiry   time.Time
-	halfOpen atomic.Uint32
+	name   string
+	config Config
+	state  atomic.Value // State
+	mu     sync.Mutex
+	counts Counts
+	expiry time.Time
+	// halfOpen counts in-flight requests admitted while half-open. It is
+	// guarded by mu (not atomics) so the MaxRequests gate stays consistent
+	// with the state/expiry transitions that also run under mu.
+	halfOpen uint32
 }
 
 // New creates a new circuit breaker
@@ -116,7 +119,7 @@ func (cb *CircuitBreaker) Call(ctx context.Context, fn func(ctx context.Context)
 	if err != nil {
 		return err
 	}
-	
+
 	err = fn(ctx)
 	cb.afterRequest(generation, err)
 	return err
@@ -125,26 +128,26 @@ func (cb *CircuitBreaker) Call(ctx context.Context, fn func(ctx context.Context)
 // CallAsync executes the given function asynchronously if the circuit breaker allows it
 func (cb *CircuitBreaker) CallAsync(ctx context.Context, fn func(ctx context.Context) error) <-chan error {
 	errCh := make(chan error, 1)
-	
+
 	go func() {
 		generation, err := cb.beforeRequest()
 		if err != nil {
 			errCh <- err
 			return
 		}
-		
+
 		err = fn(ctx)
 		cb.afterRequest(generation, err)
 		errCh <- err
 	}()
-	
+
 	return errCh
 }
 
 // beforeRequest is called before a request is made
 func (cb *CircuitBreaker) beforeRequest() (uint64, error) {
 	state := cb.State()
-	
+
 	switch state {
 	case StateClosed:
 		return cb.onBeforeRequestClosed()
@@ -160,7 +163,7 @@ func (cb *CircuitBreaker) beforeRequest() (uint64, error) {
 // afterRequest is called after a request is made
 func (cb *CircuitBreaker) afterRequest(generation uint64, err error) {
 	state := cb.State()
-	
+
 	switch state {
 	case StateClosed:
 		cb.onAfterRequestClosed(err)
@@ -173,12 +176,12 @@ func (cb *CircuitBreaker) afterRequest(generation uint64, err error) {
 func (cb *CircuitBreaker) onBeforeRequestClosed() (uint64, error) {
 	cb.mu.Lock()
 	defer cb.mu.Unlock()
-	
+
 	now := time.Now()
 	if cb.expiry.Before(now) {
 		cb.toNewGeneration(now)
 	}
-	
+
 	return 0, nil
 }
 
@@ -186,13 +189,13 @@ func (cb *CircuitBreaker) onBeforeRequestClosed() (uint64, error) {
 func (cb *CircuitBreaker) onAfterRequestClosed(err error) {
 	cb.mu.Lock()
 	defer cb.mu.Unlock()
-	
+
 	cb.counts.Requests++
 	if err != nil {
 		cb.counts.TotalFailures++
 		cb.counts.ConsecutiveSuccesses = 0
 		cb.counts.ConsecutiveFailures++
-		
+
 		if cb.config.ReadyToTrip(cb.counts) {
 			cb.setState(StateOpen)
 			cb.expiry = time.Now().Add(cb.config.Timeout)
@@ -208,50 +211,50 @@ func (cb *CircuitBreaker) onAfterRequestClosed(err error) {
 func (cb *CircuitBreaker) onBeforeRequestOpen() (uint64, error) {
 	cb.mu.Lock()
 	defer cb.mu.Unlock()
-	
+
 	now := time.Now()
 	if cb.expiry.Before(now) {
 		cb.setState(StateHalfOpen)
-		cb.halfOpen.Store(0)
+		cb.halfOpen = 0
 		cb.expiry = now.Add(cb.config.Interval)
 		return uint64(cb.expiry.UnixNano()), nil
 	}
-	
+
 	return 0, ErrCircuitOpen
 }
 
-// onBeforeRequestHalfOpen handles before request logic for half-open state
+// onBeforeRequestHalfOpen handles before request logic for half-open state.
+// The admission gate and the generation read happen under the same lock so
+// the MaxRequests cap cannot be exceeded by requests racing in concurrently.
 func (cb *CircuitBreaker) onBeforeRequestHalfOpen() (uint64, error) {
 	cb.mu.Lock()
-	generation := uint64(cb.expiry.UnixNano())
-	cb.mu.Unlock()
-	
-	if cb.halfOpen.Add(1) > cb.config.MaxRequests {
-		cb.halfOpen.Add(^uint32(0)) // Decrement
+	defer cb.mu.Unlock()
+
+	if cb.halfOpen >= cb.config.MaxRequests {
 		return 0, ErrTooManyRequests
 	}
-	
-	return generation, nil
+	cb.halfOpen++
+
+	return uint64(cb.expiry.UnixNano()), nil
 }
 
 // onAfterRequestHalfOpen handles after request logic for half-open state
 func (cb *CircuitBreaker) onAfterRequestHalfOpen(generation uint64, err error) {
 	cb.mu.Lock()
 	defer cb.mu.Unlock()
-	
+
 	// Check if this request belongs to current generation
 	if generation != uint64(cb.expiry.UnixNano()) {
 		return
 	}
-	
+
 	if err != nil {
 		cb.setState(StateOpen)
 		cb.expiry = time.Now().Add(cb.config.Timeout)
 		cb.counts = Counts{}
 	} else {
 		// Check if we've had enough successful requests
-		current := cb.halfOpen.Load()
-		if current >= cb.config.MaxRequests {
+		if cb.halfOpen >= cb.config.MaxRequests {
 			cb.setState(StateClosed)
 			cb.toNewGeneration(time.Now())
 		}
@@ -262,7 +265,7 @@ func (cb *CircuitBreaker) onAfterRequestHalfOpen(generation uint64, err error) {
 func (cb *CircuitBreaker) setState(state State) {
 	prevState := cb.State()
 	cb.state.Store(state)
-	
+
 	if cb.config.OnStateChange != nil && prevState != state {
 		cb.config.OnStateChange(cb.name, prevState, state)
 	}

@@ -30,7 +30,7 @@ func (m *MockDocProvider) UIHandler() http.Handler {
 
 func (m *MockDocProvider) Endpoints() map[string]http.Handler {
 	return map[string]http.Handler{
-		"/docs":      m.UIHandler(),
+		"/docs": m.UIHandler(),
 		"/docs.json": http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", m.ContentType())
 			w.Write(m.JSONData)

@@ -201,13 +201,13 @@ func TestEnhancedSpan_CompleteWorkflow(t *testing.T) {
 	ctx := context.Background()
 
 	// Simulate a complete workflow
-	ctx, span := tracer.StartEnhancedSpan(ctx, "process-request")
+	_, span := tracer.StartEnhancedSpan(ctx, "process-request")
 
 	// Add initial tags
 	span.AddTags(map[string]string{
-		"service":    "api",
-		"endpoint":   "/users",
-		"method":     "GET",
+		"service":  "api",
+		"endpoint": "/users",
+		"method":   "GET",
 	})
 
 	// Log some debug info
@@ -217,7 +217,7 @@ func TestEnhancedSpan_CompleteWorkflow(t *testing.T) {
 
 	// Simulate some work
 	span.LogEvent(SpanStatusINFO, "User authenticated", nil)
-	
+
 	// Simulate a warning
 	span.LogEvent(SpanStatusWARN, "Cache miss", map[string]any{
 		"cache_key": "user:123",

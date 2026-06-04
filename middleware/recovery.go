@@ -111,7 +111,7 @@ func RecoveryWithConfig(config *RecoveryConfig) MiddlewareFunc {
 func formatStack(stack []byte) []string {
 	lines := strings.Split(string(stack), "\n")
 	formatted := make([]string, 0, len(lines))
-	
+
 	for i := 0; i < len(lines); i++ {
 		line := strings.TrimSpace(lines[i])
 		if line != "" {
@@ -124,7 +124,7 @@ func formatStack(stack []byte) []string {
 			formatted = append(formatted, line)
 		}
 	}
-	
+
 	return formatted
 }
 

@@ -2,8 +2,9 @@
 package main
 
 import (
-	"github.com/yshengliao/gortex/tools/analyzer"
 	"golang.org/x/tools/go/analysis/singlechecker"
+
+	"github.com/yshengliao/gortex/tools/analyzer"
 )
 
 func main() {

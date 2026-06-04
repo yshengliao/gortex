@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
 	httpctx "github.com/yshengliao/gortex/transport/http"
 )
 
@@ -27,11 +28,11 @@ func TestParamInt(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/", nil)
 			rec := httptest.NewRecorder()
 			c := httpctx.NewDefaultContext(req, rec).(*httpctx.DefaultContext)
-			
+
 			// Set up parameter using httpctx.SetParams
 			params := map[string]string{"id": tt.paramValue}
 			httpctx.SetParams(c, params)
-			
+
 			result := c.ParamInt("id", tt.defaultValue)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -57,7 +58,7 @@ func TestQueryInt(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/"+tt.queryString, nil)
 			rec := httptest.NewRecorder()
 			c := httpctx.NewDefaultContext(req, rec).(*httpctx.DefaultContext)
-			
+
 			result := c.QueryInt(tt.paramName, tt.defaultValue)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -86,7 +87,7 @@ func TestQueryBool(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/"+tt.queryString, nil)
 			rec := httptest.NewRecorder()
 			c := httpctx.NewDefaultContext(req, rec).(*httpctx.DefaultContext)
-			
+
 			result := c.QueryBool(tt.paramName, tt.defaultValue)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -98,47 +99,47 @@ func TestResponseHelpers(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		rec := httptest.NewRecorder()
 		c := httpctx.NewDefaultContext(req, rec).(*httpctx.DefaultContext)
-		
+
 		data := httpctx.Map{"message": "success"}
 		err := c.OK(data)
-		
+
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, rec.Code)
 		assert.Contains(t, rec.Body.String(), `"message":"success"`)
 	})
-	
+
 	t.Run("Created response", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/", nil)
 		rec := httptest.NewRecorder()
 		c := httpctx.NewDefaultContext(req, rec).(*httpctx.DefaultContext)
-		
+
 		data := httpctx.Map{"id": 123}
 		err := c.Created(data)
-		
+
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusCreated, rec.Code)
 		assert.Contains(t, rec.Body.String(), `"id":123`)
 	})
-	
+
 	t.Run("NoContent204 response", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodDelete, "/", nil)
 		rec := httptest.NewRecorder()
 		c := httpctx.NewDefaultContext(req, rec).(*httpctx.DefaultContext)
-		
+
 		err := c.NoContent204()
-		
+
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusNoContent, rec.Code)
 		assert.Empty(t, rec.Body.String())
 	})
-	
+
 	t.Run("BadRequest response", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/", nil)
 		rec := httptest.NewRecorder()
 		c := httpctx.NewDefaultContext(req, rec).(*httpctx.DefaultContext)
-		
+
 		err := c.BadRequest("Invalid input")
-		
+
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
 		assert.Contains(t, rec.Body.String(), `"error":"Invalid input"`)

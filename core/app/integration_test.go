@@ -10,8 +10,10 @@ import (
 	gorillaWS "github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	gortexContext "github.com/yshengliao/gortex/transport/http"
 	"github.com/yshengliao/gortex/transport/websocket"
+
 	// Hub is in websocket package, not a subpackage
 	"go.uber.org/zap/zaptest"
 )
@@ -100,8 +102,8 @@ func TestIntegrationGracefulShutdown(t *testing.T) {
 
 		// Start server
 		go func() {
-			if err := app.Run(); err != nil && err != http.ErrServerClosed {
-				t.Errorf("Server error: %v", err)
+			if runErr := app.Run(); runErr != nil && runErr != http.ErrServerClosed {
+				t.Errorf("Server error: %v", runErr)
 			}
 		}()
 
@@ -148,10 +150,10 @@ func TestIntegrationGracefulShutdown(t *testing.T) {
 
 			// Keep reading to process close frame
 			for {
-				_, _, err := conn.ReadMessage()
-				if err != nil {
+				_, _, readErr := conn.ReadMessage()
+				if readErr != nil {
 					// Check if it's a close error
-					if gorillaWS.IsCloseError(err, gorillaWS.CloseGoingAway, gorillaWS.CloseNormalClosure) {
+					if gorillaWS.IsCloseError(readErr, gorillaWS.CloseGoingAway, gorillaWS.CloseNormalClosure) {
 						closeReceived <- true
 					}
 					return

@@ -23,11 +23,11 @@ type HealthCheck func(ctx context.Context) HealthCheckResult
 
 // HealthCheckResult represents the result of a health check
 type HealthCheckResult struct {
-	Status      HealthStatus           `json:"status"`
-	Message     string                 `json:"message,omitempty"`
+	Status      HealthStatus   `json:"status"`
+	Message     string         `json:"message,omitempty"`
 	Details     map[string]any `json:"details,omitempty"`
-	LastChecked time.Time              `json:"last_checked"`
-	Duration    time.Duration          `json:"duration_ms"`
+	LastChecked time.Time      `json:"last_checked"`
+	Duration    time.Duration  `json:"duration_ms"`
 }
 
 // HealthChecker manages health checks
@@ -51,10 +51,10 @@ func NewHealthChecker(interval, timeout time.Duration) *HealthChecker {
 		timeout:  timeout,
 		stop:     make(chan struct{}),
 	}
-	
+
 	// Start background health checks
 	go hc.runChecks()
-	
+
 	return hc
 }
 
@@ -63,10 +63,10 @@ func (hc *HealthChecker) Register(name string, check HealthCheck) {
 	if atomic.LoadInt32(&hc.stopped) == 1 {
 		return // Don't register if already stopped
 	}
-	
+
 	hc.mu.Lock()
 	defer hc.mu.Unlock()
-	
+
 	hc.checks[name] = check
 }
 
@@ -74,7 +74,7 @@ func (hc *HealthChecker) Register(name string, check HealthCheck) {
 func (hc *HealthChecker) Unregister(name string) {
 	hc.mu.Lock()
 	defer hc.mu.Unlock()
-	
+
 	delete(hc.checks, name)
 	delete(hc.results, name)
 }
@@ -87,36 +87,36 @@ func (hc *HealthChecker) Check(ctx context.Context) map[string]HealthCheckResult
 		checks[name] = check
 	}
 	hc.mu.RUnlock()
-	
+
 	results := make(map[string]HealthCheckResult)
 	var wg sync.WaitGroup
 	var mu sync.Mutex
-	
+
 	for name, check := range checks {
 		wg.Add(1)
 		go func(n string, c HealthCheck) {
 			defer wg.Done()
-			
+
 			// Create timeout context
 			checkCtx, cancel := context.WithTimeout(ctx, hc.timeout)
 			defer cancel()
-			
+
 			start := time.Now()
 			result := c(checkCtx)
 			result.Duration = time.Since(start)
 			result.LastChecked = time.Now()
-			
+
 			mu.Lock()
 			results[n] = result
 			mu.Unlock()
-			
+
 			// Update cached result
 			hc.mu.Lock()
 			hc.results[n] = result
 			hc.mu.Unlock()
 		}(name, check)
 	}
-	
+
 	wg.Wait()
 	return results
 }
@@ -125,26 +125,26 @@ func (hc *HealthChecker) Check(ctx context.Context) map[string]HealthCheckResult
 func (hc *HealthChecker) GetResults() map[string]HealthCheckResult {
 	hc.mu.RLock()
 	defer hc.mu.RUnlock()
-	
+
 	results := make(map[string]HealthCheckResult)
 	for name, result := range hc.results {
 		results[name] = result
 	}
-	
+
 	return results
 }
 
 // GetOverallStatus returns the overall health status
 func (hc *HealthChecker) GetOverallStatus() HealthStatus {
 	results := hc.GetResults()
-	
+
 	if len(results) == 0 {
 		return HealthStatusHealthy
 	}
-	
+
 	hasUnhealthy := false
 	hasDegraded := false
-	
+
 	for _, result := range results {
 		switch result.Status {
 		case HealthStatusUnhealthy:
@@ -153,14 +153,14 @@ func (hc *HealthChecker) GetOverallStatus() HealthStatus {
 			hasDegraded = true
 		}
 	}
-	
+
 	if hasUnhealthy {
 		return HealthStatusUnhealthy
 	}
 	if hasDegraded {
 		return HealthStatusDegraded
 	}
-	
+
 	return HealthStatusHealthy
 }
 
@@ -168,10 +168,10 @@ func (hc *HealthChecker) GetOverallStatus() HealthStatus {
 func (hc *HealthChecker) runChecks() {
 	ticker := time.NewTicker(hc.interval)
 	defer ticker.Stop()
-	
+
 	// Run initial check
 	hc.Check(context.Background())
-	
+
 	for {
 		select {
 		case <-ticker.C:
@@ -209,7 +209,7 @@ func DatabaseHealthCheck(ping func(ctx context.Context) error) HealthCheck {
 				},
 			}
 		}
-		
+
 		return HealthCheckResult{
 			Status:  HealthStatusHealthy,
 			Message: "Database connection successful",
@@ -219,6 +219,10 @@ func DatabaseHealthCheck(ping func(ctx context.Context) error) HealthCheck {
 
 // HTTPHealthCheck creates an HTTP endpoint health check
 func HTTPHealthCheck(url string, expectedStatus int) HealthCheck {
+	// Reuse a single client across invocations so repeated health checks
+	// share connection pooling instead of allocating a client (and its
+	// transport) on every call.
+	client := &http.Client{Timeout: 5 * time.Second}
 	return func(ctx context.Context) HealthCheckResult {
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 		if err != nil {
@@ -231,8 +235,7 @@ func HTTPHealthCheck(url string, expectedStatus int) HealthCheck {
 				},
 			}
 		}
-		
-		client := &http.Client{Timeout: 5 * time.Second}
+
 		resp, err := client.Do(req)
 		if err != nil {
 			return HealthCheckResult{
@@ -244,8 +247,8 @@ func HTTPHealthCheck(url string, expectedStatus int) HealthCheck {
 				},
 			}
 		}
-		defer resp.Body.Close()
-		
+		defer func() { _ = resp.Body.Close() }()
+
 		if resp.StatusCode != expectedStatus {
 			return HealthCheckResult{
 				Status:  HealthStatusUnhealthy,
@@ -257,7 +260,7 @@ func HTTPHealthCheck(url string, expectedStatus int) HealthCheck {
 				},
 			}
 		}
-		
+
 		return HealthCheckResult{
 			Status:  HealthStatusHealthy,
 			Message: "HTTP endpoint reachable",
@@ -274,14 +277,14 @@ func MemoryHealthCheck(maxMemoryMB uint64) HealthCheck {
 	return func(ctx context.Context) HealthCheckResult {
 		var m runtime.MemStats
 		runtime.ReadMemStats(&m)
-		
+
 		allocMB := m.Alloc / 1024 / 1024
 		totalAllocMB := m.TotalAlloc / 1024 / 1024
 		sysMB := m.Sys / 1024 / 1024
-		
+
 		status := HealthStatusHealthy
 		message := "Memory usage within limits"
-		
+
 		if allocMB > maxMemoryMB {
 			status = HealthStatusUnhealthy
 			message = "Memory usage exceeds limit"
@@ -289,7 +292,7 @@ func MemoryHealthCheck(maxMemoryMB uint64) HealthCheck {
 			status = HealthStatusDegraded
 			message = "Memory usage approaching limit"
 		}
-		
+
 		return HealthCheckResult{
 			Status:  status,
 			Message: message,

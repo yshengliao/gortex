@@ -6,16 +6,17 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
+
 	"github.com/yshengliao/gortex/transport/websocket"
 )
 
 func TestHub(t *testing.T) {
 	logger, _ := zap.NewDevelopment()
 	h := websocket.NewHub(logger)
-	
+
 	// Start hub in background
 	go h.Run()
-	
+
 	// Give hub time to start
 	time.Sleep(10 * time.Millisecond)
 
@@ -30,7 +31,7 @@ func TestHub(t *testing.T) {
 				"content": "test message",
 			},
 		}
-		
+
 		// Should not panic even with no clients
 		assert.NotPanics(t, func() {
 			h.Broadcast(msg)
@@ -44,14 +45,15 @@ func TestHub(t *testing.T) {
 				"content": "private message",
 			},
 		}
-		
+
 		// Should not panic even with no matching user
 		assert.NotPanics(t, func() {
 			h.SendToUser("user123", msg)
 		})
-		
-		// Verify target is set
-		assert.Equal(t, "user123", msg.Target)
+
+		// SendToUser must not mutate the caller's message: the Target is
+		// carried on an internal copy so a reused *Message is left intact.
+		assert.Empty(t, msg.Target, "SendToUser should not mutate the caller's message")
 	})
 
 	t.Run("Shutdown", func(t *testing.T) {
@@ -59,7 +61,7 @@ func TestHub(t *testing.T) {
 		h2 := websocket.NewHub(logger)
 		go h2.Run()
 		time.Sleep(10 * time.Millisecond)
-		
+
 		// Shutdown should not panic
 		assert.NotPanics(t, func() {
 			h2.Shutdown()
@@ -103,9 +105,9 @@ func (c *MockConn) WriteMessage(messageType int, data []byte) error {
 	return nil
 }
 
-func (c *MockConn) SetReadLimit(limit int64) {}
-func (c *MockConn) SetReadDeadline(t time.Time) error { return nil }
-func (c *MockConn) SetWriteDeadline(t time.Time) error { return nil }
+func (c *MockConn) SetReadLimit(limit int64)            {}
+func (c *MockConn) SetReadDeadline(t time.Time) error   { return nil }
+func (c *MockConn) SetWriteDeadline(t time.Time) error  { return nil }
 func (c *MockConn) SetPongHandler(h func(string) error) {}
 func (c *MockConn) Close() error {
 	c.closed = true

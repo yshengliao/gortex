@@ -11,10 +11,10 @@ import (
 
 // SwaggerProvider implements the DocProvider interface for Swagger/OpenAPI 3.0
 type SwaggerProvider struct {
-	config       *doc.DocConfig
-	swagger      *OpenAPI
-	swaggerJSON  []byte
-	uiHandler    http.Handler
+	config      *doc.DocConfig
+	swagger     *OpenAPI
+	swaggerJSON []byte
+	uiHandler   http.Handler
 }
 
 // NewSwaggerProvider creates a new Swagger documentation provider
@@ -112,17 +112,17 @@ func (p *SwaggerProvider) UIHandler() http.Handler {
 // Endpoints returns the documentation endpoints
 func (p *SwaggerProvider) Endpoints() map[string]http.Handler {
 	endpoints := make(map[string]http.Handler)
-	
+
 	// JSON endpoint
 	endpoints["/docs/swagger.json"] = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write(p.swaggerJSON)
+		_, _ = w.Write(p.swaggerJSON)
 	})
-	
+
 	// UI endpoint
 	endpoints["/docs"] = p.UIHandler()
 	endpoints["/docs/"] = p.UIHandler()
-	
+
 	return endpoints
 }
 
@@ -179,7 +179,7 @@ func (p *SwaggerProvider) generateOperationID(route doc.RouteInfo) string {
 	if route.Handler != "" {
 		return strings.ReplaceAll(route.Handler, ".", "_")
 	}
-	
+
 	// Generate from method and path
 	path := strings.ReplaceAll(route.Path, "/", "_")
 	path = strings.ReplaceAll(path, ":", "")
@@ -191,7 +191,7 @@ func (p *SwaggerProvider) generateOperationID(route doc.RouteInfo) string {
 // extractParameters extracts parameters from the route path
 func (p *SwaggerProvider) extractParameters(route doc.RouteInfo) []Parameter {
 	params := []Parameter{}
-	
+
 	// Extract path parameters
 	parts := strings.Split(route.Path, "/")
 	for _, part := range parts {
@@ -208,7 +208,7 @@ func (p *SwaggerProvider) extractParameters(route doc.RouteInfo) []Parameter {
 			})
 		}
 	}
-	
+
 	// Add documented parameters
 	for _, param := range route.Params {
 		p := Parameter{
@@ -220,21 +220,21 @@ func (p *SwaggerProvider) extractParameters(route doc.RouteInfo) []Parameter {
 				Type: param.DataType,
 			},
 		}
-		
+
 		if param.Example != "" {
 			p.Example = param.Example
 		}
-		
+
 		params = append(params, p)
 	}
-	
+
 	return params
 }
 
 // generateResponses generates standard responses
 func (p *SwaggerProvider) generateResponses(route doc.RouteInfo) map[string]*Response {
 	responses := make(map[string]*Response)
-	
+
 	// Success response
 	responses["200"] = &Response{
 		Description: "Successful response",
@@ -246,7 +246,7 @@ func (p *SwaggerProvider) generateResponses(route doc.RouteInfo) map[string]*Res
 			},
 		},
 	}
-	
+
 	// Error responses
 	responses["400"] = &Response{
 		Description: "Bad request",
@@ -258,7 +258,7 @@ func (p *SwaggerProvider) generateResponses(route doc.RouteInfo) map[string]*Res
 			},
 		},
 	}
-	
+
 	responses["500"] = &Response{
 		Description: "Internal server error",
 		Content: map[string]*MediaType{
@@ -269,7 +269,7 @@ func (p *SwaggerProvider) generateResponses(route doc.RouteInfo) map[string]*Res
 			},
 		},
 	}
-	
+
 	return responses
 }
 

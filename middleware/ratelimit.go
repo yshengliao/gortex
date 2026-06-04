@@ -261,7 +261,6 @@ func (m *MemoryRateLimiter) Cleanup() {
 	}
 }
 
-
 // GortexRateLimit returns a rate limiting middleware for Gortex
 func GortexRateLimit() MiddlewareFunc {
 	return GortexRateLimitWithConfig(DefaultGortexRateLimitConfig())
@@ -275,7 +274,7 @@ func GortexRateLimitWithConfig(config *GortexRateLimitConfig) MiddlewareFunc {
 			return c.RealIP()
 		}
 	}
-	
+
 	if config.ErrorHandler == nil {
 		config.ErrorHandler = func(c Context) error {
 			return c.JSON(http.StatusTooManyRequests, map[string]string{
@@ -283,7 +282,7 @@ func GortexRateLimitWithConfig(config *GortexRateLimitConfig) MiddlewareFunc {
 			})
 		}
 	}
-	
+
 	if config.Store == nil {
 		store := NewMemoryRateLimiter()
 		store.SetRate(rate.Limit(config.Rate), config.Burst)

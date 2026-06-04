@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
+
 	"github.com/yshengliao/gortex/transport/websocket"
 )
 
@@ -15,16 +16,16 @@ import (
 func TestHub_ConcurrentOperations(t *testing.T) {
 	logger, _ := zap.NewDevelopment()
 	h := websocket.NewHub(logger)
-	
+
 	// Start hub
 	go h.Run()
 	defer h.Shutdown()
-	
+
 	// Wait for hub to start
 	time.Sleep(10 * time.Millisecond)
-	
+
 	var wg sync.WaitGroup
-	
+
 	// Test concurrent broadcasts
 	for i := 0; i < 100; i++ {
 		wg.Add(1)
@@ -39,7 +40,7 @@ func TestHub_ConcurrentOperations(t *testing.T) {
 			h.Broadcast(msg)
 		}(i)
 	}
-	
+
 	// Test concurrent client count checks
 	for i := 0; i < 100; i++ {
 		wg.Add(1)
@@ -48,9 +49,9 @@ func TestHub_ConcurrentOperations(t *testing.T) {
 			_ = h.GetConnectedClients()
 		}()
 	}
-	
+
 	wg.Wait()
-	
+
 	// Should complete without panic or deadlock
 	assert.Equal(t, 0, h.GetConnectedClients())
 }
@@ -59,19 +60,19 @@ func TestHub_ConcurrentOperations(t *testing.T) {
 func TestHub_NoRaceCondition(t *testing.T) {
 	logger, _ := zap.NewDevelopment()
 	h := websocket.NewHub(logger)
-	
+
 	// Start hub
 	go h.Run()
 	defer h.Shutdown()
-	
+
 	// Stress test with concurrent operations
 	var wg sync.WaitGroup
-	
+
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
-			
+
 			// Rapid fire operations
 			for j := 0; j < 100; j++ {
 				// Broadcast
@@ -82,7 +83,7 @@ func TestHub_NoRaceCondition(t *testing.T) {
 						"seq":  j,
 					},
 				})
-				
+
 				// Send to user
 				h.SendToUser("user123", &websocket.Message{
 					Type: "private",
@@ -90,13 +91,13 @@ func TestHub_NoRaceCondition(t *testing.T) {
 						"from": id,
 					},
 				})
-				
+
 				// Get count
 				_ = h.GetConnectedClients()
 			}
 		}(i)
 	}
-	
+
 	wg.Wait()
 }
 
@@ -104,29 +105,29 @@ func TestHub_NoRaceCondition(t *testing.T) {
 func TestHub_Performance(t *testing.T) {
 	logger, _ := zap.NewDevelopment()
 	h := websocket.NewHub(logger)
-	
+
 	// Start hub
 	go h.Run()
 	defer h.Shutdown()
-	
+
 	// Benchmark broadcast operations
 	start := time.Now()
 	const numOps = 10000
-	
+
 	for i := 0; i < numOps; i++ {
 		h.Broadcast(&websocket.Message{
 			Type: "perf",
 			Data: map[string]interface{}{"i": i},
 		})
 	}
-	
+
 	elapsed := time.Since(start)
 	opsPerSec := float64(numOps) / elapsed.Seconds()
-	
+
 	t.Logf("Operations: %d", numOps)
 	t.Logf("Elapsed: %v", elapsed)
 	t.Logf("Ops/sec: %.0f", opsPerSec)
-	
+
 	// Should be very fast without mutex overhead
 	assert.Greater(t, opsPerSec, float64(100000), "Should handle > 100k ops/sec")
 }
@@ -136,17 +137,17 @@ func TestHub_StressTest(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping stress test in short mode")
 	}
-	
+
 	logger, _ := zap.NewDevelopment()
 	h := websocket.NewHub(logger)
-	
+
 	// Start hub
 	go h.Run()
 	defer h.Shutdown()
-	
+
 	var panics int32
 	var wg sync.WaitGroup
-	
+
 	// Function to catch panics
 	safeDo := func(fn func()) {
 		defer func() {
@@ -157,13 +158,13 @@ func TestHub_StressTest(t *testing.T) {
 		}()
 		fn()
 	}
-	
+
 	// Hammer the hub with operations
 	for i := 0; i < 100; i++ {
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
-			
+
 			for j := 0; j < 1000; j++ {
 				safeDo(func() {
 					h.Broadcast(&websocket.Message{
@@ -174,11 +175,11 @@ func TestHub_StressTest(t *testing.T) {
 						},
 					})
 				})
-				
+
 				safeDo(func() {
 					_ = h.GetConnectedClients()
 				})
-				
+
 				// Occasional targeted message
 				if j%10 == 0 {
 					safeDo(func() {
@@ -193,7 +194,7 @@ func TestHub_StressTest(t *testing.T) {
 			}
 		}(i)
 	}
-	
+
 	wg.Wait()
 	assert.Equal(t, int32(0), atomic.LoadInt32(&panics), "No panics should occur")
 }
@@ -202,10 +203,10 @@ func TestHub_StressTest(t *testing.T) {
 func TestHub_ShutdownSafety(t *testing.T) {
 	logger, _ := zap.NewDevelopment()
 	h := websocket.NewHub(logger)
-	
+
 	// Start hub
 	go h.Run()
-	
+
 	// Start some background operations
 	done := make(chan struct{})
 	go func() {
@@ -218,11 +219,11 @@ func TestHub_ShutdownSafety(t *testing.T) {
 			time.Sleep(time.Microsecond)
 		}
 	}()
-	
+
 	// Shutdown while operations are ongoing
 	time.Sleep(10 * time.Millisecond)
 	h.Shutdown()
-	
+
 	// Wait for background operations to complete
 	select {
 	case <-done:
@@ -230,7 +231,7 @@ func TestHub_ShutdownSafety(t *testing.T) {
 	case <-time.After(1 * time.Second):
 		t.Fatal("Background operations did not complete")
 	}
-	
+
 	// Further operations should not panic
 	assert.NotPanics(t, func() {
 		h.Broadcast(&websocket.Message{Type: "after-shutdown"})
@@ -242,18 +243,18 @@ func TestHub_ShutdownSafety(t *testing.T) {
 func BenchmarkHub_Broadcast(b *testing.B) {
 	logger, _ := zap.NewDevelopment()
 	h := websocket.NewHub(logger)
-	
+
 	// Start hub
 	go h.Run()
 	defer h.Shutdown()
-	
+
 	msg := &websocket.Message{
 		Type: "benchmark",
 		Data: map[string]interface{}{
 			"content": "benchmark message",
 		},
 	}
-	
+
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
@@ -266,11 +267,11 @@ func BenchmarkHub_Broadcast(b *testing.B) {
 func BenchmarkHub_GetConnectedClients(b *testing.B) {
 	logger, _ := zap.NewDevelopment()
 	h := websocket.NewHub(logger)
-	
+
 	// Start hub
 	go h.Run()
 	defer h.Shutdown()
-	
+
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {

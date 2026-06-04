@@ -4,26 +4,27 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/yshengliao/gortex/observability/tracing"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 	oteltrace "go.opentelemetry.io/otel/trace"
+
+	"github.com/yshengliao/gortex/observability/tracing"
 )
 
 // OTelTracerAdapter adapts Gortex tracer to OpenTelemetry
 type OTelTracerAdapter struct {
-	tracer       tracing.EnhancedTracer
-	otelTracer   oteltrace.Tracer
-	severityMap  map[tracing.SpanStatus]attribute.KeyValue
+	tracer      tracing.EnhancedTracer
+	otelTracer  oteltrace.Tracer
+	severityMap map[tracing.SpanStatus]attribute.KeyValue
 }
 
 // NewOTelTracerAdapter creates a new OpenTelemetry adapter
 func NewOTelTracerAdapter(tracer tracing.EnhancedTracer, tracerName string) *OTelTracerAdapter {
 	return &OTelTracerAdapter{
-		tracer:     tracer,
-		otelTracer: otel.Tracer(tracerName),
+		tracer:      tracer,
+		otelTracer:  otel.Tracer(tracerName),
 		severityMap: initSeverityMap(),
 	}
 }
@@ -60,13 +61,12 @@ func severityToNumber(status tracing.SpanStatus) int {
 		tracing.SpanStatusALERT:     22,
 		tracing.SpanStatusEMERGENCY: 24,
 	}
-	
+
 	if num, ok := severityNumbers[status]; ok {
 		return num
 	}
 	return 0
 }
-
 
 // SpanAdapter bridges Gortex enhanced span and OpenTelemetry span
 type SpanAdapter struct {
@@ -79,14 +79,14 @@ type SpanAdapter struct {
 func (s *SpanAdapter) LogEvent(severity tracing.SpanStatus, msg string, fields map[string]any) {
 	// Log to Gortex
 	s.gortexSpan.LogEvent(severity, msg, fields)
-	
+
 	// Convert to OpenTelemetry attributes
 	attrs := []attribute.KeyValue{
 		s.adapter.severityMap[severity],
 		attribute.Int("severity.number", severityToNumber(severity)),
 		attribute.String("event.name", msg),
 	}
-	
+
 	// Add fields as attributes
 	for k, v := range fields {
 		switch val := v.(type) {
@@ -104,7 +104,7 @@ func (s *SpanAdapter) LogEvent(severity tracing.SpanStatus, msg string, fields m
 			attrs = append(attrs, attribute.String(k, fmt.Sprintf("%v", val)))
 		}
 	}
-	
+
 	// Add event to OpenTelemetry span
 	s.otelSpan.AddEvent(msg, oteltrace.WithAttributes(attrs...))
 }
@@ -113,7 +113,7 @@ func (s *SpanAdapter) LogEvent(severity tracing.SpanStatus, msg string, fields m
 func (s *SpanAdapter) SetError(err error) {
 	// Set error on Gortex span
 	s.gortexSpan.SetError(err)
-	
+
 	// Set error on OpenTelemetry span
 	s.otelSpan.RecordError(err)
 	s.otelSpan.SetStatus(codes.Error, err.Error())
@@ -123,13 +123,13 @@ func (s *SpanAdapter) SetError(err error) {
 func (s *SpanAdapter) AddTags(tags map[string]string) {
 	// Add to Gortex span
 	s.gortexSpan.AddTags(tags)
-	
+
 	// Convert to OpenTelemetry attributes
 	attrs := make([]attribute.KeyValue, 0, len(tags))
 	for k, v := range tags {
 		attrs = append(attrs, attribute.String(k, v))
 	}
-	
+
 	s.otelSpan.SetAttributes(attrs...)
 }
 
@@ -137,25 +137,25 @@ func (s *SpanAdapter) AddTags(tags map[string]string) {
 func (s *SpanAdapter) SetStatus(status tracing.SpanStatus) {
 	// Set on Gortex span
 	s.gortexSpan.SetStatus(status)
-	
+
 	// Map to OpenTelemetry status
 	var code codes.Code
 	var description string
-	
+
 	switch status {
 	case tracing.SpanStatusOK:
 		code = codes.Ok
-	case tracing.SpanStatusError, tracing.SpanStatusERROR, 
-	     tracing.SpanStatusCRITICAL, tracing.SpanStatusALERT, 
-	     tracing.SpanStatusEMERGENCY:
+	case tracing.SpanStatusError, tracing.SpanStatusERROR,
+		tracing.SpanStatusCRITICAL, tracing.SpanStatusALERT,
+		tracing.SpanStatusEMERGENCY:
 		code = codes.Error
 		description = status.String()
 	default:
 		code = codes.Unset
 	}
-	
+
 	s.otelSpan.SetStatus(code, description)
-	
+
 	// Also set severity as attribute
 	s.otelSpan.SetAttributes(s.adapter.severityMap[status])
 }
@@ -164,7 +164,7 @@ func (s *SpanAdapter) SetStatus(status tracing.SpanStatus) {
 func (s *SpanAdapter) End() {
 	// Finish Gortex span
 	s.adapter.tracer.FinishSpan(s.gortexSpan.Span)
-	
+
 	// End OpenTelemetry span
 	s.otelSpan.End()
 }
@@ -211,20 +211,20 @@ func (a *OTelTracerAdapter) StartSpan(ctx context.Context, operation string) (co
 func (a *OTelTracerAdapter) StartEnhancedSpan(ctx context.Context, operation string) (context.Context, *tracing.EnhancedSpan) {
 	// Start Gortex enhanced span
 	ctx, gortexSpan := a.tracer.StartEnhancedSpan(ctx, operation)
-	
+
 	// Start OpenTelemetry span
 	ctx, otelSpan := a.otelTracer.Start(ctx, operation)
-	
+
 	// Create adapter
 	adapter := &SpanAdapter{
 		gortexSpan: gortexSpan,
 		otelSpan:   otelSpan,
 		adapter:    a,
 	}
-	
+
 	// Store adapter in context
 	ctx = ContextWithSpanAdapter(ctx, adapter)
-	
+
 	return ctx, gortexSpan
 }
 
@@ -251,20 +251,20 @@ func (a *OTelTracerAdapter) SetStatus(span *tracing.Span, status tracing.SpanSta
 func (a *OTelTracerAdapter) StartSpanWithOptions(ctx context.Context, operation string, opts ...oteltrace.SpanStartOption) (context.Context, *SpanAdapter) {
 	// Start Gortex enhanced span
 	ctx, gortexSpan := a.tracer.StartEnhancedSpan(ctx, operation)
-	
+
 	// Start OpenTelemetry span
 	ctx, otelSpan := a.otelTracer.Start(ctx, operation, opts...)
-	
+
 	// Create adapter
 	adapter := &SpanAdapter{
 		gortexSpan: gortexSpan,
 		otelSpan:   otelSpan,
 		adapter:    a,
 	}
-	
+
 	// Store adapter in context
 	ctx = ContextWithSpanAdapter(ctx, adapter)
-	
+
 	return ctx, adapter
 }
 
@@ -273,13 +273,13 @@ func (a *OTelTracerAdapter) HTTPMiddleware(next func(context.Context) error) fun
 	return func(ctx context.Context) error {
 		// Extract trace context from headers if available
 		// This would typically use the propagator from OpenTelemetry
-		
+
 		operation := "HTTP Request" // This should be extracted from the request
 		ctx, span := a.StartSpanWithOptions(ctx, operation,
 			oteltrace.WithSpanKind(oteltrace.SpanKindServer),
 		)
 		defer span.End()
-		
+
 		// Add HTTP semantic conventions
 		span.AddTags(map[string]string{
 			string(semconv.HTTPMethodKey):     "GET", // Should be extracted
@@ -287,13 +287,13 @@ func (a *OTelTracerAdapter) HTTPMiddleware(next func(context.Context) error) fun
 			string(semconv.HTTPSchemeKey):     "http",
 			string(semconv.HTTPStatusCodeKey): "200", // Should be set after
 		})
-		
+
 		// Execute the handler
 		err := next(ctx)
 		if err != nil {
 			span.SetError(err)
 		}
-		
+
 		return err
 	}
 }

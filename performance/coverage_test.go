@@ -254,12 +254,12 @@ func TestGenerateRecommendationsCoversAllBranches(t *testing.T) {
 func TestGenerateMarkdownContainsKeyFields(t *testing.T) {
 	rg := NewReportGenerator()
 	report := &PerformanceReport{
-		GeneratedAt: time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC),
-		Period:      "Weekly",
-		Summary:     Summary{TotalBenchmarks: 3, ImprovedCount: 1, DegradedCount: 1, AverageNsPerOp: 500, AverageAllocsPerOp: 2},
-		Benchmarks:  []BenchmarkComparison{{Name: "A", CurrentNsPerOp: 100, PreviousNsPerOp: 200, PercentChange: -50, Status: "improved"}},
-		Trends:      []TrendAnalysis{{Name: "A", Trend: "improving", TrendSlope: -0.5}},
-		Bottlenecks: []Bottleneck{{Component: "B", Impact: "high", Description: "slow", NsPerOp: 9999, AllocsPerOp: 99}},
+		GeneratedAt:     time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC),
+		Period:          "Weekly",
+		Summary:         Summary{TotalBenchmarks: 3, ImprovedCount: 1, DegradedCount: 1, AverageNsPerOp: 500, AverageAllocsPerOp: 2},
+		Benchmarks:      []BenchmarkComparison{{Name: "A", CurrentNsPerOp: 100, PreviousNsPerOp: 200, PercentChange: -50, Status: "improved"}},
+		Trends:          []TrendAnalysis{{Name: "A", Trend: "improving", TrendSlope: -0.5}},
+		Bottlenecks:     []Bottleneck{{Component: "B", Impact: "high", Description: "slow", NsPerOp: 9999, AllocsPerOp: 99}},
 		Recommendations: []string{"tighten it up"},
 	}
 	md, err := rg.generateMarkdown(report)

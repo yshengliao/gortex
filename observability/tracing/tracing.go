@@ -6,8 +6,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	gortexContext "github.com/yshengliao/gortex/transport/http"
+
 	"github.com/yshengliao/gortex/middleware"
+	gortexContext "github.com/yshengliao/gortex/transport/http"
 )
 
 // Event represents an event within a span
@@ -40,7 +41,7 @@ const (
 	SpanStatusUnset SpanStatus = iota
 	SpanStatusOK
 	SpanStatusError
-	
+
 	// Extended severity levels (8 levels)
 	SpanStatusDEBUG     SpanStatus = 10
 	SpanStatusINFO      SpanStatus = 20
@@ -108,13 +109,13 @@ func (s SpanStatus) severityLevel() int {
 type SpanInterface interface {
 	// LogEvent logs an event with severity level
 	LogEvent(severity SpanStatus, msg string, fields map[string]any)
-	
+
 	// SetError sets an error on the span
 	SetError(err error)
-	
+
 	// AddTags adds tags to the span
 	AddTags(tags map[string]string)
-	
+
 	// SetStatus sets the status of the span
 	SetStatus(status SpanStatus)
 }
@@ -129,14 +130,14 @@ func (s *EnhancedSpan) LogEvent(severity SpanStatus, msg string, fields map[stri
 	if s.Span == nil {
 		return
 	}
-	
+
 	event := Event{
 		Timestamp: time.Now(),
 		Severity:  severity,
 		Message:   msg,
 		Fields:    fields,
 	}
-	
+
 	s.Events = append(s.Events, event)
 }
 
@@ -145,10 +146,10 @@ func (s *EnhancedSpan) SetError(err error) {
 	if s.Span == nil || err == nil {
 		return
 	}
-	
+
 	s.Error = err
 	s.Status = SpanStatusERROR
-	
+
 	// Log error as an event
 	s.LogEvent(SpanStatusERROR, "Error occurred", map[string]any{
 		"error": err.Error(),
@@ -160,7 +161,7 @@ func (s *EnhancedSpan) AddTags(tags map[string]string) {
 	if s.Span == nil {
 		return
 	}
-	
+
 	for k, v := range tags {
 		s.Tags[k] = v
 	}
@@ -171,7 +172,7 @@ func (s *EnhancedSpan) SetStatus(status SpanStatus) {
 	if s.Span == nil {
 		return
 	}
-	
+
 	s.Status = status
 }
 
@@ -179,13 +180,13 @@ func (s *EnhancedSpan) SetStatus(status SpanStatus) {
 type Tracer interface {
 	// StartSpan starts a new span
 	StartSpan(ctx context.Context, operation string) (context.Context, *Span)
-	
+
 	// FinishSpan finishes a span
 	FinishSpan(span *Span)
-	
+
 	// AddTags adds tags to a span
 	AddTags(span *Span, tags map[string]string)
-	
+
 	// SetStatus sets the status of a span
 	SetStatus(span *Span, status SpanStatus)
 }
@@ -193,7 +194,7 @@ type Tracer interface {
 // EnhancedTracer extends Tracer with enhanced span support
 type EnhancedTracer interface {
 	Tracer
-	
+
 	// StartEnhancedSpan starts a new enhanced span
 	StartEnhancedSpan(ctx context.Context, operation string) (context.Context, *EnhancedSpan)
 }
@@ -205,9 +206,9 @@ func (n *NoOpTracer) StartSpan(ctx context.Context, operation string) (context.C
 	return ctx, &Span{}
 }
 
-func (n *NoOpTracer) FinishSpan(span *Span) {}
+func (n *NoOpTracer) FinishSpan(span *Span)                      {}
 func (n *NoOpTracer) AddTags(span *Span, tags map[string]string) {}
-func (n *NoOpTracer) SetStatus(span *Span, status SpanStatus) {}
+func (n *NoOpTracer) SetStatus(span *Span, status SpanStatus)    {}
 
 // SimpleTracer is a simple in-memory tracer
 type SimpleTracer struct {
@@ -224,7 +225,7 @@ func NewSimpleTracer() *SimpleTracer {
 func (t *SimpleTracer) StartSpan(ctx context.Context, operation string) (context.Context, *Span) {
 	// Get parent span from context
 	parentSpan := SpanFromContext(ctx)
-	
+
 	span := &Span{
 		SpanID:    uuid.New().String(),
 		Operation: operation,
@@ -233,17 +234,17 @@ func (t *SimpleTracer) StartSpan(ctx context.Context, operation string) (context
 		Status:    SpanStatusUnset,
 		Events:    make([]Event, 0),
 	}
-	
+
 	if parentSpan != nil {
 		span.TraceID = parentSpan.TraceID
 		span.ParentID = parentSpan.SpanID
 	} else {
 		span.TraceID = uuid.New().String()
 	}
-	
+
 	// Store span in context
 	ctx = ContextWithSpan(ctx, span)
-	
+
 	return ctx, span
 }
 
@@ -251,10 +252,10 @@ func (t *SimpleTracer) StartSpan(ctx context.Context, operation string) (context
 func (t *SimpleTracer) StartEnhancedSpan(ctx context.Context, operation string) (context.Context, *EnhancedSpan) {
 	ctx, span := t.StartSpan(ctx, operation)
 	enhancedSpan := &EnhancedSpan{Span: span}
-	
+
 	// Update context with enhanced span
 	ctx = ContextWithEnhancedSpan(ctx, enhancedSpan)
-	
+
 	return ctx, enhancedSpan
 }
 
@@ -262,7 +263,7 @@ func (t *SimpleTracer) FinishSpan(span *Span) {
 	if span == nil {
 		return
 	}
-	
+
 	span.EndTime = time.Now()
 	t.spans = append(t.spans, *span)
 }
@@ -271,7 +272,7 @@ func (t *SimpleTracer) AddTags(span *Span, tags map[string]string) {
 	if span == nil {
 		return
 	}
-	
+
 	for k, v := range tags {
 		span.Tags[k] = v
 	}
@@ -281,7 +282,7 @@ func (t *SimpleTracer) SetStatus(span *Span, status SpanStatus) {
 	if span == nil {
 		return
 	}
-	
+
 	span.Status = status
 }
 
@@ -325,17 +326,11 @@ func EnhancedSpanFromContext(ctx context.Context) *EnhancedSpan {
 func TracingMiddleware(tracer Tracer) middleware.MiddlewareFunc {
 	return func(next middleware.HandlerFunc) middleware.HandlerFunc {
 		return func(c gortexContext.Context) error {
-			// Extract trace context from headers
-			traceID := c.Request().Header.Get("X-Trace-ID")
-			if traceID == "" {
-				traceID = uuid.New().String()
-			}
-			
 			// Start span - use EnhancedTracer if available
 			var ctx context.Context
 			var span *Span
 			var enhancedSpan *EnhancedSpan
-			
+
 			if enhancedTracer, ok := tracer.(EnhancedTracer); ok {
 				ctx, enhancedSpan = enhancedTracer.StartEnhancedSpan(c.Request().Context(), fmt.Sprintf("%s %s", c.Request().Method, c.Path()))
 				span = enhancedSpan.Span
@@ -344,10 +339,10 @@ func TracingMiddleware(tracer Tracer) middleware.MiddlewareFunc {
 			} else {
 				ctx, span = tracer.StartSpan(c.Request().Context(), fmt.Sprintf("%s %s", c.Request().Method, c.Path()))
 			}
-			
+
 			// Store span in Gortex context for easy access
 			c.Set("span", span)
-			
+
 			// Add tags
 			tags := map[string]string{
 				"http.method":     c.Request().Method,
@@ -356,22 +351,22 @@ func TracingMiddleware(tracer Tracer) middleware.MiddlewareFunc {
 				"http.user_agent": c.Request().UserAgent(),
 				"peer.address":    c.RealIP(),
 			}
-			
+
 			if enhancedSpan != nil {
 				enhancedSpan.AddTags(tags)
 			} else {
 				tracer.AddTags(span, tags)
 			}
-			
+
 			// Set trace ID in response header
 			c.Response().Header().Set("X-Trace-ID", span.TraceID)
-			
+
 			// Update request context
 			c.SetRequest(c.Request().WithContext(ctx))
-			
+
 			// Process request
 			err := next(c)
-			
+
 			// Set span status and handle errors
 			if err != nil {
 				if enhancedSpan != nil {
@@ -389,21 +384,21 @@ func TracingMiddleware(tracer Tracer) middleware.MiddlewareFunc {
 					tracer.SetStatus(span, SpanStatusOK)
 				}
 			}
-			
+
 			// Add response tags
 			responseTags := map[string]string{
 				"http.status_code": fmt.Sprintf("%d", c.Response().Status()),
 			}
-			
+
 			if enhancedSpan != nil {
 				enhancedSpan.AddTags(responseTags)
 			} else {
 				tracer.AddTags(span, responseTags)
 			}
-			
+
 			// Finish span
 			tracer.FinishSpan(span)
-			
+
 			return err
 		}
 	}
@@ -418,7 +413,7 @@ func StartSpanFromContext(ctx context.Context, tracer Tracer, operation string) 
 func TraceFunction(ctx context.Context, tracer Tracer, operation string, fn func(context.Context) error) error {
 	ctx, span := tracer.StartSpan(ctx, operation)
 	defer tracer.FinishSpan(span)
-	
+
 	err := fn(ctx)
 	if err != nil {
 		tracer.SetStatus(span, SpanStatusError)
@@ -428,6 +423,6 @@ func TraceFunction(ctx context.Context, tracer Tracer, operation string, fn func
 	} else {
 		tracer.SetStatus(span, SpanStatusOK)
 	}
-	
+
 	return err
 }

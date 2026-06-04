@@ -25,11 +25,11 @@ func NewSafeHealthChecker(interval, timeout time.Duration) *SafeHealthChecker {
 		timeout:  timeout,
 		stopCh:   make(chan struct{}),
 	}
-	
+
 	// Start background health checks
 	hc.wg.Add(1)
 	go hc.runChecks()
-	
+
 	return hc
 }
 
@@ -56,36 +56,36 @@ func (hc *SafeHealthChecker) Check(ctx context.Context) map[string]HealthCheckRe
 	results := make(map[string]HealthCheckResult)
 	var wg sync.WaitGroup
 	var mu sync.Mutex
-	
+
 	// Iterate over all registered checks
 	hc.checks.Range(func(key, value any) bool {
 		name := key.(string)
 		check := value.(HealthCheck)
-		
+
 		wg.Add(1)
 		go func(n string, c HealthCheck) {
 			defer wg.Done()
-			
+
 			// Create timeout context
 			checkCtx, cancel := context.WithTimeout(ctx, hc.timeout)
 			defer cancel()
-			
+
 			start := time.Now()
 			result := c(checkCtx)
 			result.Duration = time.Since(start)
 			result.LastChecked = time.Now()
-			
+
 			mu.Lock()
 			results[n] = result
 			mu.Unlock()
-			
+
 			// Update cached result
 			hc.results.Store(n, result)
 		}(name, check)
-		
+
 		return true
 	})
-	
+
 	wg.Wait()
 	return results
 }
@@ -93,14 +93,14 @@ func (hc *SafeHealthChecker) Check(ctx context.Context) map[string]HealthCheckRe
 // GetResults returns cached health check results
 func (hc *SafeHealthChecker) GetResults() map[string]HealthCheckResult {
 	results := make(map[string]HealthCheckResult)
-	
+
 	hc.results.Range(func(key, value any) bool {
 		name := key.(string)
 		result := value.(HealthCheckResult)
 		results[name] = result
 		return true
 	})
-	
+
 	return results
 }
 
@@ -109,45 +109,45 @@ func (hc *SafeHealthChecker) GetOverallStatus() HealthStatus {
 	hasUnhealthy := false
 	hasDegraded := false
 	hasAny := false
-	
+
 	hc.results.Range(func(key, value any) bool {
 		hasAny = true
 		result := value.(HealthCheckResult)
-		
+
 		switch result.Status {
 		case HealthStatusUnhealthy:
 			hasUnhealthy = true
 		case HealthStatusDegraded:
 			hasDegraded = true
 		}
-		
+
 		return true
 	})
-	
+
 	if !hasAny {
 		return HealthStatusHealthy
 	}
-	
+
 	if hasUnhealthy {
 		return HealthStatusUnhealthy
 	}
 	if hasDegraded {
 		return HealthStatusDegraded
 	}
-	
+
 	return HealthStatusHealthy
 }
 
 // runChecks runs health checks periodically
 func (hc *SafeHealthChecker) runChecks() {
 	defer hc.wg.Done()
-	
+
 	ticker := time.NewTicker(hc.interval)
 	defer ticker.Stop()
-	
+
 	// Run initial check
 	hc.Check(context.Background())
-	
+
 	for {
 		select {
 		case <-ticker.C:
@@ -166,7 +166,7 @@ func (hc *SafeHealthChecker) Stop() {
 	if !atomic.CompareAndSwapInt32(&hc.stopped, 0, 1) {
 		return // Already stopped
 	}
-	
+
 	close(hc.stopCh)
 	hc.wg.Wait()
 }

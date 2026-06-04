@@ -19,11 +19,11 @@ type BufferMetrics struct {
 	TotalPut      int64
 	TotalNew      int64
 	CurrentActive int64
-	
+
 	// Size statistics
 	TotalBytesAllocated int64
 	LargestBuffer       int64
-	
+
 	// Reuse statistics
 	ReuseRate float64 // Calculated on demand
 }
@@ -33,7 +33,7 @@ func NewBufferPool() *BufferPool {
 	bp := &BufferPool{
 		metrics: &BufferMetrics{},
 	}
-	
+
 	bp.pool = &sync.Pool{
 		New: func() any {
 			atomic.AddInt64(&bp.metrics.TotalNew, 1)
@@ -44,7 +44,7 @@ func NewBufferPool() *BufferPool {
 			return buf
 		},
 	}
-	
+
 	return bp
 }
 
@@ -52,7 +52,7 @@ func NewBufferPool() *BufferPool {
 func (bp *BufferPool) Get() *bytes.Buffer {
 	atomic.AddInt64(&bp.metrics.TotalGet, 1)
 	atomic.AddInt64(&bp.metrics.CurrentActive, 1)
-	
+
 	buf := bp.pool.Get().(*bytes.Buffer)
 	buf.Reset()
 	return buf
@@ -63,10 +63,10 @@ func (bp *BufferPool) Put(buf *bytes.Buffer) {
 	if buf == nil {
 		return
 	}
-	
+
 	atomic.AddInt64(&bp.metrics.TotalPut, 1)
 	atomic.AddInt64(&bp.metrics.CurrentActive, -1)
-	
+
 	// Track largest buffer
 	size := int64(buf.Cap())
 	for {
@@ -75,12 +75,12 @@ func (bp *BufferPool) Put(buf *bytes.Buffer) {
 			break
 		}
 	}
-	
+
 	// Don't pool extremely large buffers
 	if buf.Cap() > 1024*1024 { // 1MB
 		return
 	}
-	
+
 	bp.pool.Put(buf)
 }
 
@@ -94,12 +94,12 @@ func (bp *BufferPool) GetMetrics() BufferMetrics {
 		TotalBytesAllocated: atomic.LoadInt64(&bp.metrics.TotalBytesAllocated),
 		LargestBuffer:       atomic.LoadInt64(&bp.metrics.LargestBuffer),
 	}
-	
+
 	// Calculate reuse rate
 	if metrics.TotalGet > 0 {
 		metrics.ReuseRate = float64(metrics.TotalGet-metrics.TotalNew) / float64(metrics.TotalGet)
 	}
-	
+
 	return metrics
 }
 

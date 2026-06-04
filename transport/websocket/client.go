@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -27,6 +28,8 @@ type Client struct {
 	conn   *websocket.Conn
 	send   chan *Message
 	logger *zap.Logger
+
+	closeOnce sync.Once // guards conn.Close() against the Read/Write pumps racing to close
 }
 
 // NewClient creates a new WebSocket client
@@ -41,18 +44,44 @@ func NewClient(hub *Hub, conn *websocket.Conn, userID string, logger *zap.Logger
 	}
 }
 
+// closeConn closes the underlying connection exactly once. Both ReadPump and
+// WritePump defer it, and Close() calls it too; sync.Once makes the extra
+// calls harmless instead of relying on the driver tolerating a double close.
+func (c *Client) closeConn() {
+	c.closeOnce.Do(func() {
+		_ = c.conn.Close()
+	})
+}
+
+// trySend performs a non-blocking send on the client's send channel. The hub
+// owns closing c.send (on unregister/shutdown), so a producer here can race
+// with that close; sending on a closed channel panics even inside a select,
+// so the recover turns that race into a dropped message rather than a crash.
+func (c *Client) trySend(m *Message) (ok bool) {
+	defer func() {
+		if recover() != nil {
+			ok = false
+		}
+	}()
+	select {
+	case c.send <- m:
+		return true
+	default:
+		return false
+	}
+}
+
 // ReadPump pumps messages from the WebSocket connection to the hub
 func (c *Client) ReadPump() {
 	defer func() {
 		c.hub.removeClient(c)
-		c.conn.Close()
+		c.closeConn()
 	}()
 
 	c.conn.SetReadLimit(c.hub.maxMessageBytes())
-	c.conn.SetReadDeadline(time.Now().Add(pongWait))
+	_ = c.conn.SetReadDeadline(time.Now().Add(pongWait))
 	c.conn.SetPongHandler(func(string) error {
-		c.conn.SetReadDeadline(time.Now().Add(pongWait))
-		return nil
+		return c.conn.SetReadDeadline(time.Now().Add(pongWait))
 	})
 
 	for {
@@ -79,9 +108,7 @@ func (c *Client) ReadPump() {
 					"timestamp": time.Now().Unix(),
 				},
 			}
-			select {
-			case c.send <- pongMsg:
-			default:
+			if !c.trySend(pongMsg) {
 				c.logger.Warn("Failed to send pong", zap.String("client_id", c.ID))
 			}
 			continue
@@ -112,37 +139,37 @@ func (c *Client) WritePump() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		ticker.Stop()
-		c.conn.Close()
+		c.closeConn()
 	}()
 
 	for {
 		select {
 		case message, ok := <-c.send:
-			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			_ = c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
 				// The hub closed the channel
 				c.logger.Info("Channel closed, sending close message", zap.String("client_id", c.ID))
-				c.conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseGoingAway, "Server shutting down"))
+				_ = c.conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseGoingAway, "Server shutting down"))
 				return
 			}
 
 			// Handle special close message
 			if message.Type == "close" {
 				c.logger.Info("Received close message", zap.String("client_id", c.ID))
-				
+
 				// Extract close code and reason
 				code := websocket.CloseGoingAway
 				reason := "Server shutting down"
-				
+
 				if codeVal, ok := message.Data["code"].(float64); ok {
 					code = int(codeVal)
 				}
 				if reasonVal, ok := message.Data["reason"].(string); ok {
 					reason = reasonVal
 				}
-				
+
 				// Send proper WebSocket close message
-				c.conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(code, reason))
+				_ = c.conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(code, reason))
 				return
 			}
 
@@ -154,7 +181,7 @@ func (c *Client) WritePump() {
 			}
 
 		case <-ticker.C:
-			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			_ = c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 				return
 			}
@@ -162,17 +189,14 @@ func (c *Client) WritePump() {
 	}
 }
 
-// Send sends a message to this client
+// Send sends a message to this client. It is non-blocking and safe to call
+// even if the hub has already closed the client's send channel — in that case
+// it simply returns false instead of panicking.
 func (c *Client) Send(message *Message) bool {
-	select {
-	case c.send <- message:
-		return true
-	default:
-		return false
-	}
+	return c.trySend(message)
 }
 
 // Close closes the client connection
 func (c *Client) Close() {
-	c.conn.Close()
+	c.closeConn()
 }

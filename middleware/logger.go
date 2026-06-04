@@ -102,7 +102,7 @@ func LoggerWithConfig(config *LoggerConfig) MiddlewareFunc {
 
 			// Create response writer wrapper to capture status code
 			resp := c.Response()
-			
+
 			rw := &responseWriter{
 				ResponseWriter: resp,
 				statusCode:     http.StatusOK,
@@ -232,4 +232,3 @@ func peerIsTrusted(remoteAddr string, trustedProxies []*net.IPNet) bool {
 	}
 	return false
 }
-

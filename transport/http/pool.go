@@ -36,14 +36,14 @@ func ReleaseContext(c Context) {
 		dc.handler = nil
 		dc.logger = nil
 		dc.stdContext = nil
-		
+
 		// Clear the store but keep the map allocated
 		if dc.store != nil {
 			for k := range dc.store {
 				delete(dc.store, k)
 			}
 		}
-		
+
 		contextPool.Put(dc)
 	}
 }

@@ -52,11 +52,11 @@ func GetMapping(err error) (*ErrorMapping, bool) {
 func (r *ErrorRegistry) Register(err error, code ErrorCode, httpStatus int, message string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	
+
 	if message == "" {
 		message = code.Message()
 	}
-	
+
 	r.mappings[err] = &ErrorMapping{
 		Code:       code,
 		HTTPStatus: httpStatus,
@@ -68,11 +68,11 @@ func (r *ErrorRegistry) Register(err error, code ErrorCode, httpStatus int, mess
 func (r *ErrorRegistry) RegisterType(errorTypeName string, code ErrorCode, httpStatus int, message string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	
+
 	if message == "" {
 		message = code.Message()
 	}
-	
+
 	r.typeMappings[errorTypeName] = &ErrorMapping{
 		Code:       code,
 		HTTPStatus: httpStatus,
@@ -90,24 +90,24 @@ func (r *ErrorRegistry) RegisterSimple(err error, code ErrorCode) {
 func (r *ErrorRegistry) GetMapping(err error) (*ErrorMapping, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	// First, try exact error match
 	if mapping, ok := r.mappings[err]; ok {
 		return mapping, true
 	}
-	
+
 	// Then, try error type match
 	errType := getErrorTypeName(err)
 	if mapping, ok := r.typeMappings[errType]; ok {
 		return mapping, true
 	}
-	
+
 	// Try to unwrap and check again
 	unwrapped := errors.Unwrap(err)
 	if unwrapped != nil && unwrapped != err {
 		return r.GetMapping(unwrapped)
 	}
-	
+
 	return nil, false
 }
 
@@ -115,7 +115,7 @@ func (r *ErrorRegistry) GetMapping(err error) (*ErrorMapping, bool) {
 func (r *ErrorRegistry) Clear() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	
+
 	r.mappings = make(map[error]*ErrorMapping)
 	r.typeMappings = make(map[string]*ErrorMapping)
 }
@@ -125,27 +125,27 @@ func getErrorTypeName(err error) string {
 	if err == nil {
 		return ""
 	}
-	
+
 	// Use reflection to get the type name
 	t := reflect.TypeOf(err)
 	if t == nil {
 		return ""
 	}
-	
+
 	// Handle pointer types
 	if t.Kind() == reflect.Ptr && t.Elem() != nil {
 		t = t.Elem()
 	}
-	
+
 	// Return package path + type name
 	if t.PkgPath() != "" && t.Name() != "" {
 		return t.PkgPath() + "." + t.Name()
 	}
-	
+
 	if t.Name() != "" {
 		return t.Name()
 	}
-	
+
 	// For unnamed types, return the string representation
 	return t.String()
 }
@@ -155,24 +155,24 @@ func HandleBusinessError(err error) (int, *ErrorResponse) {
 	if err == nil {
 		return http.StatusOK, nil
 	}
-	
+
 	// Check if error is already an ErrorResponse
 	if errResp, ok := err.(*ErrorResponse); ok {
 		code := ErrorCode(errResp.ErrorDetail.Code)
 		return GetHTTPStatus(code), errResp
 	}
-	
+
 	// Look up in registry
 	if mapping, ok := GetMapping(err); ok {
 		resp := New(mapping.Code, mapping.Message)
 		// Add the original error message as detail
-		resp.WithDetail("error", err.Error())
+		resp = resp.WithDetail("error", err.Error())
 		return mapping.HTTPStatus, resp
 	}
-	
+
 	// Default to internal server error
 	resp := New(CodeInternalServerError, "An error occurred")
-	resp.WithDetail("error", err.Error())
+	resp = resp.WithDetail("error", err.Error())
 	return http.StatusInternalServerError, resp
 }
 

@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
+
 	"github.com/yshengliao/gortex/pkg/utils/requestid"
 )
 
@@ -68,9 +69,9 @@ func RequestIDWithConfig(config *RequestIDConfig) MiddlewareFunc {
 			}
 
 			// Store in request context using standard context
-			ctx := context.WithValue(req.Context(), "request_id", id)
+			ctx := context.WithValue(req.Context(), contextKey("request_id"), id)
 			newReq := req.WithContext(ctx)
-			
+
 			// Update the request in context if possible
 			if setter, ok := c.(interface{ SetRequest(*http.Request) }); ok {
 				setter.SetRequest(newReq)

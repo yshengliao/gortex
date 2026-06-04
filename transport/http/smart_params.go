@@ -1,13 +1,21 @@
 package http
 
-// smartParams implements an optimized parameter storage
-// It uses a small array for common cases (up to 4 params)
-// and falls back to a map for larger cases
+// pathParam is a single key/value path parameter held in the overflow store.
+type pathParam struct {
+	key string
+	val string
+}
+
+// smartParams implements an optimized parameter storage.
+// It uses a small array for common cases (up to 4 params) and falls back to an
+// ordered slice for larger cases. The slice (rather than a map) preserves
+// insertion order so truncate can exactly drop the parameters added by an
+// abandoned route branch during backtracking.
 type smartParams struct {
 	count    int
 	keys     [4]string
-	vals     [4]string  // Renamed to avoid conflict with values() method
-	overflow map[string]string
+	vals     [4]string
+	overflow []pathParam
 }
 
 // newSmartParams creates a new smartParams instance
@@ -23,18 +31,22 @@ func (sp *smartParams) reset() {
 		sp.keys[i] = ""
 		sp.vals[i] = ""
 	}
-	// Clear overflow map if it exists
-	if sp.overflow != nil {
-		for k := range sp.overflow {
-			delete(sp.overflow, k)
-		}
-	}
+	// Keep the backing array allocated but drop the entries.
+	sp.overflow = sp.overflow[:0]
 }
 
-// truncate discards parameters beyond index n. Used for backtracking
-// during route matching without allocating.
+// truncate discards parameters beyond index n. Used for backtracking during
+// route matching without allocating. Overflow entries live at logical index
+// >= 4, so they are resliced to keep exactly the survivors; because the slice
+// is insertion-ordered this is exact even for partial (n > 4) truncations.
 func (sp *smartParams) truncate(n int) {
 	sp.count = n
+	switch {
+	case n <= 4:
+		sp.overflow = sp.overflow[:0]
+	case n-4 < len(sp.overflow):
+		sp.overflow = sp.overflow[:n-4]
+	}
 }
 
 // set adds or updates a parameter
@@ -46,28 +58,24 @@ func (sp *smartParams) set(key, value string) {
 			return
 		}
 	}
-	
-	// Check if key exists in overflow map
-	if sp.overflow != nil {
-		if _, exists := sp.overflow[key]; exists {
-			sp.overflow[key] = value
+
+	// Check if key exists in overflow
+	for i := range sp.overflow {
+		if sp.overflow[i].key == key {
+			sp.overflow[i].val = value
 			return
 		}
 	}
-	
+
 	// Add new parameter
 	if sp.count < 4 {
 		sp.keys[sp.count] = key
 		sp.vals[sp.count] = value
-		sp.count++
 	} else {
-		// Use overflow map for more than 4 params
-		if sp.overflow == nil {
-			sp.overflow = make(map[string]string)
-		}
-		sp.overflow[key] = value
-		sp.count++
+		// Use overflow slice for more than 4 params
+		sp.overflow = append(sp.overflow, pathParam{key: key, val: value})
 	}
+	sp.count++
 }
 
 // get retrieves a parameter value by key
@@ -78,12 +86,14 @@ func (sp *smartParams) get(key string) string {
 			return sp.vals[i]
 		}
 	}
-	
-	// Check overflow map
-	if sp.overflow != nil {
-		return sp.overflow[key]
+
+	// Check overflow
+	for i := range sp.overflow {
+		if sp.overflow[i].key == key {
+			return sp.overflow[i].val
+		}
 	}
-	
+
 	return ""
 }
 
@@ -92,24 +102,16 @@ func (sp *smartParams) getByIndex(index int) (string, string) {
 	if index < 0 || index >= sp.count {
 		return "", ""
 	}
-	
+
 	if index < 4 {
 		return sp.keys[index], sp.vals[index]
 	}
-	
-	// For overflow items, we need to iterate
-	// This is less efficient but only happens with many params
-	if sp.overflow != nil {
-		overflowIndex := index - 4
-		current := 0
-		for k, v := range sp.overflow {
-			if current == overflowIndex {
-				return k, v
-			}
-			current++
-		}
+
+	overflowIndex := index - 4
+	if overflowIndex < len(sp.overflow) {
+		return sp.overflow[overflowIndex].key, sp.overflow[overflowIndex].val
 	}
-	
+
 	return "", ""
 }
 
@@ -118,17 +120,16 @@ func (sp *smartParams) setByIndex(index int, key, value string) {
 	if index < 0 || index >= sp.count {
 		return
 	}
-	
+
 	if index < 4 {
 		sp.keys[index] = key
 		sp.vals[index] = value
-	} else {
-		// For overflow, we need to handle differently
-		// This is a rare case and less efficient
-		if sp.overflow == nil {
-			sp.overflow = make(map[string]string)
-		}
-		sp.overflow[key] = value
+		return
+	}
+
+	overflowIndex := index - 4
+	if overflowIndex < len(sp.overflow) {
+		sp.overflow[overflowIndex] = pathParam{key: key, val: value}
 	}
 }
 
@@ -137,21 +138,19 @@ func (sp *smartParams) names() []string {
 	if sp.count == 0 {
 		return nil
 	}
-	
+
 	names := make([]string, 0, sp.count)
-	
+
 	// Add array keys
 	for i := 0; i < sp.count && i < 4; i++ {
 		names = append(names, sp.keys[i])
 	}
-	
+
 	// Add overflow keys
-	if sp.overflow != nil {
-		for k := range sp.overflow {
-			names = append(names, k)
-		}
+	for i := range sp.overflow {
+		names = append(names, sp.overflow[i].key)
 	}
-	
+
 	return names
 }
 
@@ -160,20 +159,18 @@ func (sp *smartParams) values() []string {
 	if sp.count == 0 {
 		return nil
 	}
-	
+
 	values := make([]string, 0, sp.count)
-	
+
 	// Add array values
 	for i := 0; i < sp.count && i < 4; i++ {
 		values = append(values, sp.vals[i])
 	}
-	
+
 	// Add overflow values
-	if sp.overflow != nil {
-		for _, v := range sp.overflow {
-			values = append(values, v)
-		}
+	for i := range sp.overflow {
+		values = append(values, sp.overflow[i].val)
 	}
-	
+
 	return values
 }

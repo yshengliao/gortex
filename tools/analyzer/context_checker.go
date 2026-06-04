@@ -27,16 +27,16 @@ type Issue struct {
 
 func runContextCheck(pass *analysis.Pass) (interface{}, error) {
 	inspect := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	
+
 	// Node types we're interested in
 	nodeFilter := []ast.Node{
 		(*ast.FuncDecl)(nil),
 		(*ast.CallExpr)(nil),
 	}
-	
+
 	// Track functions that accept context
 	contextFuncs := make(map[string]bool)
-	
+
 	// First pass: identify functions that accept context.Context
 	inspect.Preorder(nodeFilter[:1], func(n ast.Node) {
 		funcDecl := n.(*ast.FuncDecl)
@@ -44,13 +44,13 @@ func runContextCheck(pass *analysis.Pass) (interface{}, error) {
 			contextFuncs[funcDecl.Name.Name] = true
 		}
 	})
-	
+
 	// Second pass: check function calls
 	inspect.Preorder(nodeFilter[1:], func(n ast.Node) {
 		call := n.(*ast.CallExpr)
 		checkContextPropagation(pass, call, contextFuncs)
 	})
-	
+
 	// Check for long-running operations without context checks
 	inspect.Preorder([]ast.Node{
 		(*ast.ForStmt)(nil),
@@ -58,7 +58,7 @@ func runContextCheck(pass *analysis.Pass) (interface{}, error) {
 	}, func(n ast.Node) {
 		checkLongRunningOps(pass, n)
 	})
-	
+
 	return nil, nil
 }
 
@@ -67,7 +67,7 @@ func hasContextParam(funcDecl *ast.FuncDecl) bool {
 	if funcDecl.Type.Params == nil {
 		return false
 	}
-	
+
 	for _, param := range funcDecl.Type.Params.List {
 		if isContextType(param.Type) {
 			return true
@@ -102,12 +102,12 @@ func checkContextPropagation(pass *analysis.Pass, call *ast.CallExpr, contextFun
 	default:
 		return
 	}
-	
+
 	// Check if this function expects context
 	if !contextFuncs[funcName] && !isKnownContextFunc(funcName) {
 		return
 	}
-	
+
 	// Check if context is passed
 	hasContext := false
 	for _, arg := range call.Args {
@@ -116,7 +116,7 @@ func checkContextPropagation(pass *analysis.Pass, call *ast.CallExpr, contextFun
 			break
 		}
 	}
-	
+
 	if !hasContext {
 		pass.Reportf(call.Pos(), "function %s expects context.Context but none was passed", funcName)
 	}
@@ -144,7 +144,7 @@ func isKnownContextFunc(name string) bool {
 		"WithContext", "NewRequestWithContext", "ExecContext", "QueryContext",
 		"QueryRowContext", "GetContext", "PostContext", "DoWithContext",
 	}
-	
+
 	for _, cf := range contextFuncs {
 		if strings.Contains(name, cf) {
 			return true
@@ -158,7 +158,7 @@ func checkLongRunningOps(pass *analysis.Pass, n ast.Node) {
 	// Check if this loop/range is inside a function with context parameter
 	var hasContextParam bool
 	var contextParamName string
-	
+
 	// Find the enclosing function by traversing the AST
 	var enclosingFunc *ast.FuncDecl
 	for _, file := range pass.Files {
@@ -176,7 +176,7 @@ func checkLongRunningOps(pass *analysis.Pass, n ast.Node) {
 			break
 		}
 	}
-	
+
 	if enclosingFunc != nil && enclosingFunc.Type.Params != nil {
 		for _, param := range enclosingFunc.Type.Params.List {
 			if isContextType(param.Type) && len(param.Names) > 0 {
@@ -186,32 +186,32 @@ func checkLongRunningOps(pass *analysis.Pass, n ast.Node) {
 			}
 		}
 	}
-	
+
 	if !hasContextParam {
 		return
 	}
-	
+
 	// Check if the loop body contains context.Done() check
 	hasContextCheck := false
 	ast.Inspect(n, func(node ast.Node) bool {
 		if hasContextCheck {
 			return false
 		}
-		
+
 		// Look for select statements with ctx.Done()
 		if sel, ok := node.(*ast.SelectStmt); ok {
 			hasContextCheck = checkSelectForContextDone(sel, contextParamName)
 			return false
 		}
-		
+
 		// Look for if statements checking ctx.Err()
 		if ifStmt, ok := node.(*ast.IfStmt); ok {
 			hasContextCheck = checkIfForContextErr(ifStmt, contextParamName)
 		}
-		
+
 		return true
 	})
-	
+
 	if !hasContextCheck {
 		var loopType string
 		switch n.(type) {
@@ -220,7 +220,7 @@ func checkLongRunningOps(pass *analysis.Pass, n ast.Node) {
 		case *ast.RangeStmt:
 			loopType = "range loop"
 		}
-		
+
 		pass.Reportf(n.Pos(), "%s in function with context parameter should check for context cancellation", loopType)
 	}
 }
@@ -232,7 +232,7 @@ func checkSelectForContextDone(sel *ast.SelectStmt, ctxName string) bool {
 		if !ok {
 			continue
 		}
-		
+
 		// Check for case <-ctx.Done():
 		if commClause.Comm != nil {
 			switch comm := commClause.Comm.(type) {

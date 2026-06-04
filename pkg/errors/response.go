@@ -6,17 +6,17 @@ import (
 
 // ErrorResponse represents a standardized error response
 type ErrorResponse struct {
-	Success      bool                   `json:"success"`
-	ErrorDetail  ErrorDetail            `json:"error"`
-	Timestamp    time.Time              `json:"timestamp"`
-	RequestID    string                 `json:"request_id,omitempty"`
-	Meta         map[string]any `json:"meta,omitempty"`
+	Success     bool           `json:"success"`
+	ErrorDetail ErrorDetail    `json:"error"`
+	Timestamp   time.Time      `json:"timestamp"`
+	RequestID   string         `json:"request_id,omitempty"`
+	Meta        map[string]any `json:"meta,omitempty"`
 }
 
 // ErrorDetail contains detailed error information
 type ErrorDetail struct {
-	Code    int                    `json:"code"`
-	Message string                 `json:"message"`
+	Code    int            `json:"code"`
+	Message string         `json:"message"`
 	Details map[string]any `json:"details,omitempty"`
 }
 
@@ -24,7 +24,6 @@ type ErrorDetail struct {
 func (e *ErrorResponse) Error() string {
 	return e.ErrorDetail.Message
 }
-
 
 // New creates a new error response with the given code and message
 func New(code ErrorCode, message string) *ErrorResponse {
@@ -82,4 +81,3 @@ func (e *ErrorResponse) WithDetails(details map[string]any) *ErrorResponse {
 	e.ErrorDetail.Details = details
 	return e
 }
-

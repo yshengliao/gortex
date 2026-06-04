@@ -14,27 +14,27 @@ type ImprovedCollector struct {
 	// Atomic counters for high-frequency metrics
 	httpRequestCount     int64
 	websocketConnections int64
-	
+
 	// Current state (updated periodically)
-	mu                   sync.RWMutex
-	httpStats           HTTPStats
-	websocketStats      WebSocketStats
-	systemStats         SystemStats
-	businessMetrics     map[string]float64
-	lastUpdate          time.Time
-	
+	mu              sync.RWMutex
+	httpStats       HTTPStats
+	websocketStats  WebSocketStats
+	systemStats     SystemStats
+	businessMetrics map[string]float64
+	lastUpdate      time.Time
+
 	// LRU cardinality management
-	maxCardinality      int
-	lruList            *list.List
-	lruMap             map[string]*list.Element
-	evictionStats      EvictionStats
+	maxCardinality int
+	lruList        *list.List
+	lruMap         map[string]*list.Element
+	evictionStats  EvictionStats
 }
 
 // EvictionStats tracks metrics eviction information
 type EvictionStats struct {
-	TotalEvictions     int64     `json:"total_evictions"`
-	LastEvictionTime   time.Time `json:"last_eviction_time"`
-	EvictedMetrics     []string  `json:"recently_evicted_metrics"`
+	TotalEvictions   int64     `json:"total_evictions"`
+	LastEvictionTime time.Time `json:"last_eviction_time"`
+	EvictedMetrics   []string  `json:"recently_evicted_metrics"`
 }
 
 // lruEntry represents an entry in the LRU cache
@@ -46,26 +46,26 @@ type lruEntry struct {
 
 // HTTPStats holds aggregated HTTP statistics
 type HTTPStats struct {
-	TotalRequests    int64                      `json:"total_requests"`
-	RequestsByStatus map[int]int64              `json:"requests_by_status"`
-	RequestsByMethod map[string]int64           `json:"requests_by_method"`
-	AverageLatency   time.Duration              `json:"average_latency"`
-	LastUpdated      time.Time                  `json:"last_updated"`
+	TotalRequests    int64            `json:"total_requests"`
+	RequestsByStatus map[int]int64    `json:"requests_by_status"`
+	RequestsByMethod map[string]int64 `json:"requests_by_method"`
+	AverageLatency   time.Duration    `json:"average_latency"`
+	LastUpdated      time.Time        `json:"last_updated"`
 }
 
 // WebSocketStats holds WebSocket connection statistics
 type WebSocketStats struct {
-	ActiveConnections int64     `json:"active_connections"`
-	TotalMessages     int64     `json:"total_messages"`
+	ActiveConnections int64            `json:"active_connections"`
+	TotalMessages     int64            `json:"total_messages"`
 	MessagesByType    map[string]int64 `json:"messages_by_type"`
-	LastUpdated       time.Time `json:"last_updated"`
+	LastUpdated       time.Time        `json:"last_updated"`
 }
 
 // SystemStats holds system-level metrics
 type SystemStats struct {
-	GoroutineCount  int      `json:"goroutine_count"`
-	MemoryUsage     uint64   `json:"memory_usage_bytes"`
-	LastUpdated     time.Time `json:"last_updated"`
+	GoroutineCount int       `json:"goroutine_count"`
+	MemoryUsage    uint64    `json:"memory_usage_bytes"`
+	LastUpdated    time.Time `json:"last_updated"`
 }
 
 // HTTPRequestMetric represents an HTTP request metric
@@ -103,7 +103,7 @@ func NewImprovedCollectorWithCardinality(maxCardinality int) *ImprovedCollector 
 	if maxCardinality <= 0 {
 		maxCardinality = 10000 // Default value
 	}
-	
+
 	return &ImprovedCollector{
 		businessMetrics: make(map[string]float64),
 		httpStats: HTTPStats{
@@ -115,8 +115,8 @@ func NewImprovedCollectorWithCardinality(maxCardinality int) *ImprovedCollector 
 		},
 		lastUpdate:     time.Now(),
 		maxCardinality: maxCardinality,
-		lruList:       list.New(),
-		lruMap:        make(map[string]*list.Element),
+		lruList:        list.New(),
+		lruMap:         make(map[string]*list.Element),
 		evictionStats: EvictionStats{
 			EvictedMetrics: make([]string, 0),
 		},
@@ -127,13 +127,13 @@ func NewImprovedCollectorWithCardinality(maxCardinality int) *ImprovedCollector 
 func (c *ImprovedCollector) RecordHTTPRequest(method, path string, statusCode int, duration time.Duration) {
 	// Update atomic counter
 	atomic.AddInt64(&c.httpRequestCount, 1)
-	
+
 	// Update aggregated stats (less frequent, with lock)
 	c.mu.Lock()
 	c.httpStats.TotalRequests = atomic.LoadInt64(&c.httpRequestCount)
 	c.httpStats.RequestsByStatus[statusCode]++
 	c.httpStats.RequestsByMethod[method]++
-	
+
 	// Simple rolling average for latency (last 100 requests)
 	if c.httpStats.AverageLatency == 0 {
 		c.httpStats.AverageLatency = duration
@@ -160,7 +160,7 @@ func (c *ImprovedCollector) RecordWebSocketConnection(connected bool) {
 	} else {
 		atomic.AddInt64(&c.websocketConnections, -1)
 	}
-	
+
 	// Update stats
 	c.mu.Lock()
 	c.websocketStats.ActiveConnections = atomic.LoadInt64(&c.websocketConnections)
@@ -171,7 +171,7 @@ func (c *ImprovedCollector) RecordWebSocketConnection(connected bool) {
 func (c *ImprovedCollector) RecordWebSocketMessage(direction string, messageType string, size int64) {
 	c.mu.Lock()
 	c.websocketStats.TotalMessages++
-	
+
 	key := direction + "_" + messageType
 	c.websocketStats.MessagesByType[key]++
 	c.websocketStats.LastUpdated = time.Now()
@@ -181,7 +181,7 @@ func (c *ImprovedCollector) RecordWebSocketMessage(direction string, messageType
 func (c *ImprovedCollector) RecordBusinessMetric(name string, value float64, tags map[string]string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	// Generate metric key (simple key without complex tag handling to avoid memory growth)
 	metricKey := name
 	if len(tags) > 0 {
@@ -191,10 +191,10 @@ func (c *ImprovedCollector) RecordBusinessMetric(name string, value float64, tag
 			break // Only use first tag to limit cardinality
 		}
 	}
-	
+
 	// Update LRU cache
 	c.updateLRUCache(metricKey, value)
-	
+
 	// Update business metrics map
 	c.businessMetrics[metricKey] = value
 }
@@ -217,7 +217,7 @@ func (c *ImprovedCollector) RecordMemoryUsage(bytes uint64) {
 // This method must be called with the mutex already held
 func (c *ImprovedCollector) updateLRUCache(key string, value float64) {
 	now := time.Now()
-	
+
 	// Check if key already exists
 	if elem, exists := c.lruMap[key]; exists {
 		// Move to front (most recently used)
@@ -228,12 +228,12 @@ func (c *ImprovedCollector) updateLRUCache(key string, value float64) {
 		entry.timestamp = now
 		return
 	}
-	
+
 	// Check if we need to evict
 	if len(c.lruMap) >= c.maxCardinality {
 		c.evictLeastRecentlyUsed()
 	}
-	
+
 	// Add new entry
 	entry := &lruEntry{
 		key:       key,
@@ -250,25 +250,25 @@ func (c *ImprovedCollector) evictLeastRecentlyUsed() {
 	if c.lruList.Len() == 0 {
 		return
 	}
-	
+
 	// Get least recently used element (back of list)
 	elem := c.lruList.Back()
 	if elem == nil {
 		return
 	}
-	
+
 	entry := elem.Value.(*lruEntry)
 	evictedKey := entry.key
-	
+
 	// Remove from both list and map
 	c.lruList.Remove(elem)
 	delete(c.lruMap, evictedKey)
 	delete(c.businessMetrics, evictedKey)
-	
+
 	// Update eviction stats
 	c.evictionStats.TotalEvictions++
 	c.evictionStats.LastEvictionTime = time.Now()
-	
+
 	// Keep track of recently evicted metrics (max 10)
 	c.evictionStats.EvictedMetrics = append(c.evictionStats.EvictedMetrics, evictedKey)
 	if len(c.evictionStats.EvictedMetrics) > 10 {
@@ -280,16 +280,16 @@ func (c *ImprovedCollector) evictLeastRecentlyUsed() {
 func (c *ImprovedCollector) GetStats() map[string]any {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	
+
 	return map[string]any{
-		"http":       c.httpStats,
-		"websocket":  c.websocketStats,
-		"system":     c.systemStats,
-		"business":   c.businessMetrics,
+		"http":      c.httpStats,
+		"websocket": c.websocketStats,
+		"system":    c.systemStats,
+		"business":  c.businessMetrics,
 		"cardinality": map[string]any{
-			"current":    len(c.businessMetrics),
-			"max":        c.maxCardinality,
-			"evictions":  c.evictionStats,
+			"current":   len(c.businessMetrics),
+			"max":       c.maxCardinality,
+			"evictions": c.evictionStats,
 		},
 		"timestamp": time.Now().Unix(),
 	}
@@ -302,7 +302,7 @@ func (c *ImprovedCollector) GetHTTPStats() HTTPStats {
 	return c.httpStats
 }
 
-// GetWebSocketStats returns WebSocket statistics  
+// GetWebSocketStats returns WebSocket statistics
 func (c *ImprovedCollector) GetWebSocketStats() WebSocketStats {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -320,7 +320,7 @@ func (c *ImprovedCollector) GetSystemStats() SystemStats {
 func (c *ImprovedCollector) Reset() {
 	atomic.StoreInt64(&c.httpRequestCount, 0)
 	atomic.StoreInt64(&c.websocketConnections, 0)
-	
+
 	c.mu.Lock()
 	c.httpStats = HTTPStats{
 		RequestsByStatus: make(map[int]int64),
@@ -332,7 +332,7 @@ func (c *ImprovedCollector) Reset() {
 	c.systemStats = SystemStats{}
 	c.businessMetrics = make(map[string]float64)
 	c.lastUpdate = time.Now()
-	
+
 	// Reset LRU cache
 	c.lruList = list.New()
 	c.lruMap = make(map[string]*list.Element)
@@ -353,7 +353,7 @@ func (c *ImprovedCollector) GetEvictionStats() EvictionStats {
 func (c *ImprovedCollector) GetCardinalityInfo() map[string]any {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	
+
 	return map[string]any{
 		"current_metrics": len(c.businessMetrics),
 		"max_cardinality": c.maxCardinality,

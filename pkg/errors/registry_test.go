@@ -36,7 +36,7 @@ func TestErrorRegistry(t *testing.T) {
 
 	t.Run("Register and retrieve exact error", func(t *testing.T) {
 		registry.Register(ErrUserNotFound, CodeResourceNotFound, http.StatusNotFound, "User not found")
-		
+
 		mapping, ok := registry.GetMapping(ErrUserNotFound)
 		assert.True(t, ok)
 		assert.Equal(t, CodeResourceNotFound, mapping.Code)
@@ -46,7 +46,7 @@ func TestErrorRegistry(t *testing.T) {
 
 	t.Run("Register with default message", func(t *testing.T) {
 		registry.RegisterSimple(ErrInvalidInput, CodeInvalidInput)
-		
+
 		mapping, ok := registry.GetMapping(ErrInvalidInput)
 		assert.True(t, ok)
 		assert.Equal(t, CodeInvalidInput, mapping.Code)
@@ -58,9 +58,9 @@ func TestErrorRegistry(t *testing.T) {
 		// Get the actual type name
 		testErr := &BusinessError{Code: "TEST", Message: "test"}
 		typeName := getErrorTypeName(testErr)
-		
+
 		registry.RegisterType(typeName, CodeBusinessLogicError, http.StatusUnprocessableEntity, "Business rule violation")
-		
+
 		bizErr := &BusinessError{Code: "BIZ001", Message: "Some business error"}
 		mapping, ok := registry.GetMapping(bizErr)
 		assert.True(t, ok)
@@ -93,12 +93,12 @@ func TestGlobalRegistry(t *testing.T) {
 
 	t.Run("Global register functions", func(t *testing.T) {
 		Register(ErrDatabaseTimeout, CodeTimeout, http.StatusRequestTimeout, "Database operation timed out")
-		
+
 		// Get the actual type name for BusinessError
 		testErr := &BusinessError{Code: "TEST", Message: "test"}
 		typeName := getErrorTypeName(testErr)
 		RegisterType(typeName, CodeBusinessLogicError, http.StatusUnprocessableEntity, "")
-		
+
 		RegisterSimple(ErrInsufficientFunds, CodeInsufficientBalance)
 
 		// Test exact error

@@ -65,10 +65,10 @@ func (c *Config) maxMessageBytes() int64 {
 
 // Message represents a WebSocket message
 type Message struct {
-	Type     string                 `json:"type"`
+	Type     string         `json:"type"`
 	Data     map[string]any `json:"data,omitempty"`
-	Target   string                 `json:"target,omitempty"`   // For targeted messages
-	ClientID string                 `json:"client_id,omitempty"` // Sender's client ID
+	Target   string         `json:"target,omitempty"`    // For targeted messages
+	ClientID string         `json:"client_id,omitempty"` // Sender's client ID
 }
 
 // clientRequest represents a request to get client information
@@ -106,20 +106,13 @@ type broadcastOp struct {
 
 // Metrics contains WebSocket hub metrics for development monitoring
 type Metrics struct {
-	CurrentConnections int                    `json:"current_connections"`
-	TotalConnections   int64                  `json:"total_connections"`
-	MessagesSent       int64                  `json:"messages_sent"`
-	MessagesReceived   int64                  `json:"messages_received"`
-	MessageTypes       map[string]int64       `json:"message_types"`
-	LastMessageTime    time.Time              `json:"last_message_time"`
-	Uptime             time.Duration          `json:"uptime"`
-}
-
-// messageRateTracker tracks message rates over time
-type messageRateTracker struct {
-	sent     int64
-	received int64
-	lastTime time.Time
+	CurrentConnections int              `json:"current_connections"`
+	TotalConnections   int64            `json:"total_connections"`
+	MessagesSent       int64            `json:"messages_sent"`
+	MessagesReceived   int64            `json:"messages_received"`
+	MessageTypes       map[string]int64 `json:"message_types"`
+	LastMessageTime    time.Time        `json:"last_message_time"`
+	Uptime             time.Duration    `json:"uptime"`
 }
 
 // Hub maintains active WebSocket connections
@@ -135,9 +128,9 @@ type Hub struct {
 	shutdownDone chan struct{}
 	shutdownOnce sync.Once // guards close(h.shutdown) against double-close
 
-	config           Config
+	config            Config
 	allowedTypesCache map[string]struct{}
-	
+
 	// Metrics fields
 	totalConnections atomic.Int64
 	messagesSent     atomic.Int64
@@ -175,7 +168,7 @@ func NewHubWithConfig(logger *zap.Logger, cfg Config) *Hub {
 // Run starts the hub's main loop - all state mutations happen here
 func (h *Hub) Run() {
 	defer close(h.shutdownDone)
-	
+
 	for {
 		select {
 		case req := <-h.register:
@@ -191,10 +184,10 @@ func (h *Hub) Run() {
 			if op.done != nil {
 				close(op.done)
 			}
-			
+
 		case req := <-h.clientCount:
 			req.response <- len(h.clients)
-			
+
 		case req := <-h.metricsReq:
 			metrics := &Metrics{
 				CurrentConnections: len(h.clients),
@@ -214,7 +207,7 @@ func (h *Hub) Run() {
 		case <-h.shutdown:
 			// Send graceful close message to all clients
 			h.logger.Info("Closing all client connections", zap.Int("count", len(h.clients)))
-			
+
 			closeMsg := &Message{
 				Type: "close",
 				Data: map[string]any{
@@ -223,7 +216,7 @@ func (h *Hub) Run() {
 					"message": "Please reconnect later",
 				},
 			}
-			
+
 			// Send close message to all clients
 			for client := range h.clients {
 				select {
@@ -233,16 +226,16 @@ func (h *Hub) Run() {
 					// Channel is full, client will be forcefully closed
 				}
 			}
-			
+
 			// Give clients a moment to receive close messages
 			time.Sleep(500 * time.Millisecond)
-			
+
 			// Now close all client connections
 			for client := range h.clients {
 				close(client.send)
 				delete(h.clients, client)
 			}
-			
+
 			h.logger.Info("Hub shutdown complete")
 			return
 		}
@@ -266,7 +259,7 @@ func (h *Hub) registerClient(client *Client) {
 			"message":   "Connected to server",
 		},
 	}
-	
+
 	select {
 	case client.send <- welcomeMsg:
 		h.messagesSent.Add(1)
@@ -296,7 +289,7 @@ func (h *Hub) broadcastMessage(message *Message) {
 	if message.Type != "" {
 		h.messageTypes[message.Type]++
 	}
-	
+
 	if message.Target != "" {
 		// Targeted message
 		for client := range h.clients {
@@ -387,10 +380,16 @@ func (h *Hub) broadcastSync(message *Message) {
 	}
 }
 
-// SendToUser sends a message to a specific user
+// SendToUser sends a message to a specific user. The caller's message is not
+// mutated — a shallow copy carries the Target so a *Message that the caller
+// still holds (or reuses for another recipient) is left untouched.
 func (h *Hub) SendToUser(userID string, message *Message) {
-	message.Target = userID
-	h.Broadcast(message)
+	if message == nil {
+		return
+	}
+	msg := *message
+	msg.Target = userID
+	h.Broadcast(&msg)
 }
 
 // GetConnectedClients returns the number of connected clients
@@ -398,7 +397,7 @@ func (h *Hub) GetConnectedClients() int {
 	req := clientRequest{
 		response: make(chan int),
 	}
-	
+
 	select {
 	case h.clientCount <- req:
 		return <-req.response
@@ -456,7 +455,7 @@ func (h *Hub) Shutdown() {
 // and return nil immediately.
 func (h *Hub) ShutdownWithTimeout(timeout time.Duration) error {
 	h.logger.Info("Hub shutdown initiated", zap.Duration("timeout", timeout))
-	
+
 	// Send shutdown notification to all clients before closing the channel.
 	// Must happen before Once.Do so the message can still be broadcast.
 	shutdownMsg := &Message{
@@ -466,7 +465,7 @@ func (h *Hub) ShutdownWithTimeout(timeout time.Duration) error {
 			"time":    time.Now().Unix(),
 		},
 	}
-	
+
 	// Try to broadcast shutdown message (best-effort).
 	select {
 	case h.broadcast <- broadcastOp{msg: shutdownMsg}:
@@ -475,10 +474,10 @@ func (h *Hub) ShutdownWithTimeout(timeout time.Duration) error {
 	default:
 		h.logger.Warn("Could not broadcast shutdown message")
 	}
-	
+
 	// Close the shutdown channel exactly once.
 	h.shutdownOnce.Do(func() { close(h.shutdown) })
-	
+
 	// Wait for shutdown with timeout.
 	select {
 	case <-h.shutdownDone:
@@ -493,7 +492,7 @@ func (h *Hub) GetMetrics() *Metrics {
 	req := metricsRequest{
 		response: make(chan *Metrics),
 	}
-	
+
 	select {
 	case h.metricsReq <- req:
 		return <-req.response

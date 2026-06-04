@@ -9,11 +9,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	httpctx "github.com/yshengliao/gortex/transport/http"
-	"github.com/yshengliao/gortex/pkg/errors"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest"
+
+	"github.com/yshengliao/gortex/pkg/errors"
+	httpctx "github.com/yshengliao/gortex/transport/http"
 )
 
 func TestErrorHandler(t *testing.T) {

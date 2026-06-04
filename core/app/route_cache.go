@@ -41,8 +41,8 @@ func (c *HandlerCache) GetHandlerMethods(t reflect.Type) map[string]HandlerMetho
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	// Double-check after acquiring write lock
-	if methods, exists := c.methods[t]; exists {
+	// Double-check after acquiring write lock (reuse outer vars to avoid shadowing)
+	if methods, exists = c.methods[t]; exists {
 		return methods
 	}
 
