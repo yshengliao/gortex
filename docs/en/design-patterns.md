@@ -1,6 +1,6 @@
 # Design Patterns & Learning Guide
 
-> Based on v0.6.2-alpha, this document catalogues the engineering patterns implemented in Gortex that are worth studying, along with areas not yet implemented but worth exploring.
+> Based on v0.7.0-alpha, this document catalogues the engineering patterns implemented in Gortex that are worth studying, along with areas not yet implemented but worth exploring.
 
 ## Implemented Core Design Patterns
 

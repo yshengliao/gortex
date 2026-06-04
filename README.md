@@ -1,7 +1,7 @@
 # Gortex - High-Performance Go Web Framework
 
 [![Go Version](https://img.shields.io/badge/go-1.25+-blue.svg)](https://go.dev/)
-![Status](https://img.shields.io/badge/status-v0.6.2--alpha-orange.svg)
+![Status](https://img.shields.io/badge/status-v0.7.0--alpha-orange.svg)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 ![AI Generated](https://img.shields.io/badge/AI_Generated-Antigravity-blueviolet.svg)
 
@@ -167,6 +167,11 @@ Full technical documentation is available in both English and Traditional Chines
 - 🔒 [SECURITY.md](SECURITY.md) — Vulnerability reporting process
 
 ## Changelog
+
+### v0.7.0-alpha (2026-06-04)
+
+- Milestone version bump consolidating the v0.6.x second-round audit cycle.
+- Circuit-breaker half-open: the Open→HalfOpen transition request is now counted as the first probe, so half-open admits exactly `MaxRequests` (not `MaxRequests + 1`) and the probe's success counts toward closing the circuit.
 
 ### v0.6.2-alpha (2026-06-04)
 

@@ -1,7 +1,7 @@
 # Gortex — 高效能 Go Web 框架
 
 [![Go Version](https://img.shields.io/badge/go-1.25+-blue.svg)](https://go.dev/)
-![Status](https://img.shields.io/badge/status-v0.6.2--alpha-orange.svg)
+![Status](https://img.shields.io/badge/status-v0.7.0--alpha-orange.svg)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 ![AI Generated](https://img.shields.io/badge/AI_Generated-Antigravity-blueviolet.svg)
 
@@ -167,6 +167,11 @@ go run ./examples/websocket  # Hub 訊息限制與授權
 - 🔒 [SECURITY.md](SECURITY.md) — 漏洞通報流程
 
 ## 變更紀錄
+
+### v0.7.0-alpha (2026-06-04)
+
+- 里程碑進版，彙整 v0.6.x 第二輪稽核週期。
+- 斷路器 half-open：Open→HalfOpen 轉換請求現在會被視為第一個探測而計入，因此 half-open 剛好放行 `MaxRequests` 個（而非 `MaxRequests + 1`），且該探測成功會計入關閉電路。
 
 ### v0.6.2-alpha (2026-06-04)
 
