@@ -108,6 +108,13 @@ func LoggerWithConfig(config *LoggerConfig) MiddlewareFunc {
 				statusCode:     http.StatusOK,
 			}
 
+			// Capture the response body for logging only when enabled, up to
+			// the configured limit (honours BodyLogLimit, which the
+			// request-body path already respects).
+			if config.LogResponseBody {
+				rw.bodyLimit = config.BodyLogLimit
+			}
+
 			// Replace response writer in context if possible
 			if setter, ok := c.(interface{ SetResponse(http.ResponseWriter) }); ok {
 				setter.SetResponse(rw)
@@ -129,8 +136,10 @@ func LoggerWithConfig(config *LoggerConfig) MiddlewareFunc {
 				zap.String("user_agent", req.UserAgent()),
 			}
 
-			if requestID != "" {
-				fields = append(fields, zap.String("request_id", requestID.(string)))
+			// comma-ok guards against a non-string value being stored under
+			// "request_id" by other code; a bare assertion would panic here.
+			if reqID, ok := requestID.(string); ok && reqID != "" {
+				fields = append(fields, zap.String("request_id", reqID))
 			}
 
 			if config.LogRequestBody && len(requestBody) > 0 {
@@ -168,6 +177,7 @@ type responseWriter struct {
 	http.ResponseWriter
 	statusCode int
 	body       []byte
+	bodyLimit  int // max bytes to capture for logging; 0 disables capture
 }
 
 func (rw *responseWriter) WriteHeader(code int) {
@@ -176,9 +186,15 @@ func (rw *responseWriter) WriteHeader(code int) {
 }
 
 func (rw *responseWriter) Write(b []byte) (int, error) {
-	// Capture body for logging (be careful with memory usage)
-	if len(rw.body) < 1024 { // Limit to 1KB
-		rw.body = append(rw.body, b...)
+	// Capture body for logging up to the configured limit (0 disables it).
+	// Cap exactly at bodyLimit so a large response is not silently truncated
+	// to a hardcoded size once BodyLogLimit is raised above the old 1KB.
+	if rw.bodyLimit > 0 && len(rw.body) < rw.bodyLimit {
+		if remaining := rw.bodyLimit - len(rw.body); remaining < len(b) {
+			rw.body = append(rw.body, b[:remaining]...)
+		} else {
+			rw.body = append(rw.body, b...)
+		}
 	}
 	return rw.ResponseWriter.Write(b)
 }

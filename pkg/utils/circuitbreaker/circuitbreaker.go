@@ -88,6 +88,11 @@ type CircuitBreaker struct {
 	// guarded by mu (not atomics) so the MaxRequests gate stays consistent
 	// with the state/expiry transitions that also run under mu.
 	halfOpen uint32
+	// halfOpenSuccesses counts requests that have *succeeded* while half-open.
+	// The circuit only closes once this reaches MaxRequests, so a single early
+	// success cannot close the breaker while sibling probes are still in flight
+	// (or about to fail) when MaxRequests > 1. Also guarded by mu.
+	halfOpenSuccesses uint32
 }
 
 // New creates a new circuit breaker
@@ -216,6 +221,7 @@ func (cb *CircuitBreaker) onBeforeRequestOpen() (uint64, error) {
 	if cb.expiry.Before(now) {
 		cb.setState(StateHalfOpen)
 		cb.halfOpen = 0
+		cb.halfOpenSuccesses = 0
 		cb.expiry = now.Add(cb.config.Interval)
 		return uint64(cb.expiry.UnixNano()), nil
 	}
@@ -252,9 +258,21 @@ func (cb *CircuitBreaker) onAfterRequestHalfOpen(generation uint64, err error) {
 		cb.setState(StateOpen)
 		cb.expiry = time.Now().Add(cb.config.Timeout)
 		cb.counts = Counts{}
+		cb.halfOpenSuccesses = 0
 	} else {
-		// Check if we've had enough successful requests
-		if cb.halfOpen >= cb.config.MaxRequests {
+		// Close only after MaxRequests *successful* probes, not merely
+		// MaxRequests admitted requests: otherwise the first success would
+		// close the breaker while sibling probes in the same batch may still
+		// be in flight or about to fail (matters when MaxRequests > 1).
+		//
+		// Count a success only while it occupies an admitted slot. The request
+		// that triggers the Open->HalfOpen transition bypasses the admission
+		// gate (it does not increment halfOpen), so on its own it must not
+		// close the breaker — preserving the "probe, then decide" behaviour.
+		if cb.halfOpenSuccesses < cb.halfOpen {
+			cb.halfOpenSuccesses++
+		}
+		if cb.halfOpenSuccesses >= cb.config.MaxRequests {
 			cb.setState(StateClosed)
 			cb.toNewGeneration(time.Now())
 		}

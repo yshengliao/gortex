@@ -456,8 +456,10 @@ func (c *DefaultContext) File(file string) error {
 		return err
 	}
 
-	// G304: cleaned has been run through safeServerPath, which rejects
-	// traversal, absolute paths, and symlink escapes.
+	// G304: cleaned has been run through safeServerPath, which rejects empty
+	// paths and ".." traversal segments. It does NOT reject absolute paths or
+	// resolve symlinks — File() is for server-trusted paths only; use FileFS
+	// (fs.ValidPath) for user-supplied filenames.
 	f, err := os.Open(cleaned) //nolint:gosec
 	if err != nil {
 		return err
