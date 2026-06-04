@@ -1,6 +1,6 @@
 # Gortex Framework - Development Guide
 
-> **Framework**: Gortex | **Language**: Go 1.25 | **Status**: v0.6.2-alpha | **Updated**: 2026-06-04
+> **Framework**: Gortex | **Language**: Go 1.25 | **Status**: v0.7.0-alpha | **Updated**: 2026-06-04
 
 Development guide for Gortex — a high-performance Go web framework with declarative struct-tag routing.
 
@@ -236,7 +236,7 @@ handlers.UserService.DB = dbConnection
 
 ## Framework Development
 
-### Completed Features (v0.6.2-alpha)
+### Completed Features (v0.7.0-alpha)
 **Core Features**
 - Struct tag routing with segment-trie router (45% faster than radix tree)
 - **Zero-allocation routing hot path** (0 allocs/op, ~65 ns/op on M3 Pro)
@@ -298,4 +298,4 @@ handlers.UserService.DB = dbConnection
 
 ---
 
-**Last Updated**: 2026-06-04 | **Framework**: Gortex v0.6.2-alpha | **Go**: 1.25+
+**Last Updated**: 2026-06-04 | **Framework**: Gortex v0.7.0-alpha | **Go**: 1.25+
