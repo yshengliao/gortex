@@ -98,12 +98,13 @@ func TestCircuitBreakerOpenState(t *testing.T) {
 	// Wait for timeout
 	time.Sleep(config.Timeout + 10*time.Millisecond)
 
-	// Should transition to half-open
+	// After the timeout the next request transitions to half-open as the first
+	// probe; with MaxRequests=1 a single successful probe closes the breaker.
 	err = cb.Call(context.Background(), func(ctx context.Context) error {
 		return nil
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, StateHalfOpen, cb.State())
+	assert.Equal(t, StateClosed, cb.State())
 }
 
 func TestCircuitBreakerHalfOpenState(t *testing.T) {

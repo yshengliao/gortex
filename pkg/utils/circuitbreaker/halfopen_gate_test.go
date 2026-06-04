@@ -112,3 +112,29 @@ func TestCircuitBreaker_HalfOpenReopensOnFailureAfterEarlySuccess(t *testing.T) 
 	cb.onAfterRequestHalfOpen(gen2, errors.New("boom"))
 	assert.Equal(t, StateOpen, cb.State())
 }
+
+// TestCircuitBreaker_HalfOpenTransitionCountsProbe verifies that the request
+// which triggers the Open->HalfOpen transition is counted as the first probe,
+// so half-open admits exactly MaxRequests in total (not MaxRequests+1).
+func TestCircuitBreaker_HalfOpenTransitionCountsProbe(t *testing.T) {
+	config := DefaultConfig()
+	config.MaxRequests = 2
+
+	cb := New("transition", config)
+	cb.setState(StateOpen)
+	cb.expiry = time.Now().Add(-time.Millisecond) // already expired -> will transition
+
+	// The transitioning request is admitted via the open path and counts as
+	// the first probe (halfOpen = 1).
+	_, err := cb.onBeforeRequestOpen()
+	require.NoError(t, err)
+	require.Equal(t, StateHalfOpen, cb.State())
+
+	// With MaxRequests=2 exactly one MORE probe may be admitted (total 2);
+	// a third must be rejected — previously the transition probe was free,
+	// allowing MaxRequests+1.
+	_, err = cb.onBeforeRequestHalfOpen()
+	require.NoError(t, err, "second probe should be admitted")
+	_, err = cb.onBeforeRequestHalfOpen()
+	require.ErrorIs(t, err, ErrTooManyRequests, "third probe must be rejected (cap is MaxRequests, not +1)")
+}

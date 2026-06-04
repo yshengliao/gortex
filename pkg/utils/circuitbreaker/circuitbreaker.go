@@ -220,7 +220,10 @@ func (cb *CircuitBreaker) onBeforeRequestOpen() (uint64, error) {
 	now := time.Now()
 	if cb.expiry.Before(now) {
 		cb.setState(StateHalfOpen)
-		cb.halfOpen = 0
+		// The request that triggers this transition is the first half-open
+		// probe, so count it (halfOpen=1). Otherwise half-open would admit
+		// MaxRequests *more* requests on top of it (MaxRequests+1 total).
+		cb.halfOpen = 1
 		cb.halfOpenSuccesses = 0
 		cb.expiry = now.Add(cb.config.Interval)
 		return uint64(cb.expiry.UnixNano()), nil
@@ -261,17 +264,11 @@ func (cb *CircuitBreaker) onAfterRequestHalfOpen(generation uint64, err error) {
 		cb.halfOpenSuccesses = 0
 	} else {
 		// Close only after MaxRequests *successful* probes, not merely
-		// MaxRequests admitted requests: otherwise the first success would
-		// close the breaker while sibling probes in the same batch may still
-		// be in flight or about to fail (matters when MaxRequests > 1).
-		//
-		// Count a success only while it occupies an admitted slot. The request
-		// that triggers the Open->HalfOpen transition bypasses the admission
-		// gate (it does not increment halfOpen), so on its own it must not
-		// close the breaker — preserving the "probe, then decide" behaviour.
-		if cb.halfOpenSuccesses < cb.halfOpen {
-			cb.halfOpenSuccesses++
-		}
+		// MaxRequests admitted requests: with several probes in flight the
+		// first success must not close the breaker while siblings may still
+		// fail (matters when MaxRequests > 1). The transition counts its own
+		// probe via halfOpen=1, so every admitted probe is counted here.
+		cb.halfOpenSuccesses++
 		if cb.halfOpenSuccesses >= cb.config.MaxRequests {
 			cb.setState(StateClosed)
 			cb.toNewGeneration(time.Now())
