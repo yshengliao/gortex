@@ -63,8 +63,8 @@ type Context interface {
     String(code int, s string) error
     Blob(code int, contentType string, b []byte) error
     Stream(code int, contentType string, r io.Reader) error
-    File(fsys fs.FS, name string) error      // 安全：基於 fsys，強制 fs.ValidPath
-    FileFS(fsys fs.FS, name string) error     // File 的別名，明確標示 fs.FS
+    File(file string) error                   // 伺服器信任路徑；已清理並拒絕 ".."
+    FileFS(fsys fs.FS, name string) error      // fs.ValidPath；可安全處理使用者輸入的檔名
     Attachment(file, name string) error
     Inline(file, name string) error
     NoContent(code int) error
@@ -187,8 +187,8 @@ func MyMiddleware() middleware.MiddlewareFunc {
 
 ### 業務錯誤
 ```go
-// 註冊錯誤碼
-errors.Register(ErrUserNotFound, 404, "User not found")
+// 註冊錯誤碼：Register(err, code ErrorCode, httpStatus int, message string)
+errors.Register(ErrUserNotFound, errors.CodeResourceNotFound, http.StatusNotFound, "User not found")
 
 // 於 Handler 中使用
 func (h *UserHandler) GET(c types.Context) error {
@@ -243,6 +243,10 @@ hub := gortexws.NewHubWithConfig(logger, gortexws.Config{
 })
 ```
 
+`Authorizer` 的簽章為 `func(*Client, *Message) error`——回傳非 nil 的錯誤即丟棄該訊息。
+`AllowedMessageTypes` 為白名單；留空表示允許任何類型。`"ping"` 一律由內部處理（keepalive）
+並略過此閘門。
+
 ### WebSocket 的 Struct Tag
 ```go
 type HandlersManager struct {
@@ -261,16 +265,22 @@ type HandlersManager struct {
 ## 回應輔助函式
 
 ```go
-// 成功回應
-response.Success(c, 200, data)
-response.Created(c, data)
+import httpctx "github.com/yshengliao/gortex/transport/http"
 
-// 錯誤回應
-response.BadRequest(c, "Invalid input")
-response.Unauthorized(c, "Login required")
-response.Forbidden(c, "Access denied")
-response.NotFound(c, "Resource not found")
-response.InternalServerError(c, "Server error")
+// 套件層級輔助函式（transport/http）會輸出標準 JSON 封包：
+httpctx.Success(c, 200, data)               // 200 {success:true, data}
+httpctx.SuccessWithMeta(c, 200, data, meta) // 200，附帶 meta 物件
+httpctx.Created(c, data)                    // 201
+httpctx.NoContent(c)                        // 204
+httpctx.Accepted(c, data)                   // 202
+
+// Context 便利方法涵蓋常見情境：
+c.OK(data)                      // 200
+c.Created(data)                 // 201
+c.BadRequest("Invalid input")   // 400
+
+// 其他狀態碼請回傳已註冊的業務錯誤（見「錯誤處理」），
+// 或以 httpctx.NewHTTPError(code, "message") 建立。
 ```
 
 ## 安全預設值
@@ -279,8 +289,8 @@ response.InternalServerError(c, "Server error")
 |------|---------|----------|
 | JSON body 大小 | 1 MiB | `BinderConfig.MaxJSONBodyBytes` |
 | Multipart body 大小 | 32 MiB | `ContextConfig.MaxMultipartBytes` |
-| `Context.File` | 綁定於 `fs.FS`，強制執行 `fs.ValidPath` | `FileDir(dir, name)` 封裝了 `os.DirFS` |
-| `Context.Redirect` | 僅允許同源（Same-origin）路徑 | `RedirectOptions.AllowAbsolute` 白名單 |
+| `Context.File(file string)` | 伺服器信任路徑；已清理並拒絕 `..`（不阻擋絕對路徑/符號連結） | 使用者輸入請改用 `Context.FileFS(fsys, name)`（`fs.ValidPath`）——以 `os.DirFS` 包裝目錄 |
+| `Context.Redirect` | 僅允許同源（Same-origin）路徑（不可 `//`、不可 CR/LF/NUL） | 外部導向請直接設定 `Location` 標頭，並對自訂允許清單驗證 |
 | CORS | 拒絕 `*` 加上 `AllowCredentials=true` | `CORSWithConfig` 會回傳 `error` |
 | 開發錯誤頁面 | 遮蔽 Auth/Secret 標頭與查詢參數 | — |
 | 受信任的代理 (Trusted proxies) | 除非連線來自 `LoggerConfig.TrustedProxies`，否則忽略 `X-Forwarded-For` | — |

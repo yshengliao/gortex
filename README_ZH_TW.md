@@ -1,7 +1,7 @@
 # Gortex — 高效能 Go Web 框架
 
 [![Go Version](https://img.shields.io/badge/go-1.25+-blue.svg)](https://go.dev/)
-![Status](https://img.shields.io/badge/status-v0.6.1--alpha-orange.svg)
+![Status](https://img.shields.io/badge/status-v0.6.2--alpha-orange.svg)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 ![AI Generated](https://img.shields.io/badge/AI_Generated-Antigravity-blueviolet.svg)
 
@@ -167,6 +167,11 @@ go run ./examples/websocket  # Hub 訊息限制與授權
 - 🔒 [SECURITY.md](SECURITY.md) — 漏洞通報流程
 
 ## 變更紀錄
+
+### v0.6.2-alpha (2026-06-04)
+
+- 程式碼審查修正：WebSocket `ReadPump` 於 Hub 關閉時可正確結束（不再洩漏 goroutine）；斷路器 half-open 改以**成功數**（而非放行數）關閉電路（修正 `MaxRequests > 1` 的行為）；logger 對回應 body 遵守 `BodyLogLimit`，並對非字串的 `request_id` 加上保護。
+- 文件準確性：修正 `errors.Register` 簽章、回應輔助函式 API、`File`/`FileFS`（移除不存在的 `FileDir`）、`Redirect`（移除不存在的 `RedirectOptions`）以及 `Context` 標頭範例——涵蓋 `docs/en`、`docs/zh-tw` 與 `CLAUDE.md`。
 
 ### v0.6.1-alpha (2026-04-25)
 

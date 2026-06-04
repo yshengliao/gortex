@@ -1,6 +1,6 @@
 # Gortex Framework - Development Guide
 
-> **Framework**: Gortex | **Language**: Go 1.25 | **Status**: v0.6.1-alpha | **Updated**: 2026-04-25
+> **Framework**: Gortex | **Language**: Go 1.25 | **Status**: v0.6.2-alpha | **Updated**: 2026-06-04
 
 Development guide for Gortex — a high-performance Go web framework with declarative struct-tag routing.
 
@@ -158,8 +158,8 @@ curl localhost:8080/_routes       # View debug routes (in debug mode)
 
 Hardened as of v0.4.0-alpha. Do not regress:
 
-- `Context.File(fsys fs.FS, name string)` — rejects `../`, absolute paths, symlinks out of root; use `FileDir(dir, name)` for filesystem-rooted serving.
-- `Context.Redirect` — only accepts same-origin paths by default; `RedirectOptions.AllowAbsolute` opts in specific hosts.
+- `Context.File(file string)` — server-trusted path; it is cleaned and `..` traversal is rejected (it does **not** block absolute paths or resolve symlinks). For user-supplied filenames use `Context.FileFS(fsys fs.FS, name string)`, which validates with `fs.ValidPath` (wrap a directory with `os.DirFS`).
+- `Context.Redirect` — accepts same-origin paths only (must start with `/`, not `//`; rejects CR/LF/NUL). To redirect to an external host, set the `Location` header directly after validating it against your own allowlist.
 - `middleware/cors.go` — `CORSWithConfig` returns `error` when `AllowOrigins` contains `*` and `AllowCredentials=true`; the `CORS()` convenience panics on the same misconfig.
 - `core/context.Binder` — wraps bodies in `http.MaxBytesReader` (default 1 MiB); surfaces decode errors rather than swallowing them.
 - `middleware/logger.go` — `TrustedProxies` gates `X-Forwarded-For`/`X-Real-IP`; `BodyRedactor` masks JSON secret keys.
@@ -181,8 +181,8 @@ Hardened as of v0.4.0-alpha. Do not regress:
 
 ### Error Handling
 ```go
-// Register business errors
-errors.Register(ErrUserNotFound, 404, "User not found")
+// Register business errors: Register(err, code ErrorCode, httpStatus int, message string)
+errors.Register(ErrUserNotFound, errors.CodeResourceNotFound, http.StatusNotFound, "User not found")
 
 func (h *UserHandler) GET(c types.Context) error {
     user, err := h.service.GetUser(c.Param("id"))
@@ -236,7 +236,7 @@ handlers.UserService.DB = dbConnection
 
 ## Framework Development
 
-### Completed Features (v0.6.1-alpha)
+### Completed Features (v0.6.2-alpha)
 **Core Features**
 - Struct tag routing with segment-trie router (45% faster than radix tree)
 - **Zero-allocation routing hot path** (0 allocs/op, ~65 ns/op on M3 Pro)
@@ -298,4 +298,4 @@ handlers.UserService.DB = dbConnection
 
 ---
 
-**Last Updated**: 2026-04-25 | **Framework**: Gortex v0.6.1-alpha | **Go**: 1.25+
+**Last Updated**: 2026-06-04 | **Framework**: Gortex v0.6.2-alpha | **Go**: 1.25+

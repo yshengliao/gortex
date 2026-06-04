@@ -403,12 +403,13 @@ func (h *OrderHandler) CreateOrder(c http.Context) error {
     // 取得請求 Context
     ctx := c.Request().Context()
     
-    // 若開啟 tracing，則從 context 提取 span
-    span := c.Span()
+    // 若開啟 tracing，則從 context 提取 span。Context.Span() 回傳 interface{}，
+    // 需斷言為 tracing.SpanInterface 才能呼叫 span 的方法。
+    span, _ := c.Span().(tracing.SpanInterface)
     if span != nil {
-        span.AddTags(map[string]interface{}{
+        span.AddTags(map[string]string{
             "handler": "CreateOrder",
-            "user_id": c.Header("X-User-ID"),
+            "user_id": c.Request().Header.Get("X-User-ID"),
         })
     }
     
@@ -427,7 +428,7 @@ func (h *OrderHandler) CreateOrder(c http.Context) error {
     
     if err := h.validateOrder(validateCtx, &req); err != nil {
         if span != nil {
-            span.LogEvent(tracing.WARN, "Validation failed", map[string]any{
+            span.LogEvent(tracing.SpanStatusWARN, "Validation failed", map[string]any{
                 "error": err.Error(),
             })
         }
@@ -476,7 +477,7 @@ func (h *OrderHandler) CreateOrder(c http.Context) error {
     case result := <-paymentResult:
         if result.Error != nil {
             if span != nil {
-                span.LogEvent(tracing.ERROR, "Payment failed", map[string]any{
+                span.LogEvent(tracing.SpanStatusERROR, "Payment failed", map[string]any{
                     "order_id": order.ID,
                     "error":    result.Error.Error(),
                 })
@@ -525,7 +526,7 @@ func (h *OrderHandler) CreateOrder(c http.Context) error {
     }()
     
     if span != nil {
-        span.LogEvent(tracing.INFO, "Order created successfully", map[string]any{
+        span.LogEvent(tracing.SpanStatusINFO, "Order created successfully", map[string]any{
             "order_id": order.ID,
             "total":    order.Total,
         })
