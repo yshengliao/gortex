@@ -403,12 +403,13 @@ func (h *OrderHandler) CreateOrder(c http.Context) error {
     // Start with request context
     ctx := c.Request().Context()
     
-    // Extract span from context if tracing is enabled
-    span := c.Span()
+    // Extract span from context if tracing is enabled. Context.Span() returns
+    // interface{}, so assert it to tracing.SpanInterface to use the span methods.
+    span, _ := c.Span().(tracing.SpanInterface)
     if span != nil {
-        span.AddTags(map[string]interface{}{
+        span.AddTags(map[string]string{
             "handler": "CreateOrder",
-            "user_id": c.Header("X-User-ID"),
+            "user_id": c.Request().Header.Get("X-User-ID"),
         })
     }
     
@@ -427,7 +428,7 @@ func (h *OrderHandler) CreateOrder(c http.Context) error {
     
     if err := h.validateOrder(validateCtx, &req); err != nil {
         if span != nil {
-            span.LogEvent(tracing.WARN, "Validation failed", map[string]any{
+            span.LogEvent(tracing.SpanStatusWARN, "Validation failed", map[string]any{
                 "error": err.Error(),
             })
         }
@@ -476,7 +477,7 @@ func (h *OrderHandler) CreateOrder(c http.Context) error {
     case result := <-paymentResult:
         if result.Error != nil {
             if span != nil {
-                span.LogEvent(tracing.ERROR, "Payment failed", map[string]any{
+                span.LogEvent(tracing.SpanStatusERROR, "Payment failed", map[string]any{
                     "order_id": order.ID,
                     "error":    result.Error.Error(),
                 })
@@ -525,7 +526,7 @@ func (h *OrderHandler) CreateOrder(c http.Context) error {
     }()
     
     if span != nil {
-        span.LogEvent(tracing.INFO, "Order created successfully", map[string]any{
+        span.LogEvent(tracing.SpanStatusINFO, "Order created successfully", map[string]any{
             "order_id": order.ID,
             "total":    order.Total,
         })

@@ -122,15 +122,33 @@ func (c *Client) ReadPump() {
 			continue
 		}
 
-		switch message.Type {
-		case "private":
+		// "private" messages carry an explicit target; otherwise the message
+		// fans out to all clients. Both kinds feed the hub's broadcast loop.
+		if message.Type == "private" {
 			if target, ok := message.Data["target"].(string); ok {
 				message.Target = target
 			}
-			c.hub.broadcast <- broadcastOp{msg: &message}
-		default:
-			c.hub.broadcast <- broadcastOp{msg: &message}
 		}
+
+		// Hand the message to the hub; stop the pump if the hub is shutting down.
+		if !c.forwardToHub(&message) {
+			return
+		}
+	}
+}
+
+// forwardToHub queues a message onto the hub's broadcast loop. It returns false
+// (and the ReadPump must stop) when the hub is shutting down: h.broadcast is
+// buffered and Run() stops draining it once shutdown is signalled, so a bare
+// send could block this goroutine forever — closing the connection cannot wake a
+// goroutine parked on a channel send. Every other hub interaction uses the same
+// escape (see hub.removeClient and hub.Broadcast).
+func (c *Client) forwardToHub(msg *Message) bool {
+	select {
+	case c.hub.broadcast <- broadcastOp{msg: msg}:
+		return true
+	case <-c.hub.shutdown:
+		return false
 	}
 }
 

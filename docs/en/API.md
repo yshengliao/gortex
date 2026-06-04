@@ -63,8 +63,8 @@ type Context interface {
     String(code int, s string) error
     Blob(code int, contentType string, b []byte) error
     Stream(code int, contentType string, r io.Reader) error
-    File(fsys fs.FS, name string) error      // safe: rooted in fsys, fs.ValidPath
-    FileFS(fsys fs.FS, name string) error     // alias of File, explicit fs.FS
+    File(file string) error                   // server-trusted path; cleaned, rejects ".."
+    FileFS(fsys fs.FS, name string) error      // fs.ValidPath; safe for user-supplied names
     Attachment(file, name string) error
     Inline(file, name string) error
     NoContent(code int) error
@@ -187,8 +187,8 @@ func MyMiddleware() middleware.MiddlewareFunc {
 
 ### Business Errors
 ```go
-// Register error codes
-errors.Register(ErrUserNotFound, 404, "User not found")
+// Register error codes: Register(err, code ErrorCode, httpStatus int, message string)
+errors.Register(ErrUserNotFound, errors.CodeResourceNotFound, http.StatusNotFound, "User not found")
 
 // Use in handlers
 func (h *UserHandler) GET(c types.Context) error {
@@ -243,6 +243,11 @@ hub := gortexws.NewHubWithConfig(logger, gortexws.Config{
 })
 ```
 
+`Authorizer` has the signature `func(*Client, *Message) error` — return a non-nil
+error to drop the message. `AllowedMessageTypes` is a whitelist; leave it empty to
+allow any type. `"ping"` is always handled internally for keepalive and bypasses
+the gate.
+
 ### Struct Tag for WebSocket
 ```go
 type HandlersManager struct {
@@ -261,16 +266,22 @@ When `Logger.Level = "debug"`:
 ## Response Helpers
 
 ```go
-// Success responses
-response.Success(c, 200, data)
-response.Created(c, data)
+import httpctx "github.com/yshengliao/gortex/transport/http"
 
-// Error responses
-response.BadRequest(c, "Invalid input")
-response.Unauthorized(c, "Login required")
-response.Forbidden(c, "Access denied")
-response.NotFound(c, "Resource not found")
-response.InternalServerError(c, "Server error")
+// Package helpers (transport/http) write a standard JSON envelope:
+httpctx.Success(c, 200, data)               // 200 {success:true, data}
+httpctx.SuccessWithMeta(c, 200, data, meta) // 200 with a meta object
+httpctx.Created(c, data)                    // 201
+httpctx.NoContent(c)                        // 204
+httpctx.Accepted(c, data)                   // 202
+
+// Context convenience methods cover the common cases:
+c.OK(data)                      // 200
+c.Created(data)                 // 201
+c.BadRequest("Invalid input")   // 400
+
+// For any other status, return a registered business error (see Error
+// Handling) or build one with httpctx.NewHTTPError(code, "message").
 ```
 
 ## Security Defaults
@@ -279,8 +290,8 @@ response.InternalServerError(c, "Server error")
 |------|---------|----------|
 | JSON body size | 1 MiB | `BinderConfig.MaxJSONBodyBytes` |
 | Multipart body | 32 MiB | `ContextConfig.MaxMultipartBytes` |
-| `Context.File` | Rooted in an `fs.FS`, `fs.ValidPath` required | `FileDir(dir, name)` wraps `os.DirFS` |
-| `Context.Redirect` | Only same-origin paths allowed | `RedirectOptions.AllowAbsolute` whitelist |
+| `Context.File(file string)` | Server-trusted path; cleaned, `..` rejected (not absolute paths/symlinks) | Use `Context.FileFS(fsys, name)` (`fs.ValidPath`) for user input — wrap a dir with `os.DirFS` |
+| `Context.Redirect` | Same-origin paths only (no `//`, no CR/LF/NUL) | Set the `Location` header directly, validated against your own allowlist |
 | CORS | `*` + `AllowCredentials=true` rejected | `CORSWithConfig` returns `error` |
 | Dev error page | Auth/secret headers and query params redacted | — |
 | Trusted proxies | `X-Forwarded-For` ignored unless peer in `LoggerConfig.TrustedProxies` | — |

@@ -1,7 +1,7 @@
 # Gortex - High-Performance Go Web Framework
 
 [![Go Version](https://img.shields.io/badge/go-1.25+-blue.svg)](https://go.dev/)
-![Status](https://img.shields.io/badge/status-v0.6.1--alpha-orange.svg)
+![Status](https://img.shields.io/badge/status-v0.6.2--alpha-orange.svg)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 ![AI Generated](https://img.shields.io/badge/AI_Generated-Antigravity-blueviolet.svg)
 
@@ -167,6 +167,11 @@ Full technical documentation is available in both English and Traditional Chines
 - 🔒 [SECURITY.md](SECURITY.md) — Vulnerability reporting process
 
 ## Changelog
+
+### v0.6.2-alpha (2026-06-04)
+
+- Code-review fixes: WebSocket `ReadPump` now exits cleanly on hub shutdown (no goroutine leak); circuit-breaker half-open closes on **successes** rather than admissions (correct for `MaxRequests > 1`); logger honours `BodyLogLimit` for response bodies and guards a non-string `request_id`.
+- Documentation accuracy: corrected `errors.Register` signature, the response-helper API, `File`/`FileFS` (removed the non-existent `FileDir`), `Redirect` (removed the non-existent `RedirectOptions`), and a `Context` header example — across `docs/en`, `docs/zh-tw`, and `CLAUDE.md`.
 
 ### v0.6.1-alpha (2026-04-25)
 
