@@ -1,7 +1,7 @@
 # Gortex - High-Performance Go Web Framework
 
 [![Go Version](https://img.shields.io/badge/go-1.25+-blue.svg)](https://go.dev/)
-![Status](https://img.shields.io/badge/status-v0.7.0--alpha-orange.svg)
+![Status](https://img.shields.io/badge/status-v0.7.1--alpha-orange.svg)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 ![AI Generated](https://img.shields.io/badge/AI_Generated-Antigravity-blueviolet.svg)
 
@@ -167,6 +167,10 @@ Full technical documentation is available in both English and Traditional Chines
 - 🔒 [SECURITY.md](SECURITY.md) — Vulnerability reporting process
 
 ## Changelog
+
+### v0.7.1-alpha (2026-06-05)
+
+- Fix: `TestBenchmarkSuite` now writes to `t.TempDir()` instead of the real `benchmark_db.json`, preventing zero-value entries from being appended on every `go test ./...` run.
 
 ### v0.7.0-alpha (2026-06-04)
 

@@ -1,7 +1,7 @@
 # Gortex — 高效能 Go Web 框架
 
 [![Go Version](https://img.shields.io/badge/go-1.25+-blue.svg)](https://go.dev/)
-![Status](https://img.shields.io/badge/status-v0.7.0--alpha-orange.svg)
+![Status](https://img.shields.io/badge/status-v0.7.1--alpha-orange.svg)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 ![AI Generated](https://img.shields.io/badge/AI_Generated-Antigravity-blueviolet.svg)
 
@@ -167,6 +167,10 @@ go run ./examples/websocket  # Hub 訊息限制與授權
 - 🔒 [SECURITY.md](SECURITY.md) — 漏洞通報流程
 
 ## 變更紀錄
+
+### v0.7.1-alpha (2026-06-05)
+
+- 修正：`TestBenchmarkSuite` 改寫至 `t.TempDir()`，不再於每次 `go test ./...` 執行時將全零 entry 寫入真實 `benchmark_db.json`。
 
 ### v0.7.0-alpha (2026-06-04)
 

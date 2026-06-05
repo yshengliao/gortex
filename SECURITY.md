@@ -24,7 +24,7 @@ Gortex is pre-1.0. Only the latest minor release line (currently
 
 ## Security Defaults
 
-The framework ships with these hardening defaults (as of v0.7.0-alpha).
+The framework ships with these hardening defaults (as of v0.7.1-alpha).
 Each can be tuned per application.
 
 | Area | Default | Override |
