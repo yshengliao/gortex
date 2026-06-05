@@ -19,10 +19,10 @@ func BenchmarkGortexRouter(b *testing.B) {
 }
 
 func TestBenchmarkSuite(t *testing.T) {
-	// Run a simple test to ensure benchmark suite works
 	suite := NewBenchmarkSuite()
+	// Redirect writes to a temp dir so the real benchmark_db.json is never touched.
+	suite.dbPath = t.TempDir() + "/bench.json"
 
-	// Create a minimal benchmark
 	b := &testing.B{N: 1}
 	suite.benchmarkSimpleRoute(b)
 
@@ -30,7 +30,6 @@ func TestBenchmarkSuite(t *testing.T) {
 		t.Errorf("Expected 1 result, got %d", len(suite.results))
 	}
 
-	// Test saving and loading
 	if err := suite.SaveResults(); err != nil {
 		t.Fatalf("Failed to save results: %v", err)
 	}
