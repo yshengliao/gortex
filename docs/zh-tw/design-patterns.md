@@ -1,6 +1,6 @@
 # 設計模式與學習指南
 
-> 本文檔以 v0.7.1-alpha 為基礎，從「可以從這個框架中學到什麼」的角度，整理 Gortex 中值得研究的工程模式與尚未實作但值得探討的方向。
+> 本文檔以 v0.8.0-alpha 為基礎，從「可以從這個框架中學到什麼」的角度，整理 Gortex 中值得研究的工程模式與尚未實作但值得探討的方向。
 
 ## 已實作的核心設計模式
 
@@ -93,8 +93,9 @@ type HandlersManager struct {
 
 **學習重點：**
 - **Go 版 Actor 模型**：用 channel 取代 mutex，單一 Goroutine 序列化所有狀態存取
-- **Graceful shutdown 設計**：`shutdownOnce` + 先發 close message 再等 500ms 的兩階段關閉
-- **Channel full 的處理策略**：broadcast 時 `select { case client.send <- msg: default: }` 直接丟棄慢消費者
+- **Graceful shutdown 設計**：`shutdownOnce` + 兩階段關閉（先排空訊息佇列，再強制斷線）；空 Hub 可立即關閉，`ShutdownWithTimeout` 在 500ms 內完成
+- **Channel full 的處理策略**：broadcast 時 `select { case client.send <- msg: default: }` 直接丟棄慢消費者；Hub 指標現在包含 `dropped_broadcasts` 與 `forced_disconnects`
+- **Authorizer 接收已解析的 Target**：私訊的 Target 在 Authorizer 執行前即已解析，因此授權策略可看到最終收件者
 
 **參考檔案**：`transport/websocket/hub.go`
 

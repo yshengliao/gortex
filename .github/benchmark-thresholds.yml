@@ -1,4 +1,7 @@
 # Performance Regression Thresholds
+# NOTE: These thresholds are reference values only. As of v0.8.0-alpha, ci.yml
+# contains no benchmark job, so these limits are NOT automatically enforced
+# in CI. They document intent for future tooling integration.
 # Define acceptable performance degradation limits
 
 global:

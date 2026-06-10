@@ -1,6 +1,6 @@
 # Gortex Framework - Development Guide
 
-> **Framework**: Gortex | **Language**: Go 1.25 | **Status**: v0.7.1-alpha | **Updated**: 2026-06-05
+> **Framework**: Gortex | **Language**: Go 1.25 | **Status**: v0.8.0-alpha | **Updated**: 2026-06-10
 
 Development guide for Gortex — a high-performance Go web framework with declarative struct-tag routing.
 
@@ -24,7 +24,7 @@ type HandlersManager struct {
 
 ### Key Features
 - **Zero Dependencies**: No Redis, Kafka, external services
-- **45% Faster Routing**: Optimized reflection caching  
+- **Fast Routing**: Segment-trie router with zero-allocation hot path (~65 ns/op, 0 allocs/op per in-repo benchmarks on Apple M3 Pro)
 - **WebSocket Native**: First-class real-time support
 - **Type-Safe**: Compile-time route validation
 - **Auto-Initialization**: Handlers automatically initialized
@@ -95,15 +95,17 @@ type HandlersManager struct {
     Users  *UserHandler   `url:"/users/:id"`      // Dynamic params
     Static *FileHandler   `url:"/static/*"`        // Wildcards
     
-    // With middleware
+    // With middleware — built-in names: auth, requestid, recover
+    // "auth" requires a middleware.MiddlewareFunc registered in the app context
+    // "rbac" is NOT implemented and will fail registration (error at NewApp time)
     Auth   *AuthHandler   `url:"/auth"`
-    Admin  *AdminHandler  `url:"/admin" middleware:"jwt,rbac"`
+    Admin  *AdminHandler  `url:"/admin" middleware:"auth"`
     
     // WebSocket
     Chat   *ChatHandler   `url:"/chat" hijack:"ws"`
     
     // Advanced features
-    API    *APIHandler    `url:"/api" middleware:"cors" ratelimit:"100/min"`
+    API    *APIHandler    `url:"/api" ratelimit:"100/min"`
 }
 ```
 
@@ -137,13 +139,13 @@ With `cfg.Logger.Level = "debug"`:
 - `/_routes` - List all registered routes
 - `/_monitor` - System metrics dashboard
 - `/_config` - Masked configuration view
-- Request/response logging with body capture
+- Request logging with body capture (request bodies only; response-body logging is not supported — `LogResponseBody` is a no-op)
 
 ### Performance Optimizations
-- **Zero-Allocation Routing**: 0 allocs/op for static, param, wildcard, and deep-param routes (~65 ns/op)
+- **Zero-Allocation Routing**: 0 allocs/op for static, param, wildcard, and deep-param routes (~65 ns/op per in-repo benchmarks on Apple M3 Pro)
 - **Context Pool**: Embedded `responseWriter` value eliminates per-request allocation
 - **Smart Params**: Inline [4]string array for ≤4 params; overflow to map
-- **Reflection Caching**: 45% faster than standard routers
+- **Segment-Trie Router**: Predictable O(segments) matching without regex backtracking
 
 ## Testing
 
@@ -161,13 +163,14 @@ Hardened as of v0.4.0-alpha. Do not regress:
 - `Context.File(file string)` — server-trusted path; it is cleaned and `..` traversal is rejected (it does **not** block absolute paths or resolve symlinks). For user-supplied filenames use `Context.FileFS(fsys fs.FS, name string)`, which validates with `fs.ValidPath` (wrap a directory with `os.DirFS`).
 - `Context.Redirect` — accepts same-origin paths only (must start with `/`, not `//`; rejects CR/LF/NUL). To redirect to an external host, set the `Location` header directly after validating it against your own allowlist.
 - `middleware/cors.go` — `CORSWithConfig` returns `error` when `AllowOrigins` contains `*` and `AllowCredentials=true`; the `CORS()` convenience panics on the same misconfig.
-- `core/context.Binder` — wraps bodies in `http.MaxBytesReader` (default 1 MiB); surfaces decode errors rather than swallowing them.
-- `middleware/logger.go` — `TrustedProxies` gates `X-Forwarded-For`/`X-Real-IP`; `BodyRedactor` masks JSON secret keys.
-- `middleware/dev_error_page.go` — redacts `Authorization`, `Cookie`, `Set-Cookie`, `X-Api-Key`, `X-Auth-Token`, `Proxy-Authorization`, plus `(?i)(token|password|secret|key|apikey|auth)` query params.
-- `middleware/csrf.go` — synchroniser-token pattern; `Secure`, `HttpOnly`, `SameSite=Lax`.
-- `middleware/ratelimit.go` — emits `X-RateLimit-Limit/Remaining/Reset` on every response and `Retry-After` on 429.
-- `pkg/auth.NewJWTService` — returns an error for secrets shorter than 32 bytes.
-- `transport/websocket` — `Config.MaxMessageBytes` sets `conn.SetReadLimit`; unknown/unauthorised messages are dropped with a log line.
+- `core/context.Binder` — wraps each JSON body in `http.MaxBytesReader` (default 1 MiB via `DefaultMaxJSONBodyBytes`); original `Body` is restored after binding; fields with an explicit `bind` tag surface conversion errors. Multipart is capped at 32 MiB.
+- `middleware/logger.go` — `TrustedProxies` CIDRs gate `X-Forwarded-For`/`X-Real-IP` for IP resolution; `BodyRedactor` masks sensitive JSON fields in **request** bodies. `LogResponseBody` is a documented no-op — response-body logging is not supported; 4xx/5xx log at Warn/Error using the real status from the tracked writer.
+- `middleware/dev_error_page.go` — redacts headers: `Authorization`, `Cookie`, `Set-Cookie`, `X-Api-Key`, `X-Auth-Token`, `X-CSRF-Token`, `Proxy-Authorization`; masks query params matching `(?i)(token|password|secret|key|apikey|api_key|auth)`.
+- `middleware/csrf.go` — double-submit cookie pattern (constant-time compare via `subtle.ConstantTimeCompare`; no server-side token store); `Secure`, `HttpOnly`, `SameSite=Lax` on the cookie; token echoed in `X-CSRF-Token` response header for SPA bootstrapping.
+- `middleware/ratelimit.go` — emits `X-RateLimit-Limit/Remaining/Reset` on every response and `Retry-After` on 429. Default `KeyFunc` keys on the **direct peer address** (spoof-resistant); set `TrustedProxies` CIDRs to honour forwarding headers only from known proxies. `DefaultGortexRateLimitConfig()` leaves `Store` nil — the middleware creates a stoppable `MemoryRateLimiter` on first use.
+- `pkg/auth.NewJWTService` — returns an error for secrets shorter than 32 bytes. Tokens carry a `typ` claim (`"access"` or `"refresh"`); tokens issued by earlier versions without `typ` are **rejected**. Signing and verification are pinned to HS256 exactly.
+- `pkg/config.Validate` — enforces 32-byte minimum JWT secret at config-load time.
+- `transport/websocket` — `Config.MaxMessageBytes` sets `conn.SetReadLimit`; unknown/unauthorised messages are dropped with a log line. Hub metrics expose `dropped_broadcasts` and `forced_disconnects`. Private message `Target` is resolved before the Authorizer runs, so the Authorizer sees the final recipient.
 
 ## Critical Don'ts
 
@@ -218,8 +221,12 @@ hub := gortexws.NewHubWithConfig(logger, gortexws.Config{
     MaxMessageBytes:     4 << 10,
     AllowedMessageTypes: []string{"chat", "ping"},
     Authorizer:          myAuthorizer, // func(*Client, *Message) error
+    // Authorizer receives the resolved Target (for private messages)
+    // and can veto the final recipient. Private-targeting policy belongs here.
 })
 ```
+
+Hub metrics include `dropped_broadcasts` and `forced_disconnects`. `ShutdownWithTimeout` completes sub-500ms on an idle hub; registered clients drain queued messages before send channels close.
 
 ### Dependency Injection (Not Yet Implemented)
 ```go
@@ -236,9 +243,9 @@ handlers.UserService.DB = dbConnection
 
 ## Framework Development
 
-### Completed Features (v0.7.1-alpha)
+### Completed Features (v0.8.0-alpha)
 **Core Features**
-- Struct tag routing with segment-trie router (45% faster than radix tree)
+- Struct tag routing with segment-trie router (zero-allocation hot path, 0 allocs/op, ~65 ns/op per in-repo benchmarks on Apple M3 Pro)
 - **Zero-allocation routing hot path** (0 allocs/op, ~65 ns/op on M3 Pro)
 - WebSocket support with hub pattern, size limits, type whitelist, authoriser hook
 - JWT authentication with ≥32-byte secret enforcement
@@ -257,6 +264,13 @@ handlers.UserService.DB = dbConnection
 - Route logging with live data (not placeholder)
 - Context helper methods — `OK()`, `Created()`
 - Dev error pages with header/query redaction
+
+**Third Audit Round (v0.8.0-alpha)**
+- JWT `typ` claim, HS256-only signing, fail-loud middleware tags, rate-limit TrustedProxies
+- Named wildcard params (`c.Param("filepath")`), router error double-write fixed, shared group lock, middleware chain aliasing
+- Logger reads real status; `LogResponseBody` documented no-op; ws hub responsive shutdown; private-target resolved before Authorizer
+- Compression Vary header, CORS wildcard-headers+credentials guard, auth SkipPaths segment-boundary matching
+- `OptimizedCollector` and `FixedHealthChecker` removed; `RouteCache` removed; config no longer mutates `os.Environ`
 
 **Dependency Hygiene**
 - Removed `Bofry/config` + 5 indirect deps
@@ -298,4 +312,4 @@ handlers.UserService.DB = dbConnection
 
 ---
 
-**Last Updated**: 2026-06-05 | **Framework**: Gortex v0.7.1-alpha | **Go**: 1.25+
+**Last Updated**: 2026-06-10 | **Framework**: Gortex v0.8.0-alpha | **Go**: 1.25+

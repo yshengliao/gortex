@@ -1,6 +1,6 @@
 # Design Patterns & Learning Guide
 
-> Based on v0.7.1-alpha, this document catalogues the engineering patterns implemented in Gortex that are worth studying, along with areas not yet implemented but worth exploring.
+> Based on v0.8.0-alpha, this document catalogues the engineering patterns implemented in Gortex that are worth studying, along with areas not yet implemented but worth exploring.
 
 ## Implemented Core Design Patterns
 
@@ -93,8 +93,9 @@ A textbook implementation of the Closed → Open → Half-Open state machine.
 
 **Key learnings:**
 - **Go-style Actor Model**: Channels replace mutexes; a single goroutine serialises all state access
-- **Graceful shutdown design**: `shutdownOnce` + two-phase close (send close message, wait 500ms, then force disconnect)
-- **Channel-full strategy**: During broadcast, `select { case client.send <- msg: default: }` drops messages for slow consumers
+- **Graceful shutdown design**: `shutdownOnce` + two-phase close (drain queued messages, then force-disconnect); an idle hub shuts down immediately and `ShutdownWithTimeout` with a sub-500ms deadline succeeds
+- **Channel-full strategy**: During broadcast, `select { case client.send <- msg: default: }` drops messages for slow consumers; hub metrics expose `dropped_broadcasts` and `forced_disconnects`
+- **Authorizer receives resolved target**: for private messages the `Target` field is resolved before the Authorizer runs, so policy decisions see the final recipient
 
 **Reference**: `transport/websocket/hub.go`
 
