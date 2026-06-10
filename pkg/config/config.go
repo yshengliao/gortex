@@ -148,11 +148,21 @@ func DefaultConfig() *Config {
 	}
 }
 
+// minJWTSecretBytes mirrors auth.MinJWTSecretBytes. It is declared locally
+// rather than imported so the config package stays free of the auth/jwt
+// dependency; keep the two in sync. auth.NewJWTService rejects shorter
+// secrets at construction time, so accepting one here would only defer the
+// failure to a less obvious place.
+const minJWTSecretBytes = 32
+
 // Validate validates the configuration
 func (c *Config) Validate() error {
 	// Basic validation for required fields
 	if c.JWT.SecretKey == "" {
 		return fmt.Errorf("JWT secret key is required")
+	}
+	if len(c.JWT.SecretKey) < minJWTSecretBytes {
+		return fmt.Errorf("JWT secret key must be at least %d bytes", minJWTSecretBytes)
 	}
 	if c.Database.User == "" {
 		return fmt.Errorf("database user is required")

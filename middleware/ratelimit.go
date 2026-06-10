@@ -4,6 +4,7 @@ package middleware
 import (
 	"fmt"
 	"math"
+	"net"
 	"net/http"
 	"strconv"
 	"sync"
@@ -50,7 +51,8 @@ type GortexRateLimitConfig struct {
 	// Burst is the maximum burst size
 	Burst int
 
-	// KeyFunc extracts the key from the request
+	// KeyFunc extracts the key from the request. When nil it defaults to
+	// keying on the trusted-proxy-resolved client IP (see TrustedProxies).
 	KeyFunc func(c Context) string
 
 	// ErrorHandler handles rate limit errors
@@ -59,29 +61,50 @@ type GortexRateLimitConfig struct {
 	// SkipFunc determines if rate limiting should be skipped
 	SkipFunc func(c Context) bool
 
-	// Store is the rate limiter implementation
+	// Store is the rate limiter implementation. When nil,
+	// GortexRateLimitWithConfig lazily creates a MemoryRateLimiter using
+	// Rate/Burst and writes it back here so the caller can Stop() it (the
+	// store starts a background cleanup goroutine).
 	Store RateLimiter
+
+	// TrustedProxies lists CIDR ranges whose requests may set
+	// X-Forwarded-For / X-Real-IP. It only takes effect for the default
+	// KeyFunc. If empty, forwarding headers are ignored and the direct peer
+	// address is used as the key, so a client cannot evade rate limiting by
+	// forging a forwarding header. A custom KeyFunc bypasses this entirely.
+	TrustedProxies []*net.IPNet
 }
 
-// DefaultGortexRateLimitConfig returns a default rate limit configuration
+// defaultRateLimitKeyFunc returns the KeyFunc used when none is supplied. It
+// resolves the client IP via the shared trusted-proxy logic: with no trusted
+// proxies it keys on the direct peer (so X-Forwarded-For cannot be used to
+// spread requests across forged buckets), and with trusted proxies it honours
+// the forwarding headers. The ephemeral source port is stripped so every
+// connection from the same client maps to one bucket.
+func defaultRateLimitKeyFunc(trustedProxies []*net.IPNet) func(Context) string {
+	return func(c Context) string {
+		ip := clientIPFromRequest(c.Request(), trustedProxies)
+		if host, _, err := net.SplitHostPort(ip); err == nil {
+			return host
+		}
+		return ip
+	}
+}
+
+// DefaultGortexRateLimitConfig returns a default rate limit configuration.
+// Store is left nil so GortexRateLimitWithConfig creates a stoppable one and
+// writes it back here; the default KeyFunc keys on the direct peer address
+// unless TrustedProxies is set.
 func DefaultGortexRateLimitConfig() *GortexRateLimitConfig {
 	return &GortexRateLimitConfig{
 		Rate:  10,
 		Burst: 20,
-		KeyFunc: func(c Context) string {
-			// Use client IP as default rate-limit key.
-			// SECURITY WARNING: c.RealIP() trusts X-Forwarded-For unconditionally.
-			// This key can be spoofed if no trusted reverse proxy is configured.
-			// Consider a custom KeyFunc (e.g., authenticated user ID) in production.
-			return c.RealIP()
-		},
 		ErrorHandler: func(c Context) error {
 			return c.JSON(http.StatusTooManyRequests, map[string]string{
 				"error": "rate limit exceeded",
 			})
 		},
 		SkipFunc: nil,
-		Store:    NewMemoryRateLimiter(),
 	}
 }
 
@@ -266,13 +289,19 @@ func GortexRateLimit() MiddlewareFunc {
 	return GortexRateLimitWithConfig(DefaultGortexRateLimitConfig())
 }
 
-// GortexRateLimitWithConfig returns a rate limiting middleware with custom config
+// GortexRateLimitWithConfig returns a rate limiting middleware with custom config.
+//
+// If config.Store is nil a MemoryRateLimiter is created from config.Rate/Burst
+// and written back into config.Store. That store owns a background cleanup
+// goroutine, so the caller is responsible for calling Stop() on it during
+// shutdown; reading it back from config.Store gives them the handle.
 func GortexRateLimitWithConfig(config *GortexRateLimitConfig) MiddlewareFunc {
 	// Set defaults
 	if config.KeyFunc == nil {
-		config.KeyFunc = func(c Context) string {
-			return c.RealIP()
-		}
+		// Default to the trusted-proxy-aware client IP rather than RealIP(),
+		// which would trust X-Forwarded-For unconditionally and let a client
+		// forge per-request keys to escape the limiter.
+		config.KeyFunc = defaultRateLimitKeyFunc(config.TrustedProxies)
 	}
 
 	if config.ErrorHandler == nil {
@@ -286,6 +315,7 @@ func GortexRateLimitWithConfig(config *GortexRateLimitConfig) MiddlewareFunc {
 	if config.Store == nil {
 		store := NewMemoryRateLimiter()
 		store.SetRate(rate.Limit(config.Rate), config.Burst)
+		// Write the store back so the caller can Stop() its cleanup goroutine.
 		config.Store = store
 	}
 

@@ -162,7 +162,8 @@ func TestRouteCacheGetSet(t *testing.T) {
 func TestParseMiddlewareBuiltins(t *testing.T) {
 	ctx := appcontext.NewContext()
 
-	mws := parseMiddleware("requestid,recover", ctx)
+	mws, err := parseMiddleware("requestid,recover", ctx)
+	require.NoError(t, err)
 	require.Len(t, mws, 2, "requestid + recover both resolve via the builtin switch")
 
 	// Builtin recover wraps the handler and converts panics into 500s.
@@ -180,11 +181,47 @@ func TestParseMiddlewareBuiltins(t *testing.T) {
 
 func TestParseMiddlewareEmptyAndUnknown(t *testing.T) {
 	ctx := appcontext.NewContext()
-	// Empty tag & bare commas resolve to zero middleware.
-	assert.Empty(t, parseMiddleware("", ctx))
-	assert.Empty(t, parseMiddleware(",,", ctx))
-	// Unknown name is silently dropped (rbac without config just logs).
-	assert.Empty(t, parseMiddleware("does-not-exist", ctx))
+	// Empty tag & bare commas resolve to zero middleware without error.
+	mws, err := parseMiddleware("", ctx)
+	require.NoError(t, err)
+	assert.Empty(t, mws)
+
+	mws, err = parseMiddleware(",,", ctx)
+	require.NoError(t, err)
+	assert.Empty(t, mws)
+
+	// Unknown name now fails loudly rather than silently dropping.
+	_, err = parseMiddleware("does-not-exist", ctx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unknown middleware")
+}
+
+// auth fails loudly when no auth middleware is registered, but resolves once
+// one is present in the context.
+func TestParseMiddlewareAuth(t *testing.T) {
+	ctx := appcontext.NewContext()
+
+	_, err := parseMiddleware("auth", ctx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "auth middleware")
+
+	authMW := middleware.MiddlewareFunc(func(next middleware.HandlerFunc) middleware.HandlerFunc {
+		return next
+	})
+	appcontext.Register(ctx, authMW)
+
+	mws, err := parseMiddleware("auth", ctx)
+	require.NoError(t, err)
+	assert.Len(t, mws, 1)
+}
+
+// rbac has no implementation, so requesting it must error and tell the user to
+// register a custom middleware.
+func TestParseMiddlewareRBACFailsLoud(t *testing.T) {
+	ctx := appcontext.NewContext()
+	_, err := parseMiddleware("rbac", ctx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "RBAC is not implemented")
 }
 
 func TestParseMiddlewareRegistry(t *testing.T) {
@@ -201,7 +238,8 @@ func TestParseMiddlewareRegistry(t *testing.T) {
 	}
 	appcontext.Register(ctx, registry)
 
-	mws := parseMiddleware("custom", ctx)
+	mws, err := parseMiddleware("custom", ctx)
+	require.NoError(t, err)
 	require.Len(t, mws, 1)
 
 	// Invoke the middleware to prove it's the one we registered.
@@ -214,7 +252,8 @@ func TestParseMiddlewareRegistry(t *testing.T) {
 
 func TestParseRateLimitSeconds(t *testing.T) {
 	ctx := appcontext.NewContext()
-	mw := parseRateLimit("5/sec", ctx)
+	mw, err := parseRateLimit("5/sec", ctx, nil)
+	require.NoError(t, err)
 	require.NotNil(t, mw)
 
 	// Fire five requests from a distinct remote — all should pass; the
@@ -239,16 +278,24 @@ func TestParseRateLimitMinutesAndHours(t *testing.T) {
 	ctx := appcontext.NewContext()
 
 	// "/min" and "/hour" compute a per-second burst of at least 1.
-	assert.NotNil(t, parseRateLimit("100/min", ctx))
-	assert.NotNil(t, parseRateLimit("100/hour", ctx))
+	mw, err := parseRateLimit("100/min", ctx, nil)
+	require.NoError(t, err)
+	assert.NotNil(t, mw)
+
+	mw, err = parseRateLimit("100/hour", ctx, nil)
+	require.NoError(t, err)
+	assert.NotNil(t, mw)
 }
 
 func TestParseRateLimitRejectsBadInput(t *testing.T) {
 	ctx := appcontext.NewContext()
-	// No slash, non-numeric count, unknown unit all surface as nil.
-	assert.Nil(t, parseRateLimit("100", ctx))
-	assert.Nil(t, parseRateLimit("abc/sec", ctx))
-	assert.Nil(t, parseRateLimit("10/fortnight", ctx))
+	// No slash, non-numeric count, unknown unit all surface as errors now.
+	_, err := parseRateLimit("100", ctx, nil)
+	assert.Error(t, err)
+	_, err = parseRateLimit("abc/sec", ctx, nil)
+	assert.Error(t, err)
+	_, err = parseRateLimit("10/fortnight", ctx, nil)
+	assert.Error(t, err)
 }
 
 // --- route_registration.go: isHandlerGroup -----------------------------

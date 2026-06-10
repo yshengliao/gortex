@@ -1,6 +1,7 @@
 package config_test
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -58,4 +59,23 @@ func TestLoadFromJSON(t *testing.T) {
 	assert.Equal(t, "8081", cfg.Server.Port)
 	assert.Equal(t, ":8081", cfg.Server.Address)
 	assert.Equal(t, "debug", cfg.Logger.Level)
+}
+
+func TestValidateRejectsShortJWTSecret(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.Database.User = "u"
+	cfg.Database.Password = "p"
+
+	// Empty secret is reported as "required".
+	cfg.JWT.SecretKey = ""
+	require.ErrorContains(t, cfg.Validate(), "required")
+
+	// A non-empty but sub-32-byte secret is rejected for length — mirroring
+	// auth.NewJWTService so the weakness surfaces at config time.
+	cfg.JWT.SecretKey = strings.Repeat("a", 31)
+	require.ErrorContains(t, cfg.Validate(), "at least 32 bytes")
+
+	// Exactly 32 bytes is accepted.
+	cfg.JWT.SecretKey = strings.Repeat("a", 32)
+	require.NoError(t, cfg.Validate())
 }

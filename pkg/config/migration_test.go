@@ -17,7 +17,8 @@ import (
 // pass, it is safe to remove the Bofry/config dependency.
 
 func TestSimpleLoader_LoadDefaults(t *testing.T) {
-	t.Setenv("GORTEX_JWT_SECRET_KEY", "test-secret")
+	// Secret must be >=32 bytes or Load()'s Validate() rejects it.
+	t.Setenv("GORTEX_JWT_SECRET_KEY", "test-secret-key-at-least-32-bytes")
 	t.Setenv("GORTEX_DATABASE_USER", "test-user")
 	t.Setenv("GORTEX_DATABASE_PASSWORD", "test-pass")
 	// Clear any leaked env vars from other test files
@@ -56,7 +57,7 @@ websocket:
   write_buffer_size: 2048
   max_message_size: 1048576
 jwt:
-  secret_key: "yaml-secret-key"
+  secret_key: "yaml-secret-key-at-least-32-bytes!"
   issuer: "yaml-issuer"
   access_token_ttl: 2h
 database:
@@ -87,7 +88,7 @@ database:
 	assert.Equal(t, 2048, cfg.WebSocket.ReadBufferSize)
 	assert.Equal(t, 2048, cfg.WebSocket.WriteBufferSize)
 	assert.Equal(t, int64(1048576), cfg.WebSocket.MaxMessageSize)
-	assert.Equal(t, "yaml-secret-key", cfg.JWT.SecretKey)
+	assert.Equal(t, "yaml-secret-key-at-least-32-bytes!", cfg.JWT.SecretKey)
 	assert.Equal(t, "yaml-issuer", cfg.JWT.Issuer)
 	assert.Equal(t, 2*time.Hour, cfg.JWT.AccessTokenTTL)
 	assert.Equal(t, "localhost", cfg.Database.Host)
@@ -107,7 +108,7 @@ func TestSimpleLoader_LoadFromEnv(t *testing.T) {
 		"GORTEX_LOGGER_LEVEL":               "debug",
 		"GORTEX_LOGGER_ENCODING":            "console",
 		"GORTEX_WEBSOCKET_READ_BUFFER_SIZE": "4096",
-		"GORTEX_JWT_SECRET_KEY":             "env-secret-key",
+		"GORTEX_JWT_SECRET_KEY":             "env-secret-key-at-least-32-bytes!",
 		"GORTEX_JWT_ISSUER":                 "env-issuer",
 		"GORTEX_JWT_ACCESS_TOKEN_TTL":       "30m",
 		"GORTEX_DATABASE_HOST":              "db.example.com",
@@ -133,7 +134,7 @@ func TestSimpleLoader_LoadFromEnv(t *testing.T) {
 	assert.Equal(t, "debug", cfg.Logger.Level)
 	assert.Equal(t, "console", cfg.Logger.Encoding)
 	assert.Equal(t, 4096, cfg.WebSocket.ReadBufferSize)
-	assert.Equal(t, "env-secret-key", cfg.JWT.SecretKey)
+	assert.Equal(t, "env-secret-key-at-least-32-bytes!", cfg.JWT.SecretKey)
 	assert.Equal(t, "env-issuer", cfg.JWT.Issuer)
 	assert.Equal(t, 30*time.Minute, cfg.JWT.AccessTokenTTL)
 	assert.Equal(t, "db.example.com", cfg.Database.Host)
@@ -166,7 +167,7 @@ database:
 
 	t.Setenv("GORTEX_SERVER_PORT", "9999")
 	t.Setenv("GORTEX_SERVER_SHUTDOWN_TIMEOUT", "5s")
-	t.Setenv("GORTEX_JWT_SECRET_KEY", "env-override-key")
+	t.Setenv("GORTEX_JWT_SECRET_KEY", "env-override-key-at-least-32-byte")
 
 	loader := config.NewLoader().
 		WithYAMLFile(tmpFile.Name()).
@@ -178,7 +179,7 @@ database:
 	// env overrides YAML
 	assert.Equal(t, "9999", cfg.Server.Port)
 	assert.Equal(t, 5*time.Second, cfg.Server.ShutdownTimeout)
-	assert.Equal(t, "env-override-key", cfg.JWT.SecretKey)
+	assert.Equal(t, "env-override-key-at-least-32-byte", cfg.JWT.SecretKey)
 	// YAML values preserved where no env override
 	assert.Equal(t, ":7777", cfg.Server.Address)
 	assert.Equal(t, "error", cfg.Logger.Level)
@@ -191,7 +192,7 @@ GORTEX_SERVER_PORT=6666
 GORTEX_SERVER_ADDRESS=:6666
 GORTEX_LOGGER_LEVEL=trace
 GORTEX_SERVER_SHUTDOWN_TIMEOUT=8s
-GORTEX_JWT_SECRET_KEY=dotenv-secret
+GORTEX_JWT_SECRET_KEY=dotenv-secret-at-least-32-bytes!!
 GORTEX_DATABASE_USER=dotenv-user
 GORTEX_DATABASE_PASSWORD=dotenv-pass
 `
@@ -228,13 +229,13 @@ GORTEX_DATABASE_PASSWORD=dotenv-pass
 	assert.Equal(t, ":6666", cfg.Server.Address)
 	assert.Equal(t, "trace", cfg.Logger.Level)
 	assert.Equal(t, 8*time.Second, cfg.Server.ShutdownTimeout)
-	assert.Equal(t, "dotenv-secret", cfg.JWT.SecretKey)
+	assert.Equal(t, "dotenv-secret-at-least-32-bytes!!", cfg.JWT.SecretKey)
 	assert.Equal(t, "dotenv-user", cfg.Database.User)
 	assert.Equal(t, "dotenv-pass", cfg.Database.Password)
 }
 
 func TestSimpleLoader_MissingFiles(t *testing.T) {
-	t.Setenv("GORTEX_JWT_SECRET_KEY", "test-secret")
+	t.Setenv("GORTEX_JWT_SECRET_KEY", "test-secret-key-at-least-32-bytes")
 	t.Setenv("GORTEX_DATABASE_USER", "test-user")
 	t.Setenv("GORTEX_DATABASE_PASSWORD", "test-pass")
 
@@ -268,7 +269,8 @@ func TestSimpleLoader_ValidationFails(t *testing.T) {
 func TestSimpleLoader_CustomEnvPrefix(t *testing.T) {
 	t.Setenv("MYAPP_SERVER_PORT", "5555")
 	t.Setenv("MYAPP_SERVER_SHUTDOWN_TIMEOUT", "25s")
-	t.Setenv("MYAPP_JWT_SECRET_KEY", "myapp-secret")
+	// Secret must be >=32 bytes or Load()'s Validate() rejects it.
+	t.Setenv("MYAPP_JWT_SECRET_KEY", "myapp-secret-key-at-least-32-byte")
 	t.Setenv("MYAPP_DATABASE_USER", "myapp-user")
 	t.Setenv("MYAPP_DATABASE_PASSWORD", "myapp-pass")
 
@@ -279,7 +281,7 @@ func TestSimpleLoader_CustomEnvPrefix(t *testing.T) {
 
 	assert.Equal(t, "5555", cfg.Server.Port)
 	assert.Equal(t, 25*time.Second, cfg.Server.ShutdownTimeout)
-	assert.Equal(t, "myapp-secret", cfg.JWT.SecretKey)
+	assert.Equal(t, "myapp-secret-key-at-least-32-byte", cfg.JWT.SecretKey)
 }
 
 func TestSimpleLoader_CommandArgsOverride(t *testing.T) {
@@ -287,7 +289,7 @@ func TestSimpleLoader_CommandArgsOverride(t *testing.T) {
 server:
   port: "1111"
 jwt:
-  secret_key: "yaml-key"
+  secret_key: "yaml-key-padded-to-at-least-32-bytes"
 database:
   user: "yaml-user"
 `
@@ -328,7 +330,7 @@ GORTEX_DATABASE_PASSWORD=dotenv-pass
 	require.NoError(t, err)
 
 	assert.Equal(t, "4444", cfg.Server.Port)
-	assert.Equal(t, "yaml-key", cfg.JWT.SecretKey)
+	assert.Equal(t, "yaml-key-padded-to-at-least-32-bytes", cfg.JWT.SecretKey)
 	assert.Equal(t, "yaml-user", cfg.Database.User)
 	assert.Equal(t, "dotenv-pass", cfg.Database.Password)
 }
@@ -341,7 +343,7 @@ server:
 logger:
   level: "warn"
 jwt:
-  secret_key: "yaml-secret"
+  secret_key: "yaml-secret-padded-to-at-least-32by"
 database:
   user: "yaml-user"
 `
@@ -386,8 +388,8 @@ GORTEX_DATABASE_PASSWORD=dotenv-pass
 	assert.Equal(t, "3333", cfg.Server.Port)              // env var (highest)
 	assert.Equal(t, ":1111", cfg.Server.Address)          // yaml
 	assert.Equal(t, "warn", cfg.Logger.Level)             // yaml
-	assert.Equal(t, "console", cfg.Logger.Encoding)       // .env
-	assert.Equal(t, "yaml-secret", cfg.JWT.SecretKey)     // yaml
-	assert.Equal(t, "yaml-user", cfg.Database.User)       // yaml
+	assert.Equal(t, "console", cfg.Logger.Encoding)                      // .env
+	assert.Equal(t, "yaml-secret-padded-to-at-least-32by", cfg.JWT.SecretKey) // yaml
+	assert.Equal(t, "yaml-user", cfg.Database.User)                      // yaml
 	assert.Equal(t, "dotenv-pass", cfg.Database.Password) // .env
 }
