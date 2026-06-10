@@ -10,6 +10,15 @@ import (
 	"go.uber.org/zap"
 )
 
+// statusReader is the subset of the response writer the logger needs to read
+// the real status that went on the wire. DefaultContext's tracked
+// responseWriter implements it (see transport/http/response_writer.go), as
+// does the framework's test response writer.
+type statusReader interface {
+	Status() int
+	Written() bool
+}
+
 // LoggerConfig contains configuration for the logger middleware
 type LoggerConfig struct {
 	// Logger is the zap logger to use
@@ -18,7 +27,20 @@ type LoggerConfig struct {
 	SkipPaths []string
 	// LogRequestBody logs the request body (be careful with sensitive data)
 	LogRequestBody bool
-	// LogResponseBody logs the response body (be careful with sensitive data)
+	// LogResponseBody is deprecated and has no effect.
+	//
+	// Capturing the response body requires swapping the context's response
+	// writer for a body-recording wrapper, which the framework's pooled
+	// DefaultContext does not support (it owns a single tracked writer for
+	// the request's lifetime). The previous implementation relied on an
+	// optional SetResponse hook that no context type implemented, so the
+	// capture never ran and every request logged an empty body and a
+	// hardcoded status 200. The dead path has been removed; the logger now
+	// reads the real status from the tracked writer instead.
+	//
+	// Request-body redaction (LogRequestBody + BodyRedactor) is unaffected
+	// and continues to mask sensitive JSON fields. To log response bodies,
+	// wrap the response writer in your own middleware.
 	LogResponseBody bool
 	// BodyLogLimit is the maximum size of body to log
 	BodyLogLimit int
@@ -99,37 +121,30 @@ func LoggerWithConfig(config *LoggerConfig) MiddlewareFunc {
 				}
 			}
 
-			// Create response writer wrapper to capture status code
-			resp := c.Response()
-
-			rw := &responseWriter{
-				ResponseWriter: resp,
-				statusCode:     http.StatusOK,
-			}
-
-			// Capture the response body for logging only when enabled, up to
-			// the configured limit (honours BodyLogLimit, which the
-			// request-body path already respects).
-			if config.LogResponseBody {
-				rw.bodyLimit = config.BodyLogLimit
-			}
-
-			// Replace response writer in context if possible
-			if setter, ok := c.(interface{ SetResponse(http.ResponseWriter) }); ok {
-				setter.SetResponse(rw)
-			}
-
-			// Process request
+			// Process request. The error-handler middleware runs *inside* the
+			// logger (it is registered after Logger, so the router wraps it
+			// closer to the route handler), which means by the time next(c)
+			// returns the real status has already been written to the
+			// context's tracked response writer — both for handlers that write
+			// a status directly and for errors the error handler converts.
 			err := next(c)
 
 			// Calculate latency
 			latency := time.Since(start)
 
+			// Read the real status from the tracked response writer. If the
+			// writer does not expose Status()/Written() (a custom context),
+			// fall back to 200 rather than guessing.
+			status := http.StatusOK
+			if sr, ok := c.Response().(statusReader); ok && sr.Written() {
+				status = sr.Status()
+			}
+
 			// Build log fields
 			fields := []zap.Field{
 				zap.String("method", req.Method),
 				zap.String("path", req.URL.Path),
-				zap.Int("status", rw.statusCode),
+				zap.Int("status", status),
 				zap.Duration("latency", latency),
 				zap.String("ip", clientIPFromRequest(req, config.TrustedProxies)),
 				zap.String("user_agent", req.UserAgent()),
@@ -145,55 +160,28 @@ func LoggerWithConfig(config *LoggerConfig) MiddlewareFunc {
 				fields = append(fields, zap.ByteString("request_body", config.BodyRedactor(requestBody)))
 			}
 
-			if config.LogResponseBody && len(rw.body) > 0 {
-				body := rw.body
-				if len(body) > config.BodyLogLimit {
-					body = body[:config.BodyLogLimit]
-				}
-				fields = append(fields, zap.ByteString("response_body", config.BodyRedactor(body)))
-			}
-
 			if err != nil {
 				fields = append(fields, zap.Error(err))
 			}
 
-			// Log based on status code
-			if err != nil || rw.statusCode >= 500 {
+			// Log based on the real status code. A handler that returned an
+			// error which the error handler then converted to a 4xx/5xx is
+			// already covered by the status check, so the error alone no
+			// longer forces an Error-level line for a 4xx response.
+			switch {
+			case status >= 500:
 				config.Logger.Error("Request failed", fields...)
-			} else if rw.statusCode >= 400 {
+			case status >= 400:
 				config.Logger.Warn("Request error", fields...)
-			} else {
+			case err != nil:
+				// The handler returned an error but nothing reached the wire
+				// (no status written) — surface it loudly so it is not lost.
+				config.Logger.Error("Request failed", fields...)
+			default:
 				config.Logger.Info("Request completed", fields...)
 			}
 
 			return err
 		}
 	}
-}
-
-// responseWriter wraps http.ResponseWriter to capture status code and body
-type responseWriter struct {
-	http.ResponseWriter
-	statusCode int
-	body       []byte
-	bodyLimit  int // max bytes to capture for logging; 0 disables capture
-}
-
-func (rw *responseWriter) WriteHeader(code int) {
-	rw.statusCode = code
-	rw.ResponseWriter.WriteHeader(code)
-}
-
-func (rw *responseWriter) Write(b []byte) (int, error) {
-	// Capture body for logging up to the configured limit (0 disables it).
-	// Cap exactly at bodyLimit so a large response is not silently truncated
-	// to a hardcoded size once BodyLogLimit is raised above the old 1KB.
-	if rw.bodyLimit > 0 && len(rw.body) < rw.bodyLimit {
-		if remaining := rw.bodyLimit - len(rw.body); remaining < len(b) {
-			rw.body = append(rw.body, b[:remaining]...)
-		} else {
-			rw.body = append(rw.body, b...)
-		}
-	}
-	return rw.ResponseWriter.Write(b)
 }

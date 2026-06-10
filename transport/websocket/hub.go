@@ -17,9 +17,24 @@ import (
 // per-connection memory footprint bounded against oversize-message DoS.
 const DefaultMaxMessageBytes int64 = 64 << 10 // 64 KiB
 
+// shutdownGrace is how long the hub keeps its event loop alive after sending
+// graceful close frames, giving connected clients a moment to receive them
+// before their send channels are closed. The loop keeps servicing requests
+// (register/unregister/metrics/broadcast drain) during this window rather than
+// blocking on a bare sleep, so callers are never frozen. An empty hub skips
+// the grace entirely and shuts down immediately.
+const shutdownGrace = 500 * time.Millisecond
+
 // MessageAuthorizer decides whether a client is allowed to publish a
 // particular message. Returning a non-nil error causes the hub to drop the
 // message and log a warning; returning nil lets the message flow as normal.
+//
+// For "private" messages the recipient is already resolved into msg.Target by
+// the time the Authorizer runs, so an Authorizer can (and for any non-trivial
+// deployment should) enforce who is allowed to target whom. The framework
+// itself only gates the message *type* via AllowedMessageTypes; it does not
+// restrict private targeting on its own — whitelisting "private" without an
+// Authorizer lets any client message any user.
 type MessageAuthorizer func(client *Client, msg *Message) error
 
 // ErrMessageUnauthorized is the canonical error to return from a
@@ -38,7 +53,10 @@ type Config struct {
 	AllowedMessageTypes []string
 
 	// Authorizer, when non-nil, is consulted for every inbound message.
-	// Returning an error drops the message.
+	// Returning an error drops the message. For "private" messages the
+	// recipient is in msg.Target before the Authorizer runs, so this is the
+	// hook that must enforce private-message targeting policy — the hub does
+	// not restrict who may target whom on its own.
 	Authorizer MessageAuthorizer
 }
 
@@ -113,6 +131,12 @@ type Metrics struct {
 	MessageTypes       map[string]int64 `json:"message_types"`
 	LastMessageTime    time.Time        `json:"last_message_time"`
 	Uptime             time.Duration    `json:"uptime"`
+	// DroppedBroadcasts counts Broadcast calls discarded because the hub's
+	// broadcast channel was full — otherwise an invisible, log-only event.
+	DroppedBroadcasts int64 `json:"dropped_broadcasts"`
+	// ForcedDisconnects counts clients evicted because their send buffer was
+	// full when the hub tried to deliver a message — also otherwise log-only.
+	ForcedDisconnects int64 `json:"forced_disconnects"`
 }
 
 // Hub maintains active WebSocket connections
@@ -132,12 +156,14 @@ type Hub struct {
 	allowedTypesCache map[string]struct{}
 
 	// Metrics fields
-	totalConnections atomic.Int64
-	messagesSent     atomic.Int64
-	messagesReceived atomic.Int64
-	messageTypes     map[string]int64
-	lastMessageTime  time.Time
-	startTime        time.Time
+	totalConnections  atomic.Int64
+	messagesSent      atomic.Int64
+	messagesReceived  atomic.Int64
+	droppedBroadcasts atomic.Int64
+	forcedDisconnects atomic.Int64
+	messageTypes      map[string]int64
+	lastMessageTime   time.Time
+	startTime         time.Time
 }
 
 // NewHub creates a new WebSocket hub with default configuration.
@@ -189,57 +215,116 @@ func (h *Hub) Run() {
 			req.response <- len(h.clients)
 
 		case req := <-h.metricsReq:
-			metrics := &Metrics{
-				CurrentConnections: len(h.clients),
-				TotalConnections:   h.totalConnections.Load(),
-				MessagesSent:       h.messagesSent.Load(),
-				MessagesReceived:   h.messagesReceived.Load(),
-				MessageTypes:       make(map[string]int64),
-				LastMessageTime:    h.lastMessageTime,
-				Uptime:             time.Since(h.startTime),
-			}
-			// Copy message types to avoid race conditions
-			for k, v := range h.messageTypes {
-				metrics.MessageTypes[k] = v
-			}
-			req.response <- metrics
+			req.response <- h.snapshotMetrics()
 
 		case <-h.shutdown:
-			// Send graceful close message to all clients
-			h.logger.Info("Closing all client connections", zap.Int("count", len(h.clients)))
-
-			closeMsg := &Message{
-				Type: "close",
-				Data: map[string]any{
-					"code":    1001, // Going Away
-					"reason":  "Server is shutting down",
-					"message": "Please reconnect later",
-				},
-			}
-
-			// Send close message to all clients
-			for client := range h.clients {
-				select {
-				case client.send <- closeMsg:
-					// Give client time to process the close message
-				default:
-					// Channel is full, client will be forcefully closed
-				}
-			}
-
-			// Give clients a moment to receive close messages
-			time.Sleep(500 * time.Millisecond)
-
-			// Now close all client connections
-			for client := range h.clients {
-				close(client.send)
-				delete(h.clients, client)
-			}
-
-			h.logger.Info("Hub shutdown complete")
+			h.runShutdown()
 			return
 		}
 	}
+}
+
+// runShutdown performs the graceful shutdown sequence from inside the hub
+// goroutine. It sends a close frame to every client, then — crucially —
+// keeps servicing the hub's request channels for the grace window instead of
+// freezing on a bare time.Sleep. Callers blocked on Register/Unregister/
+// GetMetrics/GetConnectedClients during shutdown are therefore answered
+// rather than stalled, and ShutdownWithTimeout no longer always times out on
+// a healthy hub. An empty hub skips the grace entirely and returns at once.
+func (h *Hub) runShutdown() {
+	h.logger.Info("Closing all client connections", zap.Int("count", len(h.clients)))
+
+	closeMsg := &Message{
+		Type: "close",
+		Data: map[string]any{
+			"code":    1001, // Going Away
+			"reason":  "Server is shutting down",
+			"message": "Please reconnect later",
+		},
+	}
+
+	// Send close message to all clients (best-effort; a full channel means
+	// the client is already behind and will be closed below regardless).
+	for client := range h.clients {
+		select {
+		case client.send <- closeMsg:
+		default:
+		}
+	}
+
+	// Keep the event loop responsive during the grace period so concurrent
+	// callers are not blocked. Skip it entirely when there are no clients to
+	// notify — an empty hub shuts down instantly.
+	if len(h.clients) > 0 {
+		h.serveDuringGrace(shutdownGrace)
+	}
+
+	// Now close all remaining client connections.
+	for client := range h.clients {
+		close(client.send)
+		delete(h.clients, client)
+	}
+
+	h.logger.Info("Hub shutdown complete")
+}
+
+// serveDuringGrace keeps servicing the hub's request channels until the grace
+// timer fires, so callers are answered (not frozen) while connected clients
+// receive their close frames. It runs only from runShutdown, on the hub
+// goroutine. New registrations are refused (acked but not recorded) because
+// the hub is on its way down.
+func (h *Hub) serveDuringGrace(grace time.Duration) {
+	timer := time.NewTimer(grace)
+	defer timer.Stop()
+
+	for {
+		select {
+		case <-timer.C:
+			return
+		case req := <-h.register:
+			// Refuse new registrations during shutdown: record nothing and ack
+			// so the caller unblocks. The client's send channel is left for the
+			// caller to manage; the hub never took ownership.
+			close(req.done)
+		case req := <-h.unregister:
+			h.unregisterClient(req.client)
+			close(req.done)
+		case op := <-h.broadcast:
+			// Drain queued broadcasts (e.g. a server_shutdown notice) so they
+			// still reach clients before their channels close.
+			h.broadcastMessage(op.msg)
+			if op.done != nil {
+				close(op.done)
+			}
+		case req := <-h.clientCount:
+			req.response <- len(h.clients)
+		case req := <-h.metricsReq:
+			req.response <- h.snapshotMetrics()
+		}
+	}
+}
+
+// snapshotMetrics builds a Metrics value from the hub's current state. It must
+// be called from the hub goroutine because it reads messageTypes and
+// lastMessageTime, which are mutated there without a lock; the atomic counters
+// it reads are safe from any goroutine.
+func (h *Hub) snapshotMetrics() *Metrics {
+	m := &Metrics{
+		CurrentConnections: len(h.clients),
+		TotalConnections:   h.totalConnections.Load(),
+		MessagesSent:       h.messagesSent.Load(),
+		MessagesReceived:   h.messagesReceived.Load(),
+		MessageTypes:       make(map[string]int64, len(h.messageTypes)),
+		LastMessageTime:    h.lastMessageTime,
+		Uptime:             time.Since(h.startTime),
+		DroppedBroadcasts:  h.droppedBroadcasts.Load(),
+		ForcedDisconnects:  h.forcedDisconnects.Load(),
+	}
+	// Copy message types to avoid races with subsequent mutations.
+	for k, v := range h.messageTypes {
+		m.MessageTypes[k] = v
+	}
+	return m
 }
 
 // registerClient adds a new client to the hub
@@ -298,6 +383,7 @@ func (h *Hub) broadcastMessage(message *Message) {
 				case client.send <- message:
 					h.messagesSent.Add(1)
 				default:
+					h.forcedDisconnects.Add(1)
 					h.logger.Warn("Client send channel full, closing",
 						zap.String("client_id", client.ID))
 					go h.removeClient(client)
@@ -311,6 +397,7 @@ func (h *Hub) broadcastMessage(message *Message) {
 			case client.send <- message:
 				h.messagesSent.Add(1)
 			default:
+				h.forcedDisconnects.Add(1)
 				h.logger.Warn("Client send channel full, closing",
 					zap.String("client_id", client.ID))
 				go h.removeClient(client)
@@ -360,6 +447,7 @@ func (h *Hub) Broadcast(message *Message) {
 	select {
 	case h.broadcast <- broadcastOp{msg: message}:
 	default:
+		h.droppedBroadcasts.Add(1)
 		h.logger.Warn("Broadcast channel full")
 	}
 }
@@ -466,11 +554,12 @@ func (h *Hub) ShutdownWithTimeout(timeout time.Duration) error {
 		},
 	}
 
-	// Try to broadcast shutdown message (best-effort).
+	// Try to queue the shutdown notice (best-effort). No sleep here: the Run
+	// loop drains pending broadcasts during its grace window (see runShutdown),
+	// so a queued notice still reaches clients before their channels close
+	// without freezing this caller for a fixed 100ms.
 	select {
 	case h.broadcast <- broadcastOp{msg: shutdownMsg}:
-		// Give clients a moment to receive the message.
-		time.Sleep(100 * time.Millisecond)
 	default:
 		h.logger.Warn("Could not broadcast shutdown message")
 	}

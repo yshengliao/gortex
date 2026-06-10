@@ -13,6 +13,7 @@ import (
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest"
 
+	"github.com/yshengliao/gortex/core/types"
 	"github.com/yshengliao/gortex/pkg/errors"
 	httpctx "github.com/yshengliao/gortex/transport/http"
 )
@@ -286,6 +287,101 @@ func TestErrorHandlerCommittedResponse(t *testing.T) {
 	// Response should not be modified
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Contains(t, rec.Body.String(), `"status":"ok"`)
+}
+
+// countingResponseWriter is a types.ResponseWriter wrapper that records how
+// many times WriteHeader is invoked, letting a test prove the error handler
+// emits at most one status line (no double-write).
+type countingResponseWriter struct {
+	http.ResponseWriter
+	status        int
+	written       bool
+	writeHeaderN  int
+	reportWritten bool // when true, Written() reports committed regardless of state
+}
+
+func (w *countingResponseWriter) Status() int { return w.status }
+func (w *countingResponseWriter) Size() int64 { return 0 }
+func (w *countingResponseWriter) Written() bool {
+	if w.reportWritten {
+		return true
+	}
+	return w.written
+}
+func (w *countingResponseWriter) WriteHeader(code int) {
+	w.writeHeaderN++
+	if !w.written {
+		w.status = code
+		w.written = true
+		w.ResponseWriter.WriteHeader(code)
+	}
+}
+func (w *countingResponseWriter) Write(b []byte) (int, error) {
+	if !w.written {
+		w.WriteHeader(http.StatusOK)
+	}
+	return w.ResponseWriter.Write(b)
+}
+func (w *countingResponseWriter) Flush() {
+	if f, ok := w.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+// countingContext is a testContext whose Response() returns a caller-supplied
+// countingResponseWriter, so a test can observe the writer the error handler
+// actually uses (rather than the one testContext builds internally).
+type countingContext struct {
+	*testContext
+	rw *countingResponseWriter
+}
+
+func (c *countingContext) Response() types.ResponseWriter { return c.rw }
+
+// TestErrorHandler_NoDoubleWrite is the regression test for the fragile
+// two-step write pattern in writeErrorResponse: the outer guard read Written()
+// through one assertion, then the helper wrote through a *separate*
+// http.ResponseWriter assertion with no Written() recheck. A custom context
+// whose writer is reported as already-committed used to get a second
+// WriteHeader (double-write); the hardened code must not emit one.
+func TestErrorHandler_NoDoubleWrite(t *testing.T) {
+	t.Run("uncommitted writer gets exactly one status line", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		rec := httptest.NewRecorder()
+		base := newTestContext(req, rec)
+		crw := &countingResponseWriter{ResponseWriter: rec}
+		c := &countingContext{testContext: base, rw: crw}
+
+		handler := func(Context) error {
+			return httpctx.NewHTTPError(http.StatusNotFound, "missing")
+		}
+		err := ErrorHandler()(handler)(c)
+		require.NoError(t, err)
+
+		assert.Equal(t, 1, crw.writeHeaderN, "error handler must write the status exactly once")
+		assert.Equal(t, http.StatusNotFound, rec.Code)
+		assert.Contains(t, rec.Body.String(), "HTTP_404")
+	})
+
+	t.Run("already-committed writer is not written again", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		rec := httptest.NewRecorder()
+		base := newTestContext(req, rec)
+		// reportWritten forces Written()==true to mimic a response the handler
+		// already committed; the error handler must leave it untouched.
+		crw := &countingResponseWriter{ResponseWriter: rec, reportWritten: true}
+		c := &countingContext{testContext: base, rw: crw}
+
+		handler := func(Context) error {
+			return fmt.Errorf("boom after commit")
+		}
+		err := ErrorHandler()(handler)(c)
+
+		// Outer guard sees Written()==true and returns the error as-is.
+		require.Error(t, err)
+		assert.Equal(t, "boom after commit", err.Error())
+		assert.Equal(t, 0, crw.writeHeaderN, "must not write a status onto an already-committed response")
+	})
 }
 
 // TODO: Implement mapHTTPErrorToCode function and uncomment this test

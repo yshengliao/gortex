@@ -147,15 +147,34 @@ func writeErrorResponse(c Context, statusCode int, errCode, message string, deta
 		}
 	}
 
-	// Set response header and write JSON
-	if resp, ok := c.Response().(http.ResponseWriter); ok {
+	// Write the error response directly only when the writer exposes
+	// written-tracking AND reports it has not yet committed. The two-step
+	// pattern (outer guard reads Written() through one assertion, then this
+	// helper wrote through a *separate* http.ResponseWriter assertion with no
+	// recheck) was fragile: a writer that does not expose Written() slipped
+	// past the outer guard and reached an unconditional raw WriteHeader here,
+	// which double-writes the status when the handler had already committed a
+	// response. Requiring Written() on this assertion too, and rechecking it,
+	// keeps the fast path for the framework's tracked writer (DefaultContext)
+	// while routing anything we cannot reason about through c.JSON, which
+	// respects the context's own written-tracking and stays a no-op on an
+	// already-committed response.
+	if resp, ok := c.Response().(interface {
+		http.ResponseWriter
+		Written() bool
+	}); ok {
+		if resp.Written() {
+			// Already committed — do not emit a second status line.
+			return nil
+		}
 		resp.Header().Set("Content-Type", "application/json")
 		resp.WriteHeader(statusCode)
 		encoder := json.NewEncoder(resp)
 		return encoder.Encode(response)
 	}
 
-	// Fallback to context JSON method
+	// Conservative fallback for writers without written-tracking: c.JSON
+	// goes through the context's own write path rather than a raw WriteHeader.
 	return c.JSON(statusCode, response)
 }
 
