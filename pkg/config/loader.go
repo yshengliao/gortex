@@ -20,18 +20,27 @@ import (
 //   - Command line arguments (--key=value)
 //
 // Load precedence (highest → lowest): CLI args → env vars → .env file → YAML → defaults.
+//
+// The loader does NOT mutate os.Environ; .env lines and CLI flags are held in
+// in-memory overlay maps and consulted at the correct precedence level.
 type simpleLoader struct {
 	yamlFile       string
 	dotEnvFile     string
 	envPrefix      string
 	useCommandArgs bool
+
+	// in-memory overlays — never written to os.Environ
+	dotEnvOverlay map[string]string // values parsed from the .env file
+	cliArgOverlay map[string]string // values parsed from CLI --flags
 }
 
 // NewLoader creates a new configuration loader backed by simpleLoader.
 // This is the recommended constructor; it requires no external dependencies.
 func NewLoader() *simpleLoader {
 	return &simpleLoader{
-		envPrefix: "GORTEX_",
+		envPrefix:     "GORTEX_",
+		dotEnvOverlay: make(map[string]string),
+		cliArgOverlay: make(map[string]string),
 	}
 }
 
@@ -62,12 +71,17 @@ func (l *simpleLoader) WithCommandArguments() *simpleLoader {
 // Load loads configuration from various sources.
 // Precedence (highest → lowest): CLI args → env vars → .env file → YAML → defaults.
 func (l *simpleLoader) Load(cfg *Config) error {
+	// Reset overlays for idempotent re-use
+	l.dotEnvOverlay = make(map[string]string)
+	l.cliArgOverlay = make(map[string]string)
+
 	// Start with default configuration
 	*cfg = *DefaultConfig()
 
-	// Apply command line arguments as environment variables (highest priority)
+	// Parse CLI arguments into in-memory overlay (highest priority).
+	// os.Environ is NOT mutated.
 	if l.useCommandArgs {
-		l.applyCommandArgs()
+		l.parseCommandArgs()
 	}
 
 	// Load from YAML file if specified
@@ -77,14 +91,16 @@ func (l *simpleLoader) Load(cfg *Config) error {
 		}
 	}
 
-	// Load .env file (sets env vars that don't already exist)
+	// Parse .env file into in-memory overlay.
+	// os.Environ is NOT mutated.
 	if l.dotEnvFile != "" {
-		if err := l.loadFromDotEnv(); err != nil {
+		if err := l.parseDotEnv(); err != nil {
 			return fmt.Errorf("failed to load .env file: %w", err)
 		}
 	}
 
-	// Override with environment variables
+	// Override with environment variables (consulting overlays at the right
+	// precedence level: CLI args > real env vars > .env overlay).
 	if err := l.loadFromEnv(cfg); err != nil {
 		return fmt.Errorf("failed to load env config: %w", err)
 	}
@@ -107,10 +123,10 @@ func (l *simpleLoader) loadFromYAML(cfg *Config) error {
 	return yaml.Unmarshal(data, cfg)
 }
 
-// loadFromDotEnv parses a .env file and sets environment variables.
+// parseDotEnv parses a .env file into the in-memory dotEnvOverlay map.
 // Lines are in KEY=VALUE format. Empty lines and lines starting with # are skipped.
-// Existing environment variables are NOT overwritten (so real env vars take precedence).
-func (l *simpleLoader) loadFromDotEnv() error {
+// os.Environ is NOT modified; the overlay is consulted in loadFromEnv.
+func (l *simpleLoader) parseDotEnv() error {
 	f, err := os.Open(l.dotEnvFile)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -146,21 +162,16 @@ func (l *simpleLoader) loadFromDotEnv() error {
 			}
 		}
 
-		// Only set if the env var is not already set.
-		// This ensures: real env vars > .env file values.
-		if _, exists := os.LookupEnv(key); !exists {
-			if err := os.Setenv(key, value); err != nil {
-				return err
-			}
-		}
+		l.dotEnvOverlay[key] = value
 	}
 
 	return scanner.Err()
 }
 
-// applyCommandArgs parses command line arguments in the form --name=value
-// and sets them as environment variables using the configured prefix.
-func (l *simpleLoader) applyCommandArgs() {
+// parseCommandArgs parses command line arguments in the form --name=value
+// into the in-memory cliArgOverlay map using the configured prefix.
+// os.Environ is NOT modified.
+func (l *simpleLoader) parseCommandArgs() {
 	for _, arg := range os.Args[1:] {
 		if !strings.HasPrefix(arg, "--") {
 			continue
@@ -171,11 +182,30 @@ func (l *simpleLoader) applyCommandArgs() {
 		}
 		name := strings.ToUpper(strings.ReplaceAll(kv[0], "-", "_"))
 		envName := l.envPrefix + name
-		_ = os.Setenv(envName, kv[1])
+		l.cliArgOverlay[envName] = kv[1]
 	}
 }
 
-// loadFromEnv loads configuration from environment variables.
+// lookupEnv looks up a key with precedence:
+// CLI args (highest) → real os.Environ → .env overlay (lowest).
+// Returns (value, true) if found in any source.
+func (l *simpleLoader) lookupEnv(key string) (string, bool) {
+	// 1. CLI args take highest priority
+	if v, ok := l.cliArgOverlay[key]; ok {
+		return v, true
+	}
+	// 2. Real environment variable
+	if v, ok := os.LookupEnv(key); ok {
+		return v, true
+	}
+	// 3. .env file overlay
+	if v, ok := l.dotEnvOverlay[key]; ok {
+		return v, true
+	}
+	return "", false
+}
+
+// loadFromEnv loads configuration from environment variables (and overlays).
 func (l *simpleLoader) loadFromEnv(cfg *Config) error {
 	v := reflect.ValueOf(cfg).Elem()
 	return l.loadStructFromEnv(v, l.envPrefix)
@@ -211,9 +241,9 @@ func (l *simpleLoader) loadStructFromEnv(v reflect.Value, prefix string) error {
 			continue
 		}
 
-		// Get environment variable value
-		envValue := os.Getenv(fullEnvName)
-		if envValue == "" {
+		// Get environment variable value via overlay-aware lookup
+		envValue, ok := l.lookupEnv(fullEnvName)
+		if !ok || envValue == "" {
 			continue
 		}
 

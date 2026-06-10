@@ -3,8 +3,6 @@ package app
 import (
 	"reflect"
 	"sync"
-
-	"github.com/yshengliao/gortex/core/handler"
 )
 
 // HandlerCache caches reflection results for handlers
@@ -73,7 +71,8 @@ func (c *HandlerCache) buildMethodCache(t reflect.Type) map[string]HandlerMethod
 		}
 	}
 
-	// Check custom methods
+	// Check custom methods. All non-standard method names are registered as POST
+	// by the runtime (registerCustomMethodWithMiddleware always calls r.POST).
 	for i := 0; i < t.NumMethod(); i++ {
 		method := t.Method(i)
 		name := method.Name
@@ -85,29 +84,9 @@ func (c *HandlerCache) buildMethodCache(t reflect.Type) map[string]HandlerMethod
 
 		// Check if it's a valid handler
 		if isValidGortexHandler(method) {
-			httpMethod := "GET" // Default
-
-			// Determine HTTP method from name
-			prefixMap := map[string]string{
-				"Post":   "POST",
-				"Create": "POST",
-				"Put":    "PUT",
-				"Update": "PUT",
-				"Delete": "DELETE",
-				"Remove": "DELETE",
-				"Patch":  "PATCH",
-			}
-
-			for prefix, method := range prefixMap {
-				if len(name) > len(prefix) && name[:len(prefix)] == prefix {
-					httpMethod = method
-					break
-				}
-			}
-
 			methods[name] = HandlerMethod{
 				Name:       name,
-				HTTPMethod: httpMethod,
+				HTTPMethod: "POST", // Custom methods always map to POST at runtime.
 				Path:       methodNameToPath(name),
 				IsValid:    true,
 				Method:     method,
@@ -118,46 +97,9 @@ func (c *HandlerCache) buildMethodCache(t reflect.Type) map[string]HandlerMethod
 	return methods
 }
 
-// RouteInfo represents cached route information
-type RouteInfo struct {
-	Method  string
-	Path    string
-	Handler handler.HandlerFunc
-}
-
-// RouteCache caches compiled routes
-type RouteCache struct {
-	mu     sync.RWMutex
-	routes map[string][]RouteInfo // key is struct type name
-}
-
-// Global route cache
-var routeCache = &RouteCache{
-	routes: make(map[string][]RouteInfo),
-}
-
-// GetRoutes returns cached routes for a handler type
-func (c *RouteCache) GetRoutes(key string) ([]RouteInfo, bool) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	routes, exists := c.routes[key]
-	return routes, exists
-}
-
-// SetRoutes caches routes for a handler type
-func (c *RouteCache) SetRoutes(key string, routes []RouteInfo) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.routes[key] = routes
-}
-
-// ClearCache clears all caches (useful for testing)
+// ClearCache clears the handler method cache (useful for testing).
 func ClearCache() {
 	handlerCache.mu.Lock()
 	handlerCache.methods = make(map[reflect.Type]map[string]HandlerMethod)
 	handlerCache.mu.Unlock()
-
-	routeCache.mu.Lock()
-	routeCache.routes = make(map[string][]RouteInfo)
-	routeCache.mu.Unlock()
 }

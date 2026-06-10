@@ -202,8 +202,8 @@ GORTEX_DATABASE_PASSWORD=dotenv-pass
 	require.NoError(t, err)
 	tmpFile.Close()
 
-	// Ensure these keys don't exist yet, so .env loading can set them.
-	// Register cleanup to remove them after the test.
+	// Ensure these keys don't exist in the real environment so the .env overlay
+	// is the sole source. The loader no longer calls os.Setenv, so no cleanup is needed.
 	dotEnvKeys := []string{
 		"GORTEX_SERVER_PORT", "GORTEX_SERVER_ADDRESS", "GORTEX_LOGGER_LEVEL",
 		"GORTEX_SERVER_SHUTDOWN_TIMEOUT", "GORTEX_JWT_SECRET_KEY",
@@ -212,11 +212,6 @@ GORTEX_DATABASE_PASSWORD=dotenv-pass
 	for _, key := range dotEnvKeys {
 		os.Unsetenv(key)
 	}
-	t.Cleanup(func() {
-		for _, key := range dotEnvKeys {
-			os.Unsetenv(key)
-		}
-	})
 
 	loader := config.NewLoader().
 		WithDotEnvFile(tmpFile.Name()).
@@ -309,9 +304,9 @@ GORTEX_DATABASE_PASSWORD=dotenv-pass
 	require.NoError(t, err)
 	envFile.Close()
 
-	// Pre-register keys that will be set by .env loading
+	// Ensure GORTEX_DATABASE_PASSWORD is not set in the real env so the .env
+	// overlay is the sole source. The loader no longer calls os.Setenv.
 	os.Unsetenv("GORTEX_DATABASE_PASSWORD")
-	t.Cleanup(func() { os.Unsetenv("GORTEX_DATABASE_PASSWORD") })
 
 	// Real env var: should be overridden by CLI arg (4444 > 3333)
 	t.Setenv("GORTEX_SERVER_PORT", "3333")
@@ -364,14 +359,11 @@ GORTEX_DATABASE_PASSWORD=dotenv-pass
 	require.NoError(t, err)
 	envFile.Close()
 
-	// Pre-register .env-only keys for cleanup
+	// Ensure .env-only keys are absent from the real environment so they come
+	// exclusively from the .env overlay. The loader no longer calls os.Setenv.
 	for _, key := range []string{"GORTEX_LOGGER_ENCODING", "GORTEX_DATABASE_PASSWORD"} {
 		os.Unsetenv(key)
 	}
-	t.Cleanup(func() {
-		os.Unsetenv("GORTEX_LOGGER_ENCODING")
-		os.Unsetenv("GORTEX_DATABASE_PASSWORD")
-	})
 
 	// Real env var: should win over .env value (3333 > 2222)
 	t.Setenv("GORTEX_SERVER_PORT", "3333")
@@ -392,4 +384,45 @@ GORTEX_DATABASE_PASSWORD=dotenv-pass
 	assert.Equal(t, "yaml-secret-padded-to-at-least-32by", cfg.JWT.SecretKey) // yaml
 	assert.Equal(t, "yaml-user", cfg.Database.User)                           // yaml
 	assert.Equal(t, "dotenv-pass", cfg.Database.Password)                     // .env
+}
+
+// TestSimpleLoader_DoesNotMutateOsEnviron is a regression test ensuring that
+// Load() never calls os.Setenv. Values from .env files and CLI flags must be
+// resolved via in-memory overlays without polluting the process environment.
+func TestSimpleLoader_DoesNotMutateOsEnviron(t *testing.T) {
+	// Choose unique sentinel keys that are guaranteed absent from the real env.
+	const dotEnvKey = "GORTEX_REGRESSION_DOTENV_SENTINEL"
+	const cliKey = "GORTEX_REGRESSION_CLI_SENTINEL"
+	os.Unsetenv(dotEnvKey)
+	os.Unsetenv(cliKey)
+
+	envContent := dotEnvKey + "=from-dotenv\n"
+	envFile, err := os.CreateTemp(t.TempDir(), ".env")
+	require.NoError(t, err)
+	_, err = envFile.WriteString(envContent)
+	require.NoError(t, err)
+	envFile.Close()
+
+	// Provide the required fields via real env vars so Validate() passes.
+	t.Setenv("GORTEX_JWT_SECRET_KEY", "regression-secret-key-at-least-32-bytes")
+	t.Setenv("GORTEX_DATABASE_USER", "regression-user")
+	t.Setenv("GORTEX_DATABASE_PASSWORD", "regression-pass")
+
+	origArgs := os.Args
+	os.Args = append([]string{origArgs[0]},
+		"--regression-cli-sentinel=from-cli")
+	t.Cleanup(func() { os.Args = origArgs })
+
+	loader := config.NewLoader().
+		WithDotEnvFile(envFile.Name()).
+		WithEnvPrefix("GORTEX_").
+		WithCommandArguments()
+	cfg := &config.Config{}
+	require.NoError(t, loader.Load(cfg))
+
+	// The .env key and the CLI key must NOT appear in os.Environ.
+	assert.Equal(t, "", os.Getenv(dotEnvKey),
+		"Load() must not call os.Setenv for .env keys")
+	assert.Equal(t, "", os.Getenv(cliKey),
+		"Load() must not call os.Setenv for CLI flag keys")
 }

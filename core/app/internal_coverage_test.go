@@ -106,17 +106,16 @@ func TestHandlerCacheBuildsStandardAndCustomMethods(t *testing.T) {
 	require.Contains(t, methods, "POST")
 	assert.Equal(t, "POST", methods["POST"].HTTPMethod)
 
-	// Custom methods get their HTTP verb inferred from the method-name prefix.
+	// All custom (non-HTTP-verb) methods map to POST, matching the runtime:
+	// registerCustomMethodWithMiddleware always calls r.POST.
 	require.Contains(t, methods, "CreateWidget")
 	assert.Equal(t, "POST", methods["CreateWidget"].HTTPMethod)
 	require.Contains(t, methods, "UpdateWidget")
-	assert.Equal(t, "PUT", methods["UpdateWidget"].HTTPMethod)
+	assert.Equal(t, "POST", methods["UpdateWidget"].HTTPMethod)
 	require.Contains(t, methods, "DeleteWidget")
-	assert.Equal(t, "DELETE", methods["DeleteWidget"].HTTPMethod)
-
-	// Unknown prefix falls back to GET.
+	assert.Equal(t, "POST", methods["DeleteWidget"].HTTPMethod)
 	require.Contains(t, methods, "ListWidgets")
-	assert.Equal(t, "GET", methods["ListWidgets"].HTTPMethod)
+	assert.Equal(t, "POST", methods["ListWidgets"].HTTPMethod)
 	assert.Equal(t, "/list-widgets", methods["ListWidgets"].Path)
 }
 
@@ -136,25 +135,6 @@ func TestHandlerCacheReturnsCachedCopy(t *testing.T) {
 		reflect.ValueOf(first).Pointer(),
 		reflect.ValueOf(second).Pointer(),
 		"second lookup should hit the cache, not rebuild")
-}
-
-func TestRouteCacheGetSet(t *testing.T) {
-	ClearCache()
-	t.Cleanup(ClearCache)
-
-	routes := []RouteInfo{{Method: "GET", Path: "/x"}}
-	routeCache.SetRoutes("key", routes)
-
-	got, ok := routeCache.GetRoutes("key")
-	require.True(t, ok)
-	assert.Equal(t, routes, got)
-
-	_, ok = routeCache.GetRoutes("missing")
-	assert.False(t, ok)
-
-	ClearCache()
-	_, ok = routeCache.GetRoutes("key")
-	assert.False(t, ok, "ClearCache must drop stored routes")
 }
 
 // --- route_registration.go: parseMiddleware & parseRateLimit -----------

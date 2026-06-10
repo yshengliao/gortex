@@ -170,28 +170,3 @@ func (hc *SafeHealthChecker) Stop() {
 	close(hc.stopCh)
 	hc.wg.Wait()
 }
-
-// Alternative fix for the original HealthChecker
-// This demonstrates minimal changes needed to fix race conditions
-
-// FixedHealthChecker wraps the original with proper synchronization
-type FixedHealthChecker struct {
-	*HealthChecker
-	stopOnce sync.Once
-}
-
-// NewFixedHealthChecker creates a race-free wrapper
-func NewFixedHealthChecker(interval, timeout time.Duration) *FixedHealthChecker {
-	return &FixedHealthChecker{
-		HealthChecker: NewHealthChecker(interval, timeout),
-	}
-}
-
-// Stop ensures single execution
-func (fhc *FixedHealthChecker) Stop() {
-	fhc.stopOnce.Do(func() {
-		if fhc.stop != nil {
-			close(fhc.stop)
-		}
-	})
-}

@@ -6,6 +6,9 @@ import (
 
 func BenchmarkGortexRouter(b *testing.B) {
 	suite := NewBenchmarkSuite()
+	// Redirect writes to a temp dir so benchmark_db.json is never written to the
+	// source tree. Mirrors the pattern used in TestBenchmarkSuite.
+	suite.dbPath = b.TempDir() + "/bench.json"
 
 	b.Run("Router", suite.RunRouterBenchmarks)
 	b.Run("Context", suite.RunContextBenchmarks)
