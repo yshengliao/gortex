@@ -54,12 +54,77 @@ func TestGortexRouter_Wildcard(t *testing.T) {
 		return c.String(200, "File: "+c.Param("filepath"))
 	})
 
-	req := httptest.NewRequest("GET", "/static/css/style.css", nil)
+	req := httptest.NewRequest("GET", "/static/style.css", nil)
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 
 	if rec.Code != 200 {
 		t.Errorf("expected 200, got %d", rec.Code)
+	}
+	// The captured path must be exposed under the NAMED param, not silently
+	// dropped (which would yield "File: ").
+	if got, want := rec.Body.String(), "File: style.css"; got != want {
+		t.Errorf("expected %q, got %q", want, got)
+	}
+}
+
+// TestGortexRouter_WildcardNamedMultiSegment verifies a named wildcard captures
+// the full remaining path across multiple segments.
+func TestGortexRouter_WildcardNamedMultiSegment(t *testing.T) {
+	r := ghttp.NewGortexRouter()
+	r.GET("/static/*filepath", func(c ghttp.Context) error {
+		return c.String(200, c.Param("filepath"))
+	})
+
+	req := httptest.NewRequest("GET", "/static/css/app.css", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != 200 {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+	if got, want := rec.Body.String(), "css/app.css"; got != want {
+		t.Errorf("expected %q, got %q", want, got)
+	}
+}
+
+// TestGortexRouter_WildcardNamedAlsoUnderStar verifies that a named wildcard
+// remains reachable under "*" for back-compat in addition to its name.
+func TestGortexRouter_WildcardNamedAlsoUnderStar(t *testing.T) {
+	r := ghttp.NewGortexRouter()
+	r.GET("/static/*filepath", func(c ghttp.Context) error {
+		return c.String(200, c.Param("filepath")+"|"+c.Param("*"))
+	})
+
+	req := httptest.NewRequest("GET", "/static/css/app.css", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != 200 {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+	if got, want := rec.Body.String(), "css/app.css|css/app.css"; got != want {
+		t.Errorf("expected %q, got %q", want, got)
+	}
+}
+
+// TestGortexRouter_WildcardBare verifies a bare "*" wildcard captures the
+// remaining path under "*".
+func TestGortexRouter_WildcardBare(t *testing.T) {
+	r := ghttp.NewGortexRouter()
+	r.GET("/static/*", func(c ghttp.Context) error {
+		return c.String(200, "File: "+c.Param("*"))
+	})
+
+	req := httptest.NewRequest("GET", "/static/css/app.css", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != 200 {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+	if got, want := rec.Body.String(), "File: css/app.css"; got != want {
+		t.Errorf("expected %q, got %q", want, got)
 	}
 }
 

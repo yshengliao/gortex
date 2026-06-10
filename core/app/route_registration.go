@@ -86,7 +86,14 @@ func registerRoutesRecursiveWithMiddleware(r httpctx.GortexRouter, manager any, 
 			fullPath := pathPrefix + urlTag
 
 			// Check for middleware tag on the group/handler and build the middleware chain.
-			currentMiddleware := parentMiddleware
+			//
+			// Clone the parent chain into a fresh slice rather than appending
+			// directly onto parentMiddleware: a bare append can share the
+			// parent's backing array, so sibling fields extending the same
+			// parent would clobber each other's middleware. A clone gives each
+			// field an independent chain.
+			currentMiddleware := make([]middleware.MiddlewareFunc, len(parentMiddleware), len(parentMiddleware)+1)
+			copy(currentMiddleware, parentMiddleware)
 			if middlewareTag := field.Tag.Get("middleware"); middlewareTag != "" {
 				mw, err := parseMiddleware(middlewareTag, ctx)
 				if err != nil {
