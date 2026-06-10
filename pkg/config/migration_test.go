@@ -385,11 +385,11 @@ GORTEX_DATABASE_PASSWORD=dotenv-pass
 	require.NoError(t, err)
 
 	// env var > .env > yaml > defaults
-	assert.Equal(t, "3333", cfg.Server.Port)              // env var (highest)
-	assert.Equal(t, ":1111", cfg.Server.Address)          // yaml
-	assert.Equal(t, "warn", cfg.Logger.Level)             // yaml
-	assert.Equal(t, "console", cfg.Logger.Encoding)                      // .env
+	assert.Equal(t, "3333", cfg.Server.Port)                                  // env var (highest)
+	assert.Equal(t, ":1111", cfg.Server.Address)                              // yaml
+	assert.Equal(t, "warn", cfg.Logger.Level)                                 // yaml
+	assert.Equal(t, "console", cfg.Logger.Encoding)                           // .env
 	assert.Equal(t, "yaml-secret-padded-to-at-least-32by", cfg.JWT.SecretKey) // yaml
-	assert.Equal(t, "yaml-user", cfg.Database.User)                      // yaml
-	assert.Equal(t, "dotenv-pass", cfg.Database.Password) // .env
+	assert.Equal(t, "yaml-user", cfg.Database.User)                           // yaml
+	assert.Equal(t, "dotenv-pass", cfg.Database.Password)                     // .env
 }
