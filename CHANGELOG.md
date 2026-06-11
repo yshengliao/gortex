@@ -15,7 +15,7 @@ Third-round security and correctness audit. This release is a **minor bump** bec
    `pkg/auth.JWTService` now embeds a `typ` claim in every issued token (`"access"` or `"refresh"`). `ValidateToken` rejects any token whose `typ` is not `"access"`; `ValidateRefreshToken` rejects anything whose `typ` is not `"refresh"`. Tokens issued by earlier versions carry no `typ` claim and are therefore **rejected by both validators**. Re-issue all tokens after upgrading. Access and refresh tokens are no longer interchangeable. Signing and verification are pinned to HS256 exactly; tokens signed with any other algorithm are rejected.
 
 2. **`middleware:"..."` and `ratelimit:"..."` struct tags now fail loudly**
-   Unresolved names, unimplemented names (`rbac`), and malformed rate-limit tags (e.g. `"100permin"`) now return errors from `NewApp`/`RegisterRoutes`. Previously these were warn-and-drop, meaning routes were registered **without** the intended protection. If you use `middleware:"auth,rbac"` or `middleware:"jwt,rbac"`, remove `rbac` or register a custom middleware under that name in the app context.
+   Unresolved names and malformed rate-limit tags (e.g. `"100permin"`) now return errors from `NewApp`/`RegisterRoutes`. Previously these were warn-and-drop, meaning routes were registered **without** the intended protection. Built-in names are `auth`, `requestid`, and `recover` (`auth` additionally requires a `middleware.MiddlewareFunc` registered in the app context); any other name — `rbac`, `jwt`, etc. — must be removed from the tag or registered as a custom middleware under that name in the app context.
 
 3. **Rate-limit default key no longer honours forwarding headers without `TrustedProxies`**
    The default `KeyFunc` in `GortexRateLimitConfig` now keys on the direct TCP peer address. `X-Forwarded-For` / `X-Real-IP` are only respected when the source IP is within the configured `TrustedProxies` CIDRs. This closes the IP-spoofing vector that allowed any client to evade rate limiting by forging a forwarding header. `DefaultGortexRateLimitConfig()` no longer pre-creates a `Store`; the middleware lazily creates and writes back a stoppable `MemoryRateLimiter` on first use.
@@ -31,6 +31,9 @@ Third-round security and correctness audit. This release is a **minor bump** bec
    - `observability/health.FixedHealthChecker` is removed (its `Stop()` never set the stopped flag; `SafeHealthChecker` and `HealthChecker` remain).
    - `core/app.RouteCache` is removed (only tests referenced it; `ClearCache` still clears the handler cache).
    - Doc/parser verb inference is now aligned to runtime: custom handler methods register as POST; the doc layer no longer advertises GET/PUT/DELETE routes that do not exist at runtime.
+
+7. **`websocket.Hub.RegisterClient` now returns `error`**
+   A registration that arrives while the hub is shutting down is refused with `ErrHubShuttingDown`, and the refused client's send channel is closed so a `WritePump` blocked on it exits instead of leaking until TCP teardown. Previously the client was silently dropped with its send channel left open. Existing callers still compile (Go allows discarding the return value), but should check the error before starting the client's pumps.
 
 ---
 

@@ -33,7 +33,7 @@ Each can be tuned per application.
 | Redirects | `Redirect(code, url)` accepts only same-origin paths starting with `/`. | Write the `Location` header directly when an external redirect is required. |
 | CORS | Default config allows `*` origins but not credentials. Combining `*` with `AllowCredentials=true` is rejected. | `CORSWithConfig` returns an error on unsafe configs. |
 | JSON body size | `1 MiB` cap, enforced via `http.MaxBytesReader`. | `ParameterBinder.SetMaxJSONBodyBytes(n)`. |
-| Dev error page | Redacts `Authorization`, `Cookie`, `Set-Cookie`, `X-Api-Key`, `X-Auth-Token`, `Proxy-Authorization`, and any query parameter whose name matches `(?i)(token\|password\|secret\|key\|apikey\|auth)`. | Do not run the dev error page middleware in production. |
+| Dev error page | Redacts `Authorization`, `Cookie`, `Set-Cookie`, `X-Api-Key`, `X-Auth-Token`, `X-CSRF-Token`, `Proxy-Authorization`, and any query parameter whose name matches `(?i)(token\|password\|secret\|key\|apikey\|api_key\|auth)`. | Do not run the dev error page middleware in production. |
 
 ## JWT Authentication Hardening
 

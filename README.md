@@ -88,7 +88,7 @@ type HandlersManager struct {
     Users    *UserHandler    `url:"/users/:id"`                   // Dynamic params
     Static   *FileHandler    `url:"/static/*"`                    // Wildcards
     API      *APIGroup       `url:"/api"`                         // Nested groups
-    Profile  *ProfileHandler `url:"/profile" middleware:"jwt"`    // Protected
+    Profile  *ProfileHandler `url:"/profile" middleware:"auth"`   // Protected
     Chat     *ChatHandler    `url:"/chat" hijack:"ws"`            // WebSocket
 }
 ```

@@ -52,7 +52,12 @@ func (h *ChatHandler) HandleConnection(c httpctx.Context) error {
 		return err
 	}
 	client := websocket.NewClient(h.Hub, conn, userID, h.Logger)
-	h.Hub.RegisterClient(client)
+	if err := h.Hub.RegisterClient(client); err != nil {
+		// Hub is shutting down: the client's send channel is already closed,
+		// so just drop the freshly upgraded connection.
+		_ = conn.Close()
+		return err
+	}
 
 	go client.WritePump()
 	go client.ReadPump()

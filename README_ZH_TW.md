@@ -88,7 +88,7 @@ type HandlersManager struct {
     Users    *UserHandler    `url:"/users/:id"`                   // 動態參數
     Static   *FileHandler    `url:"/static/*"`                    // 萬用字元
     API      *APIGroup       `url:"/api"`                         // 巢狀群組
-    Profile  *ProfileHandler `url:"/profile" middleware:"jwt"`    // 受保護路由
+    Profile  *ProfileHandler `url:"/profile" middleware:"auth"`   // 受保護路由
     Chat     *ChatHandler    `url:"/chat" hijack:"ws"`            // WebSocket
 }
 ```

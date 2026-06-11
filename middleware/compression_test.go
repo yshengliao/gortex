@@ -119,6 +119,48 @@ func TestCompressionPreSetContentEncodingPassthrough(t *testing.T) {
 		"pre-compressed body must pass through without double encoding")
 }
 
+// TestCompressionPreSetContentEncodingPassthroughLargeBody mirrors
+// TestCompressionPreSetContentEncodingPassthrough but uses a pre-compressed
+// body that exceeds the default MinSize threshold (1 KiB). This ensures the
+// middleware does not re-encode content once it has buffered enough bytes to
+// trigger the compression decision path: the pre-set Content-Encoding must
+// cause passthrough even when the size threshold has been crossed.
+func TestCompressionPreSetContentEncodingPassthroughLargeBody(t *testing.T) {
+	// Build a valid gzip payload whose plaintext is well above the 1 KiB
+	// MinSize (use ~4 KiB so the threshold is exceeded comfortably).
+	plaintext := strings.Repeat("pre-compressed large body content ", 120) // ~4 KiB
+	var buf strings.Builder
+	gw := gzip.NewWriter(&buf)
+	_, _ = io.WriteString(gw, plaintext)
+	_ = gw.Close()
+	precompressed := buf.String()
+
+	handler := GzipHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Content-Encoding", "gzip") // already compressed
+		w.WriteHeader(http.StatusOK)
+		_, _ = io.WriteString(w, precompressed)
+	}))
+
+	req := newGzipRequest("/")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	// Content-Encoding must remain exactly as the handler set it.
+	assert.Equal(t, "gzip", rec.Header().Get("Content-Encoding"))
+	// Body must be byte-for-byte identical to what the handler wrote —
+	// no double encoding.
+	assert.Equal(t, precompressed, rec.Body.String(),
+		"pre-compressed body must pass through without double encoding")
+	// Decompressing the response exactly once must recover the original
+	// plaintext — a double-gzipped body would still be compressed here.
+	got := string(decompressGzip(t, rec.Body))
+	assert.Equal(t, plaintext, got,
+		"single gzip decode of passthrough body must recover original plaintext")
+	// Vary must be present (middleware was active for this request).
+	assert.Equal(t, "Accept-Encoding", rec.Header().Get("Vary"))
+}
+
 // TestCompressionNoAcceptEncodingNoVary verifies that when the client does
 // not advertise gzip, the middleware passes through without any
 // Content-Encoding or Vary header (the middleware was not active).

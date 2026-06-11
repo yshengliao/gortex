@@ -41,6 +41,13 @@ type MessageAuthorizer func(client *Client, msg *Message) error
 // MessageAuthorizer when a client's message should be rejected.
 var ErrMessageUnauthorized = errors.New("websocket: message unauthorized")
 
+// ErrHubShuttingDown is returned by RegisterClient when the hub is shutting
+// down (or already stopped) and the client was not registered. The client's
+// send channel has already been closed by the time RegisterClient returns
+// this error, so a WritePump blocked on the channel exits instead of leaking
+// until TCP teardown.
+var ErrHubShuttingDown = errors.New("websocket: hub is shutting down")
+
 // Config tunes the hub's runtime behaviour. The zero value is valid and
 // applies the defaults.
 type Config struct {
@@ -99,12 +106,14 @@ type metricsRequest struct {
 	response chan *Metrics
 }
 
-// registerRequest carries a client to be registered plus an ack channel that
-// is closed once the hub has recorded the registration. Acking removes the
-// need for callers (and tests) to sleep-and-pray after RegisterClient.
+// registerRequest carries a client to be registered plus a result channel
+// (buffered, capacity 1) on which the hub reports exactly once: true when the
+// client was recorded, false when registration was refused because the hub is
+// shutting down. Reporting synchronously removes the need for callers (and
+// tests) to sleep-and-pray after RegisterClient.
 type registerRequest struct {
 	client *Client
-	done   chan struct{}
+	result chan bool
 }
 
 // unregisterRequest mirrors registerRequest for removals.
@@ -199,7 +208,7 @@ func (h *Hub) Run() {
 		select {
 		case req := <-h.register:
 			h.registerClient(req.client)
-			close(req.done)
+			req.result <- true
 
 		case req := <-h.unregister:
 			h.unregisterClient(req.client)
@@ -282,10 +291,11 @@ func (h *Hub) serveDuringGrace(grace time.Duration) {
 		case <-timer.C:
 			return
 		case req := <-h.register:
-			// Refuse new registrations during shutdown: record nothing and ack
-			// so the caller unblocks. The client's send channel is left for the
-			// caller to manage; the hub never took ownership.
-			close(req.done)
+			// Refuse new registrations during shutdown: record nothing and
+			// report the refusal so RegisterClient closes the client's send
+			// channel and returns ErrHubShuttingDown. The hub never took
+			// ownership of the channel.
+			req.result <- false
 		case req := <-h.unregister:
 			h.unregisterClient(req.client)
 			close(req.done)
@@ -495,20 +505,33 @@ func (h *Hub) GetConnectedClients() int {
 }
 
 // RegisterClient registers a new client to the hub. It blocks until the hub
-// has recorded the client (and sent its welcome message) or until the hub is
-// shut down, so tests can observe the post-registration state without
-// time-based waits.
-func (h *Hub) RegisterClient(client *Client) {
-	req := registerRequest{client: client, done: make(chan struct{})}
+// has recorded the client (and sent its welcome message), so tests can
+// observe the post-registration state without time-based waits.
+//
+// If the hub is shutting down the registration is refused: the client's send
+// channel is closed — releasing a WritePump blocked on it — and
+// ErrHubShuttingDown is returned. On success the hub owns the send channel
+// and closes it on unregister or shutdown. The two outcomes are mutually
+// exclusive, so the channel is closed exactly once either way.
+func (h *Hub) RegisterClient(client *Client) error {
+	req := registerRequest{client: client, result: make(chan bool, 1)}
 	select {
 	case h.register <- req:
+		// Delivered: register is unbuffered, so the hub has the request and
+		// reports a result exactly once (from the Run loop or the shutdown
+		// grace window). The buffered result channel means the hub never
+		// blocks on the report, so waiting here cannot deadlock.
 	case <-h.shutdown:
-		return
+		// Not delivered: after the grace window nothing reads h.register, so
+		// without this escape a late caller would block forever.
+		close(client.send)
+		return ErrHubShuttingDown
 	}
-	select {
-	case <-req.done:
-	case <-h.shutdown:
+	if <-req.result {
+		return nil
 	}
+	close(client.send)
+	return ErrHubShuttingDown
 }
 
 // UnregisterClient removes a client from the hub and blocks until the hub

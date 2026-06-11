@@ -207,7 +207,11 @@ type WSHandler struct {
 func (h *WSHandler) HandleConnection(c types.Context) error {
     conn, _ := upgrader.Upgrade(c.Response(), c.Request(), nil)
     client := gortexws.NewClient(h.hub, conn, clientID, logger)
-    h.hub.RegisterClient(client) // synchronous; returns only after hub records client
+    // Synchronous: nil means the hub recorded the client. ErrHubShuttingDown
+    // means it was refused and the client's send channel is already closed.
+    if err := h.hub.RegisterClient(client); err != nil {
+        return err
+    }
     go client.WritePump()
     go client.ReadPump()
     return nil

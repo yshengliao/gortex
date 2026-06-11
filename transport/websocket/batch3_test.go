@@ -44,7 +44,7 @@ func TestHub_GetMetricsDuringShutdownGrace(t *testing.T) {
 	// grace window busy. We use a buffered channel and register it so the hub
 	// has a client and therefore runs the grace loop on shutdown.
 	client := &Client{ID: "c1", UserID: "u1", send: make(chan *Message, 256)}
-	hub.RegisterClient(client)
+	require.NoError(t, hub.RegisterClient(client))
 
 	// Trigger shutdown asynchronously so we can poke the hub mid-grace.
 	shutdownDone := make(chan struct{})
@@ -60,9 +60,11 @@ func TestHub_GetMetricsDuringShutdownGrace(t *testing.T) {
 		defer close(done)
 		_ = hub.GetMetrics()
 		_ = hub.GetConnectedClients()
-		// RegisterClient during shutdown must not hang; it is refused/acked
-		// or returns via the shutdown escape.
-		hub.RegisterClient(&Client{ID: "c2", UserID: "u2", send: make(chan *Message, 1)})
+		// RegisterClient during shutdown must not hang. Depending on timing
+		// it either lands before the hub observes shutdown (nil) or is
+		// refused with ErrHubShuttingDown, so the error is intentionally
+		// not asserted here.
+		_ = hub.RegisterClient(&Client{ID: "c2", UserID: "u2", send: make(chan *Message, 1)})
 	}()
 
 	select {
@@ -83,7 +85,7 @@ func TestHub_ShutdownDeliversCloseToClient(t *testing.T) {
 	go hub.Run()
 
 	client := &Client{ID: "c1", UserID: "u1", send: make(chan *Message, 256)}
-	hub.RegisterClient(client)
+	require.NoError(t, hub.RegisterClient(client))
 
 	// Drain the welcome message first.
 	select {
@@ -92,7 +94,13 @@ func TestHub_ShutdownDeliversCloseToClient(t *testing.T) {
 		t.Fatal("did not receive welcome message")
 	}
 
-	go hub.Shutdown()
+	// Join the shutdown goroutine before the test returns so the hub's final
+	// log lines land while the zaptest logger is still valid.
+	shutdownDone := make(chan struct{})
+	go func() {
+		hub.Shutdown()
+		close(shutdownDone)
+	}()
 
 	// The next message must be the graceful close, delivered before the
 	// channel is closed.
@@ -103,6 +111,58 @@ func TestHub_ShutdownDeliversCloseToClient(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("client never received the close frame")
 	}
+
+	<-shutdownDone
+}
+
+// TestHub_RegisterDuringShutdownClosesSend verifies that a registration
+// arriving while the hub is shutting down is refused with ErrHubShuttingDown
+// and that the refused client's send channel is closed, so a WritePump
+// blocked on it exits instead of leaking until TCP teardown. Both shutdown
+// race outcomes (request delivered to the grace window, or the shutdown
+// escape taken before delivery) must converge on this behaviour.
+func TestHub_RegisterDuringShutdownClosesSend(t *testing.T) {
+	hub := NewHub(zaptest.NewLogger(t))
+	go hub.Run()
+
+	c1 := &Client{ID: "c1", UserID: "u1", send: make(chan *Message, 256)}
+	require.NoError(t, hub.RegisterClient(c1))
+
+	// Drain the welcome message.
+	select {
+	case <-c1.send:
+	case <-time.After(time.Second):
+		t.Fatal("did not receive welcome message")
+	}
+
+	shutdownDone := make(chan struct{})
+	go func() {
+		hub.Shutdown()
+		close(shutdownDone)
+	}()
+
+	// Wait for c1's close frame: Shutdown closes h.shutdown before the close
+	// frames go out, so once the frame arrives the registration below is
+	// guaranteed to observe the shutdown — via the grace-window refusal or
+	// the escape path, both of which must behave identically.
+	select {
+	case msg := <-c1.send:
+		assert.Equal(t, "close", msg.Type)
+	case <-time.After(2 * time.Second):
+		t.Fatal("c1 never received the close frame")
+	}
+
+	c2 := &Client{ID: "c2", UserID: "u2", send: make(chan *Message, 1)}
+	assert.ErrorIs(t, hub.RegisterClient(c2), ErrHubShuttingDown)
+
+	select {
+	case _, ok := <-c2.send:
+		assert.False(t, ok, "send channel of a refused client must be closed")
+	case <-time.After(time.Second):
+		t.Fatal("send channel of a refused client was not closed")
+	}
+
+	<-shutdownDone
 }
 
 // --- Fix 4: private target resolved before authorization ----------------------

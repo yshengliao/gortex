@@ -100,19 +100,19 @@ func TestValidateTokenRejectsAlgorithmConfusion(t *testing.T) {
 		// requires to emit an unsigned token.
 		token := signWith(t, jwt.SigningMethodNone, jwt.UnsafeAllowNoneSignatureType, "access")
 		_, err := svc.ValidateToken(token)
-		assert.Error(t, err)
+		assert.ErrorContains(t, err, "unexpected signing method")
 	})
 
 	t.Run("HS384 same secret", func(t *testing.T) {
 		token := signWith(t, jwt.SigningMethodHS384, []byte(testSecret), "access")
 		_, err := svc.ValidateToken(token)
-		assert.Error(t, err)
+		assert.ErrorContains(t, err, "unexpected signing method")
 	})
 
 	t.Run("HS512 same secret", func(t *testing.T) {
 		token := signWith(t, jwt.SigningMethodHS512, []byte(testSecret), "access")
 		_, err := svc.ValidateToken(token)
-		assert.Error(t, err)
+		assert.ErrorContains(t, err, "unexpected signing method")
 	})
 }
 
@@ -122,9 +122,9 @@ func TestValidateRefreshTokenRejectsAlgorithmConfusion(t *testing.T) {
 
 	none := signWith(t, jwt.SigningMethodNone, jwt.UnsafeAllowNoneSignatureType, "refresh")
 	_, err := svc.ValidateRefreshToken(none)
-	assert.Error(t, err)
+	assert.ErrorContains(t, err, "unexpected signing method")
 
 	hs384 := signWith(t, jwt.SigningMethodHS384, []byte(testSecret), "refresh")
 	_, err = svc.ValidateRefreshToken(hs384)
-	assert.Error(t, err)
+	assert.ErrorContains(t, err, "unexpected signing method")
 }

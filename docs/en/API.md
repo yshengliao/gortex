@@ -116,7 +116,7 @@ type HandlersManager struct {
 
 ### Supported Tags
 - `url:"/path"` - Define the route path
-- `middleware:"auth,cors"` - Apply middleware (comma-separated)
+- `middleware:"auth,requestid"` - Apply middleware (comma-separated). Built-in names: `auth`, `requestid`, `recover` (`auth` requires a `middleware.MiddlewareFunc` registered in the app context); unknown names fail at `NewApp`
 - `hijack:"ws"` - Protocol hijacking (e.g., WebSocket)
 
 ### Dynamic Parameters
@@ -226,7 +226,10 @@ func (h *WSHandler) HandleConnection(c types.Context) error {
         return err
     }
     client := gortexws.NewClient(h.hub, conn, clientID, logger)
-    h.hub.RegisterClient(client)
+    if err := h.hub.RegisterClient(client); err != nil {
+        // Hub is shutting down; the client's send channel is already closed.
+        return err
+    }
     go client.WritePump()
     go client.ReadPump()
     return nil
