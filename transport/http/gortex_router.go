@@ -29,13 +29,20 @@ type GortexRouter interface {
 	ServeHTTP(w http.ResponseWriter, r *http.Request)
 }
 
-// gortexRouter implements GortexRouter interface
+// gortexRouter implements GortexRouter interface.
+//
+// Group() returns a new gortexRouter value that shares the parent's trees map.
+// Because the tree data is shared across the whole router family, the mutex
+// guarding it must be shared too: mu is a pointer created once in
+// NewGortexRouter and propagated to every child in Group(). Using a value mutex
+// here would give each group handle its own independent lock over the same
+// data, which is a data race when sibling groups register concurrently.
 type gortexRouter struct {
 	trees       map[string]*routeNode
 	middlewares []MiddlewareFunc
 	prefix      string
 	parent      *gortexRouter
-	mu          sync.RWMutex
+	mu          *sync.RWMutex
 }
 
 // routeNode represents a node in the route tree
@@ -56,6 +63,7 @@ func NewGortexRouter() GortexRouter {
 	return &gortexRouter{
 		trees:       make(map[string]*routeNode),
 		middlewares: make([]MiddlewareFunc, 0),
+		mu:          &sync.RWMutex{},
 	}
 }
 
@@ -94,13 +102,26 @@ func (r *gortexRouter) OPTIONS(path string, h HandlerFunc, m ...MiddlewareFunc) 
 	r.addRoute("OPTIONS", path, h, m...)
 }
 
-// Group creates a new route group
+// Group creates a new route group.
+//
+// The child shares the parent's trees map AND the parent's mutex pointer, so
+// that concurrent registration on sibling group handles is serialised by a
+// single lock over the shared tree data.
+//
+// The middleware slice is cloned with exact capacity rather than appended onto
+// the parent's slice: a bare append can share the parent's backing array, so
+// two sibling groups extending the same parent would clobber each other's
+// middleware. Cloning gives each group an independent chain.
 func (r *gortexRouter) Group(prefix string, m ...MiddlewareFunc) GortexRouter {
+	middlewares := make([]MiddlewareFunc, 0, len(r.middlewares)+len(m))
+	middlewares = append(middlewares, r.middlewares...)
+	middlewares = append(middlewares, m...)
 	return &gortexRouter{
 		trees:       r.trees,
-		middlewares: append(r.middlewares, m...),
+		middlewares: middlewares,
 		prefix:      r.prefix + prefix,
 		parent:      r,
+		mu:          r.mu,
 	}
 }
 
@@ -167,11 +188,16 @@ func (r *gortexRouter) addToTree(root *routeNode, path string, handler HandlerFu
 			}
 			current = current.paramChild
 		} else if strings.HasPrefix(segment, "*") {
-			// Wildcard route
+			// Wildcard route. Capture the name after '*' (empty for a bare
+			// "*"). If a wildcard already exists under this parent the first
+			// registration wins — its name is kept, so registering "/a/*x"
+			// then "/a/*y" deterministically resolves the captured path under
+			// "x" (the first name), never "y".
 			if current.wildChild == nil {
 				current.wildChild = &routeNode{
-					children: make(map[string]*routeNode),
-					isWild:   true,
+					children:  make(map[string]*routeNode),
+					isWild:    true,
+					paramName: segment[1:],
 				}
 			}
 			current = current.wildChild
@@ -208,21 +234,30 @@ func (r *gortexRouter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	if handler := r.findRoute(req.Method, req.URL.Path, dc.params); handler != nil {
 		if err := handler(ctx); err != nil {
-			// Handle error - check if it's an HTTPError
+			// If the handler already wrote a response, the headers and status
+			// line are committed — writing the error now would emit a second
+			// WriteHeader and append the error body after the real one. Do
+			// nothing in that case. Otherwise write the error through the
+			// tracked writer (dc.response) so status/size accounting stays
+			// correct rather than bypassing it via the raw w.
+			if dc.response.Written() {
+				return
+			}
+			rw := dc.response
 			if he, ok := err.(*HTTPError); ok {
 				// Write the proper HTTP error response
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(he.Code)
+				rw.Header().Set("Content-Type", "application/json")
+				rw.WriteHeader(he.Code)
 				response := map[string]interface{}{
 					"message": he.Message,
 				}
-				if encErr := json.NewEncoder(w).Encode(response); encErr != nil {
+				if encErr := json.NewEncoder(rw).Encode(response); encErr != nil {
 					// Fall back to plain text if JSON encoding fails
-					http.Error(w, he.Error(), he.Code)
+					http.Error(rw, he.Error(), he.Code)
 				}
 			} else {
 				// Generic error handling
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				http.Error(rw, err.Error(), http.StatusInternalServerError)
 			}
 		}
 	} else {
@@ -297,8 +332,15 @@ func (r *gortexRouter) searchTree(node *routeNode, path string, params *smartPar
 	// Try wildcard route
 	if node.wildChild != nil {
 		saved := params.count
-		// path contains segment + rest — the full remaining path
+		// path contains segment + rest — the full remaining path.
+		// Always expose the captured path under "*" for back-compat; when the
+		// wildcard was registered with a name (e.g. "*filepath"), also expose
+		// it under that name so c.Param("filepath") works. A bare "*" has an
+		// empty paramName and is only set under "*".
 		params.set("*", path)
+		if name := node.wildChild.paramName; name != "" {
+			params.set(name, path)
+		}
 		if handler, middlewares := r.searchTree(node.wildChild, "", params); handler != nil {
 			return handler, middlewares
 		}

@@ -1,7 +1,7 @@
 # Gortex - High-Performance Go Web Framework
 
 [![Go Version](https://img.shields.io/badge/go-1.25+-blue.svg)](https://go.dev/)
-![Status](https://img.shields.io/badge/status-v0.7.1--alpha-orange.svg)
+![Status](https://img.shields.io/badge/status-v0.8.0--alpha-orange.svg)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 ![AI Generated](https://img.shields.io/badge/AI_Generated-Antigravity-blueviolet.svg)
 
@@ -88,7 +88,7 @@ type HandlersManager struct {
     Users    *UserHandler    `url:"/users/:id"`                   // Dynamic params
     Static   *FileHandler    `url:"/static/*"`                    // Wildcards
     API      *APIGroup       `url:"/api"`                         // Nested groups
-    Profile  *ProfileHandler `url:"/profile" middleware:"jwt"`    // Protected
+    Profile  *ProfileHandler `url:"/profile" middleware:"auth"`   // Protected
     Chat     *ChatHandler    `url:"/chat" hijack:"ws"`            // WebSocket
 }
 ```
@@ -107,11 +107,14 @@ func (h *UserHandler) Profile(c types.Context) error { /* POST /users/:id/profil
 ### Middleware
 
 ```go
-// Via struct tags
+// Via struct tags — built-in names: auth, requestid, recover
+// "auth" requires a middleware.MiddlewareFunc registered in the app context.
+// "rbac" is NOT implemented and causes registration to fail loudly.
+// Unknown names also fail at NewApp time (routes are never registered unprotected).
 type HandlersManager struct {
     Public  *PublicHandler  `url:"/public"`
     Private *PrivateHandler `url:"/private" middleware:"auth"`
-    Admin   *AdminHandler   `url:"/admin" middleware:"auth,rbac"`
+    Admin   *AdminHandler   `url:"/admin" middleware:"auth"`
 }
 
 // Or globally
@@ -134,13 +137,13 @@ cfg := config.NewConfigBuilder().
 |----------|----------|
 | **Routing** | Struct-tag auto-discovery, segment-trie, nested groups, **zero-allocation** context pooling |
 | **Security** | Path-traversal-safe `File`, origin-locked `Redirect`, CORS guard, 1 MiB body cap, CSRF, secret redaction |
-| **Observability** | Jaeger/OTel tracing, sharded metrics, health checks (healthy/degraded/unhealthy), `/_routes` & `/_monitor` |
+| **Observability** | Jaeger/OTel tracing, metrics collectors (ShardedCollector + ImprovedCollector — wired explicitly by the app), health checks (healthy/degraded/unhealthy), `/_routes` & `/_monitor` |
 | **Resilience** | Circuit breaker, token-bucket rate limiter with TTL cleanup, graceful shutdown |
 | **Real-time** | WebSocket Hub with read-size limits, type whitelist, and authoriser hooks |
 
 ## Performance
 
-Routing hot path achieves **0 allocations per request** (Apple M3 Pro, Go 1.25):
+Routing hot path achieves **0 allocations per request** (Apple M3 Pro, Go 1.25; numbers from a maintainer machine, not reproduced in CI):
 
 | Benchmark | ns/op | B/op | allocs/op |
 |-----------|------:|-----:|----------:|
@@ -167,6 +170,10 @@ Full technical documentation is available in both English and Traditional Chines
 - 🔒 [SECURITY.md](SECURITY.md) — Vulnerability reporting process
 
 ## Changelog
+
+### v0.8.0-alpha (2026-06-10)
+
+See [CHANGELOG.md](CHANGELOG.md) for full details.
 
 ### v0.7.1-alpha (2026-06-05)
 

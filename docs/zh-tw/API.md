@@ -116,7 +116,7 @@ type HandlersManager struct {
 
 ### 支援的標籤 (Tags)
 - `url:"/path"` - 定義路由路徑
-- `middleware:"auth,cors"` - 套用中介軟體（以逗號分隔）
+- `middleware:"auth,requestid"` - 套用中介軟體（以逗號分隔）。內建名稱：`auth`、`requestid`、`recover`（`auth` 需先在 app context 註冊 `middleware.MiddlewareFunc`）；未知名稱會在 `NewApp` 時回傳錯誤
 - `hijack:"ws"` - 協議劫持（例如 WebSocket）
 
 ### 動態參數
@@ -226,7 +226,10 @@ func (h *WSHandler) HandleConnection(c types.Context) error {
         return err
     }
     client := gortexws.NewClient(h.hub, conn, clientID, logger)
-    h.hub.RegisterClient(client)
+    if err := h.hub.RegisterClient(client); err != nil {
+        // Hub 正在關閉；client 的 send channel 已被關閉。
+        return err
+    }
     go client.WritePump()
     go client.ReadPump()
     return nil

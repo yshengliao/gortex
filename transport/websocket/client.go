@@ -71,6 +71,20 @@ func (c *Client) trySend(m *Message) (ok bool) {
 	}
 }
 
+// resolveTarget populates msg.Target from a "private" message's client-supplied
+// Data["target"] field. It is a no-op for other message types and for private
+// messages that omit a string target. Resolving the target before the hub's
+// inbound authorization check lets a configured Authorizer veto the final
+// recipient — without it, a whitelisted "private" type could be sent to anyone.
+func resolveTarget(msg *Message) {
+	if msg.Type != "private" {
+		return
+	}
+	if target, ok := msg.Data["target"].(string); ok {
+		msg.Target = target
+	}
+}
+
 // ReadPump pumps messages from the WebSocket connection to the hub
 func (c *Client) ReadPump() {
 	defer func() {
@@ -114,20 +128,21 @@ func (c *Client) ReadPump() {
 			continue
 		}
 
+		// Resolve the recipient of a "private" message from its client-supplied
+		// Data["target"] BEFORE authorization, so the Authorizer sees the final
+		// Target it must vet. Resolving after checkInbound (the old order) meant
+		// an Authorizer could never see the recipient, and whitelisting
+		// "private" let any client message any user. The framework only gates
+		// the message *type*; enforcing who may target whom is the Authorizer's
+		// responsibility (see Config.Authorizer).
+		resolveTarget(&message)
+
 		if err := c.hub.checkInbound(c, &message); err != nil {
 			c.logger.Warn("Dropping inbound WebSocket message",
 				zap.String("client_id", c.ID),
 				zap.String("type", message.Type),
 				zap.Error(err))
 			continue
-		}
-
-		// "private" messages carry an explicit target; otherwise the message
-		// fans out to all clients. Both kinds feed the hub's broadcast loop.
-		if message.Type == "private" {
-			if target, ok := message.Data["target"].(string); ok {
-				message.Target = target
-			}
 		}
 
 		// Hand the message to the hub; stop the pump if the hub is shutting down.

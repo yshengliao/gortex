@@ -66,6 +66,12 @@ type App struct {
 	docProvider     doc.DocProvider
 	docRouteInfos   []doc.RouteInfo // Stores route info for documentation
 
+	// stoppables holds resources created by the framework during route
+	// registration (e.g. rate-limit stores started from struct tags) that
+	// own background goroutines. App.Shutdown stops them so they don't leak
+	// for the process lifetime. Guarded by mu.
+	stoppables []interface{ Stop() }
+
 	// pendingHandlers holds the manager passed to WithHandlers until the
 	// router's default middleware chain is set up in NewApp. The Gortex
 	// router snapshots middleware at route-registration time, so handler
@@ -379,6 +385,30 @@ func (app *App) RegisterShutdownHook(hook ShutdownHook) {
 	app.shutdownHooks = append(app.shutdownHooks, hook)
 }
 
+// registerStoppable records a framework-created resource whose Stop method
+// must run during shutdown (e.g. a rate-limit store's cleanup goroutine).
+func (app *App) registerStoppable(s interface{ Stop() }) {
+	if s == nil {
+		return
+	}
+	app.mu.Lock()
+	defer app.mu.Unlock()
+	app.stoppables = append(app.stoppables, s)
+}
+
+// stopStoppables stops every resource registered via registerStoppable. It is
+// invoked by Shutdown and is safe to call when the slice is empty.
+func (app *App) stopStoppables() {
+	app.mu.Lock()
+	stoppables := app.stoppables
+	app.stoppables = nil
+	app.mu.Unlock()
+
+	for _, s := range stoppables {
+		s.Stop()
+	}
+}
+
 // OnShutdown is a convenience method for registering shutdown hooks
 func (app *App) OnShutdown(fn func(context.Context) error) {
 	app.RegisterShutdownHook(ShutdownHook(fn))
@@ -417,10 +447,17 @@ func (app *App) Shutdown(ctx context.Context) error {
 			if app.logger != nil {
 				app.logger.Error("Error shutting down HTTP server", zap.Error(err))
 			}
+			// Stop framework-created background workers even when the server
+			// shutdown errors, so their goroutines don't leak.
+			app.stopStoppables()
 			// Server shutdown error takes precedence
 			return err
 		}
 	}
+
+	// Stop framework-created background workers (e.g. rate-limit store
+	// cleanup goroutines) registered during route registration.
+	app.stopStoppables()
 
 	if app.logger != nil {
 		app.logger.Info("Graceful shutdown completed")

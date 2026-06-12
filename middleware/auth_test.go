@@ -474,3 +474,162 @@ func TestGetClaimsFromContext(t *testing.T) {
 		t.Error("Expected nil claims from empty context")
 	}
 }
+
+// TestJWTAuthSkipPathsBoundary verifies that the segment-boundary rule is
+// applied correctly: "/public" skips "/public" and "/public/x" but NOT
+// "/publicadmin". The same rule is exercised for SessionAuth below.
+func TestJWTAuthSkipPathsBoundary(t *testing.T) {
+	jwtService, err := auth.NewJWTService("test-secret-key-at-least-32-chars!!", 1*time.Hour, 24*time.Hour, "test-issuer")
+	if err != nil {
+		t.Fatalf("NewJWTService: %v", err)
+	}
+
+	config := &AuthConfig{
+		JWTService: jwtService,
+		SkipPaths:  []string{"/public"},
+	}
+	mw := JWTAuthWithConfig(config)
+
+	cases := []struct {
+		path    string
+		skipped bool
+	}{
+		{"/public", true},
+		{"/public/", true},
+		{"/public/resource", true},
+		{"/publicadmin", false}, // must NOT be skipped — different segment
+		{"/api/users", false},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.path, func(t *testing.T) {
+			req := httptest.NewRequest("GET", tc.path, nil)
+			// No auth header — if the path is not skipped, the middleware must error.
+			rec := httptest.NewRecorder()
+			ctx := newMockContext(req, rec)
+
+			called := false
+			handler := mw(func(c types.Context) error {
+				called = true
+				return c.String(200, "OK")
+			})
+			handlerErr := handler(ctx)
+
+			if tc.skipped {
+				if handlerErr != nil {
+					t.Errorf("path %s should be skipped but got error: %v", tc.path, handlerErr)
+				}
+				if !called {
+					t.Errorf("path %s should be skipped but handler was not called", tc.path)
+				}
+			} else {
+				if handlerErr == nil {
+					t.Errorf("path %s should require auth but no error returned", tc.path)
+				}
+			}
+		})
+	}
+}
+
+// TestSessionAuthSkipPathsBoundary applies the same boundary rule to SessionAuth.
+func TestSessionAuthSkipPathsBoundary(t *testing.T) {
+	store := newMockSessionStore()
+	config := &SessionConfig{
+		SessionStore: store,
+		SessionKey:   "session_id",
+		SkipPaths:    []string{"/public"},
+	}
+	mw := SessionAuthWithConfig(config)
+
+	cases := []struct {
+		path    string
+		skipped bool
+	}{
+		{"/public", true},
+		{"/public/x", true},
+		{"/publicadmin", false},
+		{"/private", false},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.path, func(t *testing.T) {
+			req := httptest.NewRequest("GET", tc.path, nil)
+			rec := httptest.NewRecorder()
+			ctx := newMockContext(req, rec)
+
+			called := false
+			handler := mw(func(c types.Context) error {
+				called = true
+				return c.String(200, "OK")
+			})
+			handlerErr := handler(ctx)
+
+			if tc.skipped {
+				if handlerErr != nil {
+					t.Errorf("path %s should be skipped but got error: %v", tc.path, handlerErr)
+				}
+				if !called {
+					t.Errorf("path %s should be skipped but handler was not called", tc.path)
+				}
+			} else {
+				if handlerErr == nil {
+					t.Errorf("path %s should require auth but no error returned", tc.path)
+				}
+			}
+		})
+	}
+}
+
+// TestJWTAuthBearerDoubleSpace verifies that "Bearer  <token>" (double space)
+// is accepted — the token is trimmed after the prefix.
+func TestJWTAuthBearerDoubleSpace(t *testing.T) {
+	jwtService, err := auth.NewJWTService("test-secret-key-at-least-32-chars!!", 1*time.Hour, 24*time.Hour, "test-issuer")
+	if err != nil {
+		t.Fatalf("NewJWTService: %v", err)
+	}
+	validToken, err := jwtService.GenerateAccessToken("u1", "user1", "u1@example.com", "user")
+	if err != nil {
+		t.Fatalf("GenerateAccessToken: %v", err)
+	}
+
+	mw := JWTAuth(jwtService)
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Authorization", "Bearer  "+validToken) // double space
+	rec := httptest.NewRecorder()
+	ctx := newMockContext(req, rec)
+
+	called := false
+	handler := mw(func(c types.Context) error {
+		called = true
+		return c.String(200, "OK")
+	})
+	if handlerErr := handler(ctx); handlerErr != nil {
+		t.Errorf("double-space Bearer should succeed, got: %v", handlerErr)
+	}
+	if !called {
+		t.Error("handler should have been called for valid double-space Bearer")
+	}
+}
+
+// TestJWTAuthBearerAloneRejected verifies that "Bearer" with no token is rejected.
+func TestJWTAuthBearerAloneRejected(t *testing.T) {
+	jwtService, err := auth.NewJWTService("test-secret-key-at-least-32-chars!!", 1*time.Hour, 24*time.Hour, "test-issuer")
+	if err != nil {
+		t.Fatalf("NewJWTService: %v", err)
+	}
+
+	mw := JWTAuth(jwtService)
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Authorization", "Bearer") // no token
+	rec := httptest.NewRecorder()
+	ctx := newMockContext(req, rec)
+
+	handler := mw(func(c types.Context) error {
+		return c.String(200, "OK")
+	})
+	if handlerErr := handler(ctx); handlerErr == nil {
+		t.Error("'Bearer' alone should be rejected")
+	}
+}

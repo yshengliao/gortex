@@ -225,6 +225,8 @@ func TestParameterBinderEdgeCases(t *testing.T) {
 	})
 
 	t.Run("type conversion errors", func(t *testing.T) {
+		// ComplexParams.UserID has an explicit bind tag ("user_id,path") so a
+		// conversion failure must surface as an error (Fix 1d behaviour).
 		req := httptest.NewRequest(http.MethodGet, "/users/abc?page_size=xyz", nil)
 		rec := httptest.NewRecorder()
 		ctx := httpctx.NewDefaultContext(req, rec)
@@ -235,11 +237,8 @@ func TestParameterBinderEdgeCases(t *testing.T) {
 		paramValue := reflect.ValueOf(params)
 
 		err := binder.bindParameter(ctx, paramValue)
-		require.NoError(t, err)
-
-		// Invalid conversions should result in zero values
-		assert.Equal(t, 0, params.UserID)
-		assert.Equal(t, 0, params.PageSize)
+		require.Error(t, err, "explicit bind tag with non-parseable value must return error")
+		assert.Contains(t, err.Error(), "UserID")
 	})
 }
 

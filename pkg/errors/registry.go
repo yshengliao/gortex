@@ -150,7 +150,15 @@ func getErrorTypeName(err error) string {
 	return t.String()
 }
 
-// HandleBusinessError converts a business error to an HTTP error response
+// HandleBusinessError converts a business error to an HTTP error response.
+//
+// For registered business errors the original error message is included in
+// the response details (these are intentional, developer-defined messages).
+// For unregistered errors only the generic "An error occurred" message is
+// sent to the client; the raw error string is NOT included because it may
+// contain sensitive internals (SQL fragments, file paths, etc.). The caller
+// is responsible for logging the underlying error before invoking this
+// function so that the information is not lost.
 func HandleBusinessError(err error) (int, *ErrorResponse) {
 	if err == nil {
 		return http.StatusOK, nil
@@ -165,14 +173,17 @@ func HandleBusinessError(err error) (int, *ErrorResponse) {
 	// Look up in registry
 	if mapping, ok := GetMapping(err); ok {
 		resp := New(mapping.Code, mapping.Message)
-		// Add the original error message as detail
+		// Registered errors carry intentional, developer-defined messages;
+		// include the original error string as a detail for context.
 		resp = resp.WithDetail("error", err.Error())
 		return mapping.HTTPStatus, resp
 	}
 
-	// Default to internal server error
+	// Default to internal server error. Do NOT include err.Error() in the
+	// client-facing response — raw internal error strings (SQL fragments,
+	// file paths, stack details) must not reach clients. The caller should
+	// log the error before calling this function.
 	resp := New(CodeInternalServerError, "An error occurred")
-	resp = resp.WithDetail("error", err.Error())
 	return http.StatusInternalServerError, resp
 }
 

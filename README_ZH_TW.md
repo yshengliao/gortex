@@ -1,7 +1,7 @@
 # Gortex — 高效能 Go Web 框架
 
 [![Go Version](https://img.shields.io/badge/go-1.25+-blue.svg)](https://go.dev/)
-![Status](https://img.shields.io/badge/status-v0.7.1--alpha-orange.svg)
+![Status](https://img.shields.io/badge/status-v0.8.0--alpha-orange.svg)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE)
 ![AI Generated](https://img.shields.io/badge/AI_Generated-Antigravity-blueviolet.svg)
 
@@ -88,7 +88,7 @@ type HandlersManager struct {
     Users    *UserHandler    `url:"/users/:id"`                   // 動態參數
     Static   *FileHandler    `url:"/static/*"`                    // 萬用字元
     API      *APIGroup       `url:"/api"`                         // 巢狀群組
-    Profile  *ProfileHandler `url:"/profile" middleware:"jwt"`    // 受保護路由
+    Profile  *ProfileHandler `url:"/profile" middleware:"auth"`   // 受保護路由
     Chat     *ChatHandler    `url:"/chat" hijack:"ws"`            // WebSocket
 }
 ```
@@ -107,11 +107,14 @@ func (h *UserHandler) Profile(c types.Context) error { /* POST /users/:id/profil
 ### Middleware
 
 ```go
-// 透過 struct tag 套用
+// 透過 struct tag 套用 — 內建名稱：auth、requestid、recover
+// "auth" 需要在 app context 中註冊一個 middleware.MiddlewareFunc。
+// "rbac" 尚未實作，使用會導致路由註冊失敗（回傳 error）。
+// 未知名稱也會在 NewApp 時立即報錯（路由永遠不會在未受保護的情況下被註冊）。
 type HandlersManager struct {
     Public  *PublicHandler  `url:"/public"`
     Private *PrivateHandler `url:"/private" middleware:"auth"`
-    Admin   *AdminHandler   `url:"/admin" middleware:"auth,rbac"`
+    Admin   *AdminHandler   `url:"/admin" middleware:"auth"`
 }
 
 // 或全域套用
@@ -134,13 +137,13 @@ cfg := config.NewConfigBuilder().
 |------|------|
 | **路由** | Struct-tag 自動發現、segment-trie、巢狀群組、**零分配** Context pooling |
 | **安全** | 防穿越 `File`、同源鎖定 `Redirect`、CORS 防護、1 MiB body 上限、CSRF、敏感值遮蔽 |
-| **可觀測性** | Jaeger/OTel 追蹤、分片指標收集、三態健康檢查、`/_routes` & `/_monitor` |
+| **可觀測性** | Jaeger/OTel 追蹤、指標收集器（ShardedCollector + ImprovedCollector，由應用程式自行連結）、三態健康檢查、`/_routes` & `/_monitor` |
 | **韌性** | Circuit breaker、Token-bucket rate limiter（TTL 自動清理）、優雅關機 |
 | **即時通訊** | WebSocket Hub：訊息大小限制、類型白名單、授權勾子 |
 
 ## 效能
 
-路由 hot path 達成**每請求零記憶體分配**（Apple M3 Pro, Go 1.25）：
+路由 hot path 達成**每請求零記憶體分配**（Apple M3 Pro, Go 1.25；數據來自維護者機器，未在 CI 中重現）：
 
 | 基準測試 | ns/op | B/op | allocs/op |
 |----------|------:|-----:|----------:|
@@ -167,6 +170,10 @@ go run ./examples/websocket  # Hub 訊息限制與授權
 - 🔒 [SECURITY.md](SECURITY.md) — 漏洞通報流程
 
 ## 變更紀錄
+
+### v0.8.0-alpha (2026-06-10)
+
+詳細內容請見 [CHANGELOG.md](CHANGELOG.md)。
 
 ### v0.7.1-alpha (2026-06-05)
 

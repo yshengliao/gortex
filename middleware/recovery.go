@@ -45,6 +45,12 @@ func RecoveryWithConfig(config *RecoveryConfig) MiddlewareFunc {
 	if config.StackSize == 0 {
 		config.StackSize = 4 << 10
 	}
+	// Fall back to the global zap logger when none is supplied. zap.L()
+	// returns a no-op logger until the application replaces it, so this is
+	// always safe and avoids a nil check in the hot path.
+	if config.Logger == nil {
+		config.Logger = zap.L()
+	}
 
 	return func(next HandlerFunc) HandlerFunc {
 		return func(c Context) error {
@@ -115,10 +121,10 @@ func formatStack(stack []byte) []string {
 	for i := 0; i < len(lines); i++ {
 		line := strings.TrimSpace(lines[i])
 		if line != "" {
-			// Skip runtime internals
+			// Skip runtime internals and this middleware's own frames.
 			if strings.Contains(line, "runtime/") ||
 				strings.Contains(line, "net/http/") ||
-				strings.Contains(line, "github.com/labstack/echo") {
+				strings.Contains(line, "github.com/yshengliao/gortex/middleware") {
 				continue
 			}
 			formatted = append(formatted, line)

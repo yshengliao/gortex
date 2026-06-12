@@ -1,6 +1,6 @@
 module github.com/yshengliao/gortex/tools/analyzer
 
-go 1.26.2
+go 1.25.0
 
 require golang.org/x/tools v0.44.0
 

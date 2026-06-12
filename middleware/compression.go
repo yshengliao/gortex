@@ -150,8 +150,13 @@ func (w *gzipResponseWriter) Write(p []byte) (int, error) {
 		return len(p), nil
 	}
 
-	if !w.shouldCompress() {
+	if !w.shouldCompress() || w.Header().Get("Content-Encoding") != "" {
+		// Either the content type is not eligible for compression, or the
+		// handler already set a Content-Encoding (e.g. a pre-compressed asset)
+		// — pass through without re-encoding. We still emit Vary so that
+		// shared caches know this response was subject to content negotiation.
 		w.passthrough = true
+		w.Header().Add("Vary", "Accept-Encoding")
 		w.ResponseWriter.WriteHeader(w.status)
 		if _, err := w.ResponseWriter.Write(w.buf); err != nil {
 			w.buf = nil
@@ -212,7 +217,9 @@ func (w *gzipResponseWriter) close() {
 		return
 	}
 	// Buffered body shorter than MinSize: flush as-is without
-	// Content-Encoding.
+	// Content-Encoding. Still emit Vary because the middleware was active
+	// for this request and could have compressed a larger response.
+	w.Header().Add("Vary", "Accept-Encoding")
 	w.ResponseWriter.WriteHeader(w.status)
 	if len(w.buf) > 0 {
 		_, _ = w.ResponseWriter.Write(w.buf)

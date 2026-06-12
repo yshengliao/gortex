@@ -16,7 +16,8 @@ import (
 // These tests verify only that the deprecated aliases still wire correctly.
 
 func TestBofryLoader_DeprecatedAlias(t *testing.T) {
-	t.Setenv("GORTEX_JWT_SECRET_KEY", "test-secret")
+	// Secret must be >=32 bytes or Load()'s Validate() rejects it.
+	t.Setenv("GORTEX_JWT_SECRET_KEY", "test-secret-key-at-least-32-bytes")
 	t.Setenv("GORTEX_DATABASE_USER", "test-user")
 	t.Setenv("GORTEX_DATABASE_PASSWORD", "test-pass")
 
@@ -34,7 +35,7 @@ func TestConfigBuilder_BuilderPattern(t *testing.T) {
 server:
   port: "9999"
 jwt:
-  secret_key: "builder-secret"
+  secret_key: "builder-secret-at-least-32-bytes!"
 database:
   user: "builder-user"
   password: "builder-pass"
@@ -53,7 +54,7 @@ database:
 	require.NoError(t, err)
 
 	assert.Equal(t, "9999", cfg.Server.Port)
-	assert.Equal(t, "builder-secret", cfg.JWT.SecretKey)
+	assert.Equal(t, "builder-secret-at-least-32-bytes!", cfg.JWT.SecretKey)
 }
 
 func TestConfigBuilder_MustBuild_Panics(t *testing.T) {
@@ -66,7 +67,7 @@ func TestConfigBuilder_MustBuild_Panics(t *testing.T) {
 func TestBofryLoader_CustomPrefix(t *testing.T) {
 	t.Setenv("MYPREFIX_SERVER_PORT", "7777")
 	t.Setenv("MYPREFIX_SERVER_SHUTDOWN_TIMEOUT", "15s")
-	t.Setenv("MYPREFIX_JWT_SECRET_KEY", "prefix-secret")
+	t.Setenv("MYPREFIX_JWT_SECRET_KEY", "prefix-secret-at-least-32-bytes!!")
 	t.Setenv("MYPREFIX_DATABASE_USER", "prefix-user")
 	t.Setenv("MYPREFIX_DATABASE_PASSWORD", "prefix-pass")
 
@@ -77,5 +78,5 @@ func TestBofryLoader_CustomPrefix(t *testing.T) {
 
 	assert.Equal(t, "7777", cfg.Server.Port)
 	assert.Equal(t, 15*time.Second, cfg.Server.ShutdownTimeout)
-	assert.Equal(t, "prefix-secret", cfg.JWT.SecretKey)
+	assert.Equal(t, "prefix-secret-at-least-32-bytes!!", cfg.JWT.SecretKey)
 }

@@ -21,8 +21,9 @@ import (
 // bodies accepted by the parameter binder. Bodies larger than this
 // are rejected with HTTP 413 before any decoding takes place. The
 // limit exists to protect the server from memory exhaustion via
-// hostile payloads.
-const DefaultMaxJSONBodyBytes int64 = 10 << 20 // 10 MiB
+// hostile payloads. This matches DefaultMaxBodyBytes in
+// transport/http/default.go so both code paths enforce the same policy.
+const DefaultMaxJSONBodyBytes int64 = 1 << 20 // 1 MiB
 
 // ParameterBinder handles automatic parameter binding from HTTP requests
 type ParameterBinder struct {
@@ -154,22 +155,30 @@ func (pb *ParameterBinder) bindStruct(c gortexContext.Context, structValue refle
 	}
 
 	// First, try to bind from JSON body if it's a POST/PUT/PATCH request.
-	// The body is wrapped in http.MaxBytesReader so that an oversized
-	// payload is rejected before exhausting memory. Decode failures
-	// (other than io.EOF on an empty body) are surfaced to the caller
-	// so that malformed or oversized JSON is not silently ignored.
+	// The body is read via a local http.MaxBytesReader so that an oversized
+	// payload is rejected before exhausting memory. The original
+	// c.Request().Body is restored afterwards so that later middleware or
+	// handlers that read the body again (e.g. for logging) are not surprised
+	// by the wrapped reader. Decode failures (other than io.EOF on an empty
+	// body) are surfaced to the caller so that malformed or oversized JSON is
+	// not silently ignored.
 	if c.Request().Method == "POST" || c.Request().Method == "PUT" || c.Request().Method == "PATCH" {
-		if c.Request().Header.Get("Content-Type") == "application/json" {
+		if strings.HasPrefix(c.Request().Header.Get("Content-Type"), "application/json") {
 			limit := pb.maxJSONBodyBytes
 			if limit <= 0 {
 				limit = DefaultMaxJSONBodyBytes
 			}
-			c.Request().Body = http.MaxBytesReader(c.Response(), c.Request().Body, limit)
-			if err := json.NewDecoder(c.Request().Body).Decode(structValue.Addr().Interface()); err != nil {
+			originalBody := c.Request().Body
+			limited := http.MaxBytesReader(c.Response(), originalBody, limit)
+			if err := json.NewDecoder(limited).Decode(structValue.Addr().Interface()); err != nil {
 				if !errors.Is(err, io.EOF) {
 					return fmt.Errorf("binder: json decode: %w", err)
 				}
 			}
+			// Restore the original body reference.  The body bytes have already
+			// been consumed, but this prevents downstream readers from seeing an
+			// unexpected *http.maxBytesReader wrapper type.
+			c.Request().Body = originalBody
 		}
 	}
 
@@ -202,9 +211,20 @@ func (pb *ParameterBinder) bindStruct(c gortexContext.Context, structValue refle
 			bindName = strings.ToLower(field.Name)
 		}
 
+		// Determine whether the developer explicitly provided a bind tag name.
+		// A field has an explicit tag when the "bind" tag is non-empty and not
+		// equal to "-"; auto-detected names (from json tag or lowercased field
+		// name) are treated as lenient.
+		hasExplicitBindTag := field.Tag.Get(pb.tagName) != "" && strings.Split(field.Tag.Get(pb.tagName), ",")[0] != "" && strings.Split(field.Tag.Get(pb.tagName), ",")[0] != "-"
+
 		// Try to bind from different sources
 		if err := pb.bindField(c, fieldValue, field, bindName); err != nil {
-			// Continue on error, field remains at zero value
+			if hasExplicitBindTag {
+				// Explicit tag: surface conversion errors so the caller knows
+				// that a value was present but could not be converted.
+				return fmt.Errorf("binder: field %q: %w", field.Name, err)
+			}
+			// Auto-bound field: stay lenient, leave at zero value.
 			continue
 		}
 	}

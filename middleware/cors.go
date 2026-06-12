@@ -113,6 +113,12 @@ type CORSConfig struct {
 // combination that browsers will reject.
 var ErrCORSWildcardWithCredentials = errors.New("cors: cannot combine AllowOrigins \"*\" with AllowCredentials=true")
 
+// ErrCORSWildcardHeadersWithCredentials is returned when a CORS config
+// combines a wildcard in AllowHeaders with AllowCredentials=true. The Fetch
+// spec does not treat a literal "*" as a wildcard when credentials are
+// included; reflecting the request headers verbatim sidesteps that safeguard.
+var ErrCORSWildcardHeadersWithCredentials = errors.New("cors: cannot combine AllowHeaders \"*\" with AllowCredentials=true")
+
 // Validate checks the configuration for unsafe combinations.
 func (c *CORSConfig) Validate() error {
 	if !c.AllowCredentials {
@@ -121,6 +127,11 @@ func (c *CORSConfig) Validate() error {
 	for _, o := range c.AllowOrigins {
 		if o == "*" {
 			return ErrCORSWildcardWithCredentials
+		}
+	}
+	for _, h := range c.AllowHeaders {
+		if h == "*" {
+			return ErrCORSWildcardHeadersWithCredentials
 		}
 	}
 	return nil

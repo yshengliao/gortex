@@ -156,7 +156,9 @@ func TestHandleBusinessError(t *testing.T) {
 		assert.NotNil(t, resp)
 		assert.Equal(t, CodeInternalServerError.Int(), resp.ErrorDetail.Code)
 		assert.Equal(t, "An error occurred", resp.ErrorDetail.Message)
-		assert.Equal(t, "some unknown error", resp.ErrorDetail.Details["error"])
+		// Raw internal error strings must NOT be exposed to clients.
+		assert.Nil(t, resp.ErrorDetail.Details,
+			"unregistered error details must not include raw err.Error()")
 	})
 
 	t.Run("Handle wrapped error", func(t *testing.T) {

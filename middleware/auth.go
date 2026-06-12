@@ -60,9 +60,13 @@ func JWTAuthWithConfig(config *AuthConfig) MiddlewareFunc {
 		return func(c Context) error {
 			req := c.Request()
 
-			// Skip if path is in skip list
+			// Skip if path is in skip list. A skip entry matches when it equals
+			// the request path exactly, or when the request path starts with the
+			// skip entry followed by a "/" (segment boundary). A trailing "/"
+			// on the skip entry is handled naturally by this rule.
 			for _, skip := range config.SkipPaths {
-				if req.URL.Path == skip || strings.HasPrefix(req.URL.Path, skip) {
+				if req.URL.Path == skip ||
+					strings.HasPrefix(req.URL.Path, strings.TrimSuffix(skip, "/")+"/") {
 					return next(c)
 				}
 			}
@@ -79,9 +83,21 @@ func JWTAuthWithConfig(config *AuthConfig) MiddlewareFunc {
 				}
 			}
 
-			// Check Bearer prefix
-			parts := strings.Split(authHeader, " ")
-			if len(parts) != 2 || parts[0] != "Bearer" {
+			// Parse "Bearer <token>". Use HasPrefix + TrimSpace so that extra
+			// whitespace between scheme and token (e.g. double space) is tolerated,
+			// and reject an empty token after trimming.
+			const bearerPrefix = "Bearer "
+			if !strings.HasPrefix(authHeader, bearerPrefix) {
+				return &errors.ErrorResponse{
+					Success: false,
+					ErrorDetail: errors.ErrorDetail{
+						Code:    int(errors.CodeUnauthorized),
+						Message: "invalid authorization header format",
+					},
+				}
+			}
+			tokenStr := strings.TrimSpace(authHeader[len(bearerPrefix):])
+			if tokenStr == "" {
 				return &errors.ErrorResponse{
 					Success: false,
 					ErrorDetail: errors.ErrorDetail{
@@ -92,7 +108,7 @@ func JWTAuthWithConfig(config *AuthConfig) MiddlewareFunc {
 			}
 
 			// Validate token
-			claims, err := config.JWTService.ValidateToken(parts[1])
+			claims, err := config.JWTService.ValidateToken(tokenStr)
 			if err != nil {
 				return &errors.ErrorResponse{
 					Success: false,
@@ -310,9 +326,10 @@ func SessionAuthWithConfig(config *SessionConfig) MiddlewareFunc {
 		return func(c Context) error {
 			req := c.Request()
 
-			// Skip if path is in skip list
+			// Skip if path is in skip list (same segment-boundary rule as JWTAuth).
 			for _, skip := range config.SkipPaths {
-				if req.URL.Path == skip || strings.HasPrefix(req.URL.Path, skip) {
+				if req.URL.Path == skip ||
+					strings.HasPrefix(req.URL.Path, strings.TrimSuffix(skip, "/")+"/") {
 					return next(c)
 				}
 			}

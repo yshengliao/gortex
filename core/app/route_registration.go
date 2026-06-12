@@ -86,18 +86,29 @@ func registerRoutesRecursiveWithMiddleware(r httpctx.GortexRouter, manager any, 
 			fullPath := pathPrefix + urlTag
 
 			// Check for middleware tag on the group/handler and build the middleware chain.
-			currentMiddleware := parentMiddleware
+			//
+			// Clone the parent chain into a fresh slice rather than appending
+			// directly onto parentMiddleware: a bare append can share the
+			// parent's backing array, so sibling fields extending the same
+			// parent would clobber each other's middleware. A clone gives each
+			// field an independent chain.
+			currentMiddleware := make([]middleware.MiddlewareFunc, len(parentMiddleware), len(parentMiddleware)+1)
+			copy(currentMiddleware, parentMiddleware)
 			if middlewareTag := field.Tag.Get("middleware"); middlewareTag != "" {
-				if mw := parseMiddleware(middlewareTag, ctx); mw != nil {
-					currentMiddleware = append(currentMiddleware, mw...)
+				mw, err := parseMiddleware(middlewareTag, ctx)
+				if err != nil {
+					return fmt.Errorf("middleware tag on %s (%q): %w", field.Name, middlewareTag, err)
 				}
+				currentMiddleware = append(currentMiddleware, mw...)
 			}
 
 			// Check for ratelimit tag
 			if rateLimitTag := field.Tag.Get("ratelimit"); rateLimitTag != "" {
-				if rlMiddleware := parseRateLimit(rateLimitTag, ctx); rlMiddleware != nil {
-					currentMiddleware = append(currentMiddleware, rlMiddleware)
+				rlMiddleware, err := parseRateLimit(rateLimitTag, ctx, app)
+				if err != nil {
+					return fmt.Errorf("ratelimit tag on %s (%q): %w", field.Name, rateLimitTag, err)
 				}
+				currentMiddleware = append(currentMiddleware, rlMiddleware)
 			}
 
 			// Check if it's a WebSocket handler.
@@ -363,10 +374,14 @@ func createHandlerFunc(handler any, method reflect.Method) middleware.HandlerFun
 	}
 }
 
-// parseMiddleware parses middleware from tag string
-func parseMiddleware(tag string, ctx *appcontext.Context) []middleware.MiddlewareFunc {
-	// This is a simple implementation that could be extended
-	// to support multiple middleware separated by commas
+// parseMiddleware resolves a comma-separated `middleware:"..."` tag into a
+// chain of MiddlewareFunc.
+//
+// It fails loudly: any name that cannot be resolved returns an error instead
+// of silently registering the route without that middleware. A typo or a
+// missing wiring step that drops `auth` would otherwise expose a route that
+// the developer believes is protected.
+func parseMiddleware(tag string, ctx *appcontext.Context) ([]middleware.MiddlewareFunc, error) {
 	middlewares := []middleware.MiddlewareFunc{}
 
 	// Split by comma for multiple middleware
@@ -388,10 +403,15 @@ func parseMiddleware(tag string, ctx *appcontext.Context) []middleware.Middlewar
 		// Fall back to predefined middleware
 		switch name {
 		case "auth":
-			// Try to get auth middleware from context
-			if authMW, err := appcontext.Get[middleware.MiddlewareFunc](ctx); err == nil {
-				middlewares = append(middlewares, authMW)
+			// The auth middleware must be registered in the app context as a
+			// middleware.MiddlewareFunc. If it is missing we cannot protect
+			// the route, so fail rather than register it unprotected.
+			authMW, err := appcontext.Get[middleware.MiddlewareFunc](ctx)
+			if err != nil {
+				return nil, fmt.Errorf("middleware %q requested but no auth middleware is registered; "+
+					"register a middleware.MiddlewareFunc in the app context (e.g. appcontext.Register(ctx, middleware.JWTAuth(jwtService)))", name)
 			}
+			middlewares = append(middlewares, authMW)
 		case "requestid":
 			// Add request ID middleware
 			middlewares = append(middlewares, middleware.RequestID())
@@ -413,34 +433,39 @@ func parseMiddleware(tag string, ctx *appcontext.Context) []middleware.Middlewar
 				})
 			}
 		case "rbac":
-			// Role-based access control would need to be configured
-			if logger, _ := appcontext.Get[*zap.Logger](ctx); logger != nil {
-				logger.Warn("RBAC middleware requested but not configured", zap.String("middleware", name))
-			}
+			// No RBAC implementation ships with Gortex, so this name can only
+			// be satisfied by a custom middleware registered under "rbac".
+			// Reaching here means it was not, so fail loudly.
+			return nil, fmt.Errorf("middleware %q requested but RBAC is not implemented; "+
+				"register a custom middleware under %q in the app context (e.g. a role check) instead", name, name)
+		default:
+			return nil, fmt.Errorf("unknown middleware %q; known names are auth, requestid, recover, rbac, "+
+				"or register a custom middleware under that name in the app context", name)
 		}
 	}
 
-	return middlewares
+	return middlewares, nil
 }
 
-// parseRateLimit parses rate limit tag and returns rate limit middleware
-func parseRateLimit(tag string, ctx *appcontext.Context) middleware.MiddlewareFunc {
+// parseRateLimit parses a `ratelimit:"100/min"` tag and returns the rate-limit
+// middleware. Malformed tags fail loudly rather than silently leaving the
+// route unlimited.
+//
+// The middleware lazily creates a MemoryRateLimiter (which starts a background
+// cleanup goroutine). To avoid leaking one goroutine per tagged route for the
+// process lifetime, the created store is registered with the app so
+// App.Shutdown stops it.
+func parseRateLimit(tag string, ctx *appcontext.Context, app *App) (middleware.MiddlewareFunc, error) {
 	// Parse formats like "100/min", "10/sec", "1000/hour"
 	parts := strings.Split(tag, "/")
 	if len(parts) != 2 {
-		if logger, _ := appcontext.Get[*zap.Logger](ctx); logger != nil {
-			logger.Warn("Invalid rate limit format", zap.String("tag", tag))
-		}
-		return nil
+		return nil, fmt.Errorf("invalid rate limit format %q; expected <number>/<sec|min|hour>", tag)
 	}
 
 	// Parse limit number
 	limit, err := strconv.Atoi(parts[0])
 	if err != nil {
-		if logger, _ := appcontext.Get[*zap.Logger](ctx); logger != nil {
-			logger.Warn("Invalid rate limit number", zap.String("tag", tag), zap.Error(err))
-		}
-		return nil
+		return nil, fmt.Errorf("invalid rate limit number in %q: %w", tag, err)
 	}
 
 	// Parse time unit
@@ -459,10 +484,7 @@ func parseRateLimit(tag string, ctx *appcontext.Context) middleware.MiddlewareFu
 			burst = 1
 		}
 	default:
-		if logger, _ := appcontext.Get[*zap.Logger](ctx); logger != nil {
-			logger.Warn("Unknown rate limit time unit", zap.String("unit", parts[1]))
-		}
-		return nil
+		return nil, fmt.Errorf("unknown rate limit time unit %q in %q; expected sec, min or hour", parts[1], tag)
 	}
 
 	// Create rate limit config
@@ -476,7 +498,18 @@ func parseRateLimit(tag string, ctx *appcontext.Context) middleware.MiddlewareFu
 		},
 	}
 
-	return middleware.GortexRateLimitWithConfig(config)
+	mw := middleware.GortexRateLimitWithConfig(config)
+
+	// GortexRateLimitWithConfig writes the store it created back into
+	// config.Store; register it so its cleanup goroutine is stopped on
+	// shutdown instead of leaking.
+	if app != nil {
+		if s, ok := config.Store.(interface{ Stop() }); ok {
+			app.registerStoppable(s)
+		}
+	}
+
+	return mw, nil
 }
 
 // isHandlerGroup checks if a handler is a group (has nested fields with url tags)

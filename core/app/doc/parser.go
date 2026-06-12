@@ -127,32 +127,22 @@ func (p *TagParser) ParseRouteInfo(handlerType reflect.Type, method reflect.Meth
 	return routeInfo
 }
 
-// extractHTTPMethod extracts HTTP method from handler method name
+// extractHTTPMethod extracts HTTP method from handler method name.
+//
+// Standard HTTP verb names (GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS) map
+// to themselves. All other method names map to POST, which is the HTTP method
+// used by registerCustomMethodWithMiddleware at runtime — regardless of what
+// the Go method name implies.
 func (p *TagParser) extractHTTPMethod(methodName string) string {
-	// Standard HTTP method names
+	// Standard HTTP method names map to themselves.
 	httpMethods := []string{"GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"}
-
 	for _, method := range httpMethods {
 		if methodName == method {
 			return method
 		}
 	}
 
-	// Check for RESTful naming conventions
-	if strings.HasPrefix(methodName, "List") || strings.HasPrefix(methodName, "Get") {
-		return "GET"
-	}
-	if strings.HasPrefix(methodName, "Create") || strings.HasPrefix(methodName, "Add") {
-		return "POST"
-	}
-	if strings.HasPrefix(methodName, "Update") || strings.HasPrefix(methodName, "Edit") {
-		return "PUT"
-	}
-	if strings.HasPrefix(methodName, "Delete") || strings.HasPrefix(methodName, "Remove") {
-		return "DELETE"
-	}
-
-	// Default to POST for custom methods
+	// All custom (non-standard-verb) method names are registered as POST at runtime.
 	return "POST"
 }
 

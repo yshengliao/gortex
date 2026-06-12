@@ -52,15 +52,21 @@ func TestExtractHTTPMethod(t *testing.T) {
 		methodName string
 		want       string
 	}{
+		// Standard HTTP verb names map to themselves.
 		{"GET", "GET"},
 		{"POST", "POST"},
 		{"PUT", "PUT"},
 		{"DELETE", "DELETE"},
-		{"ListUsers", "GET"},
-		{"GetUser", "GET"},
+		{"PATCH", "PATCH"},
+		{"HEAD", "HEAD"},
+		{"OPTIONS", "OPTIONS"},
+		// All custom (non-standard-verb) methods map to POST, matching the runtime:
+		// registerCustomMethodWithMiddleware always registers as HTTP POST.
+		{"ListUsers", "POST"},
+		{"GetUser", "POST"},
 		{"CreateUser", "POST"},
-		{"UpdateUser", "PUT"},
-		{"DeleteUser", "DELETE"},
+		{"UpdateUser", "POST"},
+		{"DeleteUser", "POST"},
 		{"CustomMethod", "POST"},
 	}
 
