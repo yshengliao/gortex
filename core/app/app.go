@@ -272,6 +272,7 @@ func (app *App) setupRouter() {
 		app.router.Use(middleware.RecoverWithErrorPage())
 	}
 
+	// Register global error handler middleware
 	app.router.Use(middleware.ErrorHandlerWithConfig(&middleware.ErrorHandlerConfig{
 		Logger:                         app.logger,
 		HideInternalServerErrorDetails: !app.IsDevelopment(),
