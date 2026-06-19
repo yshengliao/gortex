@@ -214,19 +214,12 @@ func registerMethodWithMiddleware(r httpctx.GortexRouter, httpMethod, path strin
 	// Collect route info if app is provided, logging is enabled, or dev mode is on.
 	if app != nil && (app.enableRoutesLog || app.developmentMode) {
 		handlerName := reflect.TypeOf(handler).Elem().Name()
-		var middlewareNames []string
-		// TODO: Extract middleware names - for now just count them
-		if len(middleware) > 0 {
-			middlewareNames = []string{fmt.Sprintf("%d middleware", len(middleware))}
-		} else {
-			middlewareNames = []string{}
-		}
 
 		app.routeInfos = append(app.routeInfos, RouteLogInfo{
 			Method:      httpMethod,
 			Path:        path,
 			Handler:     handlerName,
-			Middlewares: middlewareNames,
+			Middlewares: extractMiddlewareNames(middleware),
 		})
 	}
 
@@ -287,18 +280,12 @@ func registerCustomMethodWithMiddleware(r httpctx.GortexRouter, path string, han
 	// Collect route info for custom methods (same condition as standard methods).
 	if app != nil && (app.enableRoutesLog || app.developmentMode) {
 		handlerName := reflect.TypeOf(handler).Elem().Name()
-		var middlewareNames []string
-		if len(middleware) > 0 {
-			middlewareNames = []string{fmt.Sprintf("%d middleware", len(middleware))}
-		} else {
-			middlewareNames = []string{}
-		}
 
 		app.routeInfos = append(app.routeInfos, RouteLogInfo{
 			Method:      "POST", // Custom methods are always registered as POST.
 			Path:        path,
 			Handler:     handlerName + "." + method.Name,
-			Middlewares: middlewareNames,
+			Middlewares: extractMiddlewareNames(middleware),
 		})
 	}
 
