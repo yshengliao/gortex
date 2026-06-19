@@ -5,6 +5,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); version
 
 ---
 
+## [v0.8.1-alpha] — 2026-06-19
+
+Patch release — no breaking changes.
+
+### Changed
+- **Route logging**: registered-route logging and the `/_routes` debug view now show the actual middleware function names, resolved via `runtime.FuncForPC`, instead of a placeholder count (`"N middleware"`) or index-based names (`middleware_0`). Package paths and the method-value `-fm` suffix are trimmed for readability. Affects `RouteLogInfo.Middlewares` in `core/app` (#26).
+
+---
+
 ## [v0.8.0-alpha] — 2026-06-10
 
 Third-round security and correctness audit. This release is a **minor bump** because it contains multiple breaking changes to the JWT, middleware-tag, and rate-limit APIs.
