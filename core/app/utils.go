@@ -1,8 +1,8 @@
 package app
 
 import (
-	"fmt"
 	"reflect"
+	"runtime"
 	"strings"
 
 	"github.com/yshengliao/gortex/middleware"
@@ -65,11 +65,16 @@ func methodNameToPath(name string) string {
 // extractMiddlewareNames extracts middleware names from a slice of middleware functions
 func extractMiddlewareNames(middlewares []middleware.MiddlewareFunc) []string {
 	names := make([]string, 0, len(middlewares))
-	for i, mw := range middlewares {
+	for _, mw := range middlewares {
 		if mw != nil {
-			// Try to extract name from function type
-			// Since Go doesn't provide function names at runtime, we use generic names
-			names = append(names, fmt.Sprintf("middleware_%d", i))
+			// Extract name from function pointer
+			name := runtime.FuncForPC(reflect.ValueOf(mw).Pointer()).Name()
+			// Clean up package path, just keep the last part
+			parts := strings.Split(name, "/")
+			name = parts[len(parts)-1]
+			// Optional: remove -fm (method value) suffix
+			name = strings.TrimSuffix(name, "-fm")
+			names = append(names, name)
 		}
 	}
 	return names

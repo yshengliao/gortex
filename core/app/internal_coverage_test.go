@@ -45,8 +45,8 @@ func TestExtractMiddlewareNames(t *testing.T) {
 	noop := func(next middleware.HandlerFunc) middleware.HandlerFunc { return next }
 	got := extractMiddlewareNames([]middleware.MiddlewareFunc{noop, nil, noop})
 	// nil middleware is skipped; the two non-nil entries produce
-	// generic placeholder names derived from their slice index.
-	assert.Equal(t, []string{"middleware_0", "middleware_2"}, got)
+	// the actual function name derived from reflection.
+	assert.Equal(t, []string{"app.TestExtractMiddlewareNames.func1", "app.TestExtractMiddlewareNames.func1"}, got)
 	assert.Empty(t, extractMiddlewareNames(nil))
 }
 
