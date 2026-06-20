@@ -142,7 +142,7 @@ With `cfg.Logger.Level = "debug"`:
 - Request logging with body capture (request bodies only; response-body logging is not supported — `LogResponseBody` is a no-op)
 
 ### Performance Optimizations
-- **Zero-Allocation Routing**: 0 allocs/op for trie traversal on static, param, wildcard, and deep-param routes (~65 ns/op on Apple M3 Pro; numbers from a maintainer machine, not reproduced in CI — full request context setup adds ~3 allocs/op from map and response-writer initialization)
+- **Zero-Allocation Routing**: 0 allocs/op for trie traversal on static, param, wildcard, and deep-param routes (~65 ns/op on Apple M3 Pro; numbers from a maintainer machine, not reproduced in CI — full request context setup adds ~3 allocs/op from context map and `responseWriter` initialization)
 - **Context Pool**: Embedded `responseWriter` value eliminates per-request allocation
 - **Smart Params**: Inline [4]string array for ≤4 params; overflow to ordered slice (preserves insertion order)
 - **Segment-Trie Router**: Predictable O(segments) matching without regex backtracking
@@ -286,6 +286,7 @@ handlers.UserService.DB = dbConnection
 - **Examples Updated**: Verify affected examples still work
 - **Documentation Current**: Keep README.md performance metrics updated
 - **Zero Regressions**: `go test ./...` must pass before commits
+- **OpenAPI/Swagger**: Skeleton exists in `core/app/doc/`; spec generation is not yet functional — do not depend on it
 
 ### Performance Targets
 - **Routing**: ~65 ns/op trie traversal on Apple M3 Pro (not reproduced in CI; Linux/x86 runs ~275–315 ns/op with 3 allocs/op from context setup)
@@ -312,7 +313,6 @@ handlers.UserService.DB = dbConnection
 - ❌ Not implementing complex optimizations that confuse developers
 - ❌ Not sacrificing developer experience for minor gains
 - ❌ Not increasing learning curve unnecessarily
-- ❌ OpenAPI/Swagger spec generation: skeleton exists (`core/app/doc/`), not yet functional
 
 ---
 
