@@ -1,6 +1,6 @@
 # Gortex Framework - Development Guide
 
-> **Framework**: Gortex | **Language**: Go 1.25 | **Status**: v0.8.1-alpha | **Updated**: 2026-06-19
+> **Framework**: Gortex | **Language**: Go 1.25 | **Status**: v0.8.2-alpha | **Updated**: 2026-06-20
 
 Development guide for Gortex — a high-performance Go web framework with declarative struct-tag routing.
 
@@ -316,4 +316,4 @@ handlers.UserService.DB = dbConnection
 
 ---
 
-**Last Updated**: 2026-06-19 | **Framework**: Gortex v0.8.1-alpha | **Go**: 1.25+
+**Last Updated**: 2026-06-20 | **Framework**: Gortex v0.8.2-alpha | **Go**: 1.25+
