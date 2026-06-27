@@ -173,7 +173,7 @@ type HandlersManager struct {
 
 ### 6. OpenAPI / Swagger 自動產生
 
-`core/app/doc/` 已有 `swagger.Provider` 的骨架，但 spec 產生邏輯尚未完成。從 struct tag + method 簽章自動推導出 OpenAPI spec 是一個很有深度的題目。
+`core/app/doc/` 提供路由 metadata 解析器，但 OpenAPI spec 產生尚未實作（先前未使用的 `swagger.Provider` 骨架已於 v0.8.2-alpha 移除）。從 struct tag + method 簽章自動推導出 OpenAPI spec 是一個很有深度的題目。
 
 ---
 

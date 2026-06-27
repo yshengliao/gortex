@@ -88,9 +88,3 @@ func (w *responseWriter) reset(writer http.ResponseWriter) {
 	w.size = 0
 	w.written = false
 }
-
-// Before is a no-op for basic implementation
-func (w *responseWriter) Before(func()) {}
-
-// After is a no-op for basic implementation
-func (w *responseWriter) After(func()) {}

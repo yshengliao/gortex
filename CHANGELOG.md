@@ -5,6 +5,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); version
 
 ---
 
+## [v0.8.2-alpha] — 2026-06-27
+
+Dead-code cleanup. No behavioural changes — every removed symbol was unreferenced by production code (verified by repo-wide reference checks).
+
+### Removed
+- **Handler-method cache** (`core/app/route_cache.go`): `HandlerCache`, `handlerCache`, `HandlerMethod`, `GetHandlerMethods`, and `ClearCache`. The cache was never reached by production route registration — `registerHTTPHandlerWithMiddleware` builds method metadata via reflection directly; only tests referenced the cache.
+- **`core/app/interfaces`** package (`Service`, `HealthChecker`, `ConfigProvider`, `EventBus`, `CacheService`, `MetricsCollector`, `Logger`): aspirational interfaces with zero implementations or references anywhere in the module.
+- **`core/app/doc/swagger`** package (`SwaggerProvider`, `SwaggerUIHandler`, `NewSwaggerUIHandler`, …): unreachable — never imported, and `WithDocProvider` was never wired to it. The `core/app/doc` parser/provider (used by route logging) is retained.
+- **`core/app/testutil`** package (`NewMinimalApp`, `NewTestApp`, `NewTestAppWithConfig`, `TestHandler`, `EchoHandler`, `ErrorHandler`, `PanicHandler`): never imported; tests construct apps via `app.NewApp` directly.
+- **`internal/testutil/assert`** and **`internal/testutil/fixture`** packages, plus the unused `internal/testutil` helpers `TestApp`, `Request`, `RequestWithHeaders`, `JSONResponse`: no importers. `MockContext`/`NewMockContext` (used by `transport/http` tests) are retained.
+- **`responseWriter.Before` / `responseWriter.After`**: empty no-op methods left over from the Echo migration; satisfied no interface and had no callers.
+
+---
+
 ## [v0.8.1-alpha] — 2026-06-19
 
 Patch release — no breaking changes.

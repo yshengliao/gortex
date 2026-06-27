@@ -173,7 +173,7 @@ The current `pkg/errors` is a simple code-to-message registry. More advanced des
 
 ### 6. OpenAPI / Swagger Auto-generation
 
-`core/app/doc/` already has a `swagger.Provider` skeleton, but the spec generation logic is not yet complete. Automatically deriving an OpenAPI spec from struct tags and method signatures is a topic with significant depth.
+`core/app/doc/` provides a route-metadata parser, but OpenAPI spec generation is not implemented (an earlier unused `swagger.Provider` skeleton was removed in v0.8.2-alpha). Automatically deriving an OpenAPI spec from struct tags and method signatures is a topic with significant depth.
 
 ---
 

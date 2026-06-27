@@ -82,61 +82,6 @@ func TestIsValidGortexHandler(t *testing.T) {
 	assert.False(t, isValidGortexHandler(tworet), "two returns must be rejected")
 }
 
-// --- route_cache.go ----------------------------------------------------
-
-type cacheTestHandler struct{}
-
-func (cacheTestHandler) GET(c httpctx.Context) error          { return nil }
-func (cacheTestHandler) POST(c httpctx.Context) error         { return nil }
-func (cacheTestHandler) CreateWidget(c httpctx.Context) error { return nil }
-func (cacheTestHandler) UpdateWidget(c httpctx.Context) error { return nil }
-func (cacheTestHandler) DeleteWidget(c httpctx.Context) error { return nil }
-func (cacheTestHandler) ListWidgets(c httpctx.Context) error  { return nil }
-func (cacheTestHandler) notExported(c httpctx.Context) error  { return nil } //nolint:unused
-
-func TestHandlerCacheBuildsStandardAndCustomMethods(t *testing.T) {
-	ClearCache()
-	t.Cleanup(ClearCache)
-
-	ty := reflect.TypeOf(cacheTestHandler{})
-	methods := handlerCache.GetHandlerMethods(ty)
-
-	require.Contains(t, methods, "GET")
-	assert.Equal(t, "GET", methods["GET"].HTTPMethod)
-	require.Contains(t, methods, "POST")
-	assert.Equal(t, "POST", methods["POST"].HTTPMethod)
-
-	// All custom (non-HTTP-verb) methods map to POST, matching the runtime:
-	// registerCustomMethodWithMiddleware always calls r.POST.
-	require.Contains(t, methods, "CreateWidget")
-	assert.Equal(t, "POST", methods["CreateWidget"].HTTPMethod)
-	require.Contains(t, methods, "UpdateWidget")
-	assert.Equal(t, "POST", methods["UpdateWidget"].HTTPMethod)
-	require.Contains(t, methods, "DeleteWidget")
-	assert.Equal(t, "POST", methods["DeleteWidget"].HTTPMethod)
-	require.Contains(t, methods, "ListWidgets")
-	assert.Equal(t, "POST", methods["ListWidgets"].HTTPMethod)
-	assert.Equal(t, "/list-widgets", methods["ListWidgets"].Path)
-}
-
-func TestHandlerCacheReturnsCachedCopy(t *testing.T) {
-	ClearCache()
-	t.Cleanup(ClearCache)
-
-	ty := reflect.TypeOf(cacheTestHandler{})
-	first := handlerCache.GetHandlerMethods(ty)
-	second := handlerCache.GetHandlerMethods(ty)
-
-	// Both calls return the same map — the second hits the cache.
-	assert.Equal(t, len(first), len(second))
-	// Go maps compare by reference; if the cache hit returns the same
-	// instance reflect.ValueOf gives equal pointers.
-	assert.Equal(t,
-		reflect.ValueOf(first).Pointer(),
-		reflect.ValueOf(second).Pointer(),
-		"second lookup should hit the cache, not rebuild")
-}
-
 // --- route_registration.go: parseMiddleware & parseRateLimit -----------
 
 func TestParseMiddlewareBuiltins(t *testing.T) {
