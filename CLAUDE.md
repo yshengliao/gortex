@@ -24,7 +24,7 @@ type HandlersManager struct {
 
 ### Key Features
 - **Zero Dependencies**: No Redis, Kafka, external services
-- **Fast Routing**: Segment-trie router with zero-allocation hot path (~65 ns/op, 0 allocs/op per in-repo benchmarks on Apple M3 Pro)
+- **Fast Routing**: Segment-trie router with zero-allocation hot path (~65 ns/op, 0 allocs/op for trie traversal on Apple M3 Pro; not reproduced in CI — see Performance Optimizations)
 - **WebSocket Native**: First-class real-time support
 - **Type-Safe**: Compile-time route validation
 - **Auto-Initialization**: Handlers automatically initialized
@@ -142,9 +142,9 @@ With `cfg.Logger.Level = "debug"`:
 - Request logging with body capture (request bodies only; response-body logging is not supported — `LogResponseBody` is a no-op)
 
 ### Performance Optimizations
-- **Zero-Allocation Routing**: 0 allocs/op for static, param, wildcard, and deep-param routes (~65 ns/op per in-repo benchmarks on Apple M3 Pro)
+- **Zero-Allocation Routing**: 0 allocs/op for trie traversal on static, param, wildcard, and deep-param routes (~65 ns/op on Apple M3 Pro; numbers from a maintainer machine, not reproduced in CI — full request context setup adds ~3 allocs/op from the context map and `responseWriter` initialization)
 - **Context Pool**: Embedded `responseWriter` value eliminates per-request allocation
-- **Smart Params**: Inline [4]string array for ≤4 params; overflow to map
+- **Smart Params**: Inline [4]string array for ≤4 params; overflow to ordered slice (preserves insertion order)
 - **Segment-Trie Router**: Predictable O(segments) matching without regex backtracking
 
 ## Testing
@@ -249,8 +249,7 @@ handlers.UserService.DB = dbConnection
 
 ### Completed Features (v0.8.0-alpha)
 **Core Features**
-- Struct tag routing with segment-trie router (zero-allocation hot path, 0 allocs/op, ~65 ns/op per in-repo benchmarks on Apple M3 Pro)
-- **Zero-allocation routing hot path** (0 allocs/op, ~65 ns/op on M3 Pro)
+- Struct tag routing with segment-trie router (zero-allocation trie-traversal hot path, ~65 ns/op on Apple M3 Pro; not reproduced in CI)
 - WebSocket support with hub pattern, size limits, type whitelist, authoriser hook
 - JWT authentication with ≥32-byte secret enforcement
 - Zero-dependency config loader (YAML, .env, env vars, CLI args)
@@ -287,10 +286,11 @@ handlers.UserService.DB = dbConnection
 - **Examples Updated**: Verify affected examples still work
 - **Documentation Current**: Keep README.md performance metrics updated
 - **Zero Regressions**: `go test ./...` must pass before commits
+- **OpenAPI/Swagger**: spec generation is not implemented — `core/app/doc/` provides route-metadata parsing only; do not depend on OpenAPI output
 
 ### Performance Targets
-- **Routing**: <100 ns/op (currently ~65 ns/op, 0 allocs)
-- **Memory**: Zero allocations on routing hot path
+- **Routing**: ~65 ns/op trie traversal on Apple M3 Pro (not reproduced in CI; Linux/x86 runs ~275–315 ns/op with 3 allocs/op from context setup)
+- **Memory**: Zero allocations in the trie-traversal hot path; full request context setup adds ~3 allocs
 - **Throughput**: >10k RPS on standard hardware
 
 ## Framework Context
