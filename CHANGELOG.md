@@ -5,7 +5,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); version
 
 ---
 
-## [v0.8.2-alpha] — 2026-06-20
+## [v0.8.2-alpha] — 2026-06-27
 
 Dead-code cleanup. No behavioural changes — every removed symbol was unreferenced by production code (verified by repo-wide reference checks).
 
