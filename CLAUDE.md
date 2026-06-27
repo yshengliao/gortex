@@ -290,7 +290,7 @@ handlers.UserService.DB = dbConnection
 
 ### Performance Targets
 - **Routing**: ~65 ns/op trie traversal on Apple M3 Pro (not reproduced in CI; Linux/x86 runs ~275–315 ns/op with 3 allocs/op from context setup)
-- **Memory**: zero allocations in the trie-traversal hot path; full request context setup adds ~3 allocs
+- **Memory**: Zero allocations in the trie-traversal hot path; full request context setup adds ~3 allocs
 - **Throughput**: >10k RPS on standard hardware
 
 ## Framework Context
